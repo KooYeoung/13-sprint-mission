@@ -24,6 +24,11 @@ public class JavaApplication {
 
       runChannelServiceCrudTest(channelService);
 
+      runMessageServiceCrudTest(userService, channelService, messageService);
+
+   }
+
+   private static void runMessageServiceCrudTest(UserService userService, ChannelService channelService, MessageService messageService) {
       // 기존 등록한 유저 및 채널을 가져옴.
       // 유저와 채널이 없을경우 메시지 등록은 미진행.
       User user = userService.findAll().get(0);
@@ -57,10 +62,14 @@ public class JavaApplication {
       Message updateFoundMessage = messageService.findById(foundMessage.getId());
       System.out.println("updateFoundMessage = " + updateFoundMessage);
 
+      //7. 삭제
+      messageService.delete(updateFoundMessage.getId());
 
+      //8. 삭제 후 재 조회
+      Message deleteMessage = messageService.findById(updateFoundMessage.getId());
+      System.out.println("deleteMessage = " + deleteMessage);
+      System.out.println("deleteMessage = " + (deleteMessage == null));
    }
-
-
 
 
    private static void runChannelServiceCrudTest(ChannelService channelService) {
