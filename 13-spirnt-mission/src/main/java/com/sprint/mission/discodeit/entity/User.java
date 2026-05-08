@@ -49,4 +49,19 @@ public class User extends BaseEntity{
    public String getPhoneNumber() {
       return phoneNumber;
    }
+
+   @Override
+   public String toString() {
+      return "User{" +
+            "id='" + getId() + '\'' +
+            "username='" + username + '\'' +
+            ", nickname='" + nickname + '\'' +
+            ", realName='" + realName + '\'' +
+            ", password='" + password + '\'' +
+            ", email='" + email + '\'' +
+            ", phoneNumber='" + phoneNumber + '\'' +
+            ", createdAt='" + getCreatedAt() + '\'' +
+            ", updatedAt='" + getUpdatedAt() + '\'' +
+            '}';
+   }
 }

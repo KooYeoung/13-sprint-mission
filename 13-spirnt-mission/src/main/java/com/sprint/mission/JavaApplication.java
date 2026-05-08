@@ -4,6 +4,8 @@ import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.service.UserService;
 import com.sprint.mission.discodeit.service.jcf.JCFUserService;
 
+import java.util.List;
+
 public class JavaApplication {
    
    public static void main(String[] args) {
@@ -18,6 +20,15 @@ public class JavaApplication {
          userService.save(userCreate(i));
       }
 
+      //3. 단일 조회
+      User foundUser = userService.findById(user.getId());
+      System.out.println("foundUser = " + foundUser);
+
+      //4. 다건 조회
+      List<User> userList = userService.findAll();
+      for (User u : userList){
+         System.out.println("foundUser = " + u);
+      }
 
 
    }
