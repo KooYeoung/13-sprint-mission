@@ -2,6 +2,8 @@ package com.sprint.mission.discodeit.service.jcf;
 
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.repository.ChannelRepository;
+import com.sprint.mission.discodeit.repository.jfc.JCFChannelRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
 
 import java.util.HashMap;
@@ -9,34 +11,33 @@ import java.util.List;
 import java.util.UUID;
 
 public class JCFChannelService implements ChannelService {
+   private final ChannelRepository channelRepository = new JCFChannelRepository();
 
-   private final static HashMap<UUID, Channel> channelHashMap = new HashMap<>();
 
    @Override
    public void save(Channel channel) {
-      channelHashMap.put(channel.getId(), channel);
+      channelRepository.save(channel);
+
    }
 
    @Override
    public Channel findById(UUID channelId) {
-      return channelHashMap.get(channelId);
+      return channelRepository.findById(channelId);
    }
 
    @Override
    public List<Channel> findAll() {
-      return channelHashMap.values().stream().toList();
+      return channelRepository.findAll();
    }
 
    @Override
    public void update(UUID channelId, String channelName, String description, ChannelType channelType) {
       Channel byId = findById(channelId);
       if(byId == null) return;
-      System.out.println("byId = " + byId);
 
       byId.update(channelName,description,channelType);
 
-      channelHashMap.put(byId.getId(), byId);
-
+      channelRepository.save(byId);
    }
 
    @Override
@@ -44,6 +45,7 @@ public class JCFChannelService implements ChannelService {
       Channel byId = findById(channelId);
       if(byId == null) return;
 
-      channelHashMap.remove(byId.getId());
+      channelRepository.delete(byId.getId());
+
    }
 }
