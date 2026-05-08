@@ -2,10 +2,13 @@ package com.sprint.mission;
 
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.service.ChannelService;
+import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
 import com.sprint.mission.discodeit.service.jcf.JCFChannelService;
+import com.sprint.mission.discodeit.service.jcf.JCFMessageService;
 import com.sprint.mission.discodeit.service.jcf.JCFUserService;
 
 import java.util.List;
@@ -15,9 +18,34 @@ public class JavaApplication {
    public static void main(String[] args) {
       UserService userService = new JCFUserService();
       ChannelService channelService = new JCFChannelService();
+      MessageService messageService = new JCFMessageService(userService, channelService);
 
       runUserServiceCrudTest(userService);
 
+      runChannelServiceCrudTest(channelService);
+
+      // 기존 등록한 유저 및 채널을 가져옴.
+      // 유저와 채널이 없을경우 메시지 등록은 미진행.
+      User user = userService.findAll().get(0);
+      Channel channel = channelService.findAll().get(0);
+
+      //1. 메시지 단일 등록
+      Message message = createMessage(user, channel);
+      messageService.save(message);
+      System.out.println("message = " + message);
+
+      //2. 리스트 조회를 위해 다량 등록.
+      for (int i = 1; i <= 10; i++) {
+         messageService.save(createMessage(user, channel, i));
+      }
+
+
+   }
+
+
+
+
+   private static void runChannelServiceCrudTest(ChannelService channelService) {
       //1. 채널 단일 등록
       Channel channel = channelCreate();
       channelService.save(channel);
@@ -55,13 +83,7 @@ public class JavaApplication {
       Channel deleteChannel = channelService.findById(updateFoundChannel.getId());
       System.out.println("deleteChannel = " + deleteChannel);
       System.out.println("deleteChannel = " + (deleteChannel == null));
-
-
-
-
-
    }
-
 
 
    private static void runUserServiceCrudTest(UserService userService) {
@@ -120,6 +142,16 @@ public class JavaApplication {
 
    private static Channel channelCreate(){
       return  channelCreate(0);
+   }
+
+
+   private static Message createMessage(User user, Channel channel, int i) {
+      String count = i == 0 ? "" : ""+i;
+      return new Message("message" + count, user, channel);
+   }
+
+   private static Message createMessage(User user, Channel channel) {
+      return createMessage(user, channel, 0);
    }
 
 
