@@ -49,6 +49,14 @@ public class JavaApplication {
          System.out.println("foundMessage = " + m);
       }
 
+      //5. 수정
+      messageService.update(foundMessage.getId()
+            ,"updateMessageContent");
+
+      //6. 수정 조회
+      Message updateFoundMessage = messageService.findById(foundMessage.getId());
+      System.out.println("updateFoundMessage = " + updateFoundMessage);
+
 
    }
 
