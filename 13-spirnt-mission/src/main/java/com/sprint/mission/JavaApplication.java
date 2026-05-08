@@ -48,6 +48,14 @@ public class JavaApplication {
       Channel updateFoundChannel = channelService.findById(foundChannel.getId());
       System.out.println("updateFoundChannel = " + updateFoundChannel);
 
+      //7. 삭제
+      channelService.delete(updateFoundChannel.getId());
+
+      //8. 삭제 후 재 조회
+      Channel deleteChannel = channelService.findById(updateFoundChannel.getId());
+      System.out.println("deleteChannel = " + deleteChannel);
+      System.out.println("deleteChannel = " + (deleteChannel == null));
+
 
 
 
