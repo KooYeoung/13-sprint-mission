@@ -17,13 +17,13 @@ public class User extends BaseEntity{
       this.nickname = nickname;
    }
 
-   public void update(User updateUser){
+   public void update(String nickname,String realName, String password, String email, String phoneNumber){
       super.update();
-      this.nickname = updateUser.nickname;
-      this.realName = updateUser.realName;
-      this.password = updateUser.password;
-      this.email = updateUser.email;
-      this.phoneNumber = updateUser.phoneNumber;
+      this.nickname = nickname;
+      this.realName = realName;
+      this.password = password;
+      this.email = email;
+      this.phoneNumber = phoneNumber;
    }
 
    public String getUsername() {

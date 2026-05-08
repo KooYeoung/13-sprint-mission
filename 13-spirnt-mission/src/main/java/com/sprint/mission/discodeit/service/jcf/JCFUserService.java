@@ -32,10 +32,21 @@ public class JCFUserService implements UserService {
    }
 
    @Override
-   public void update(User updateUser) {
-      User byId = findById(updateUser.getId());
+   public void update(UUID userId, String nickname, String realName, String password, String email, String phoneNumber) {
+      User byId = findById(userId);
+      if(byId == null) return;
 
-      byId.update(updateUser);
+      System.out.println("byId = " + byId);
+
+      byId.update(nickname
+            , realName
+            , password
+            , email
+            , phoneNumber);
+
+      // Map에서 조회한 User 객체의 필드 값을 직접 수정했기 때문에,
+      // Map에 저장된 객체에도 변경 내용이 이미 반영된다.
+      // 단, 갱신 의도를 명확히 하기 위해 동일한 key로 다시 저장한다.
 
       userHashMap.put(byId.getId(), byId);
    }

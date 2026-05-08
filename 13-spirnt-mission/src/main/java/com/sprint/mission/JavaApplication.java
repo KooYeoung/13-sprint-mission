@@ -30,6 +30,18 @@ public class JavaApplication {
          System.out.println("foundUser = " + u);
       }
 
+      //5. 수정
+      userService.update(foundUser.getId()
+            ,"updateNickname"
+            , foundUser.getRealName()
+            , foundUser.getPassword()
+            , foundUser.getEmail()
+            , foundUser.getPhoneNumber());
+
+      //6. 수정 조회
+      User updateFoundUser = userService.findById(foundUser.getId());
+      System.out.println("updateFoundUser = " + updateFoundUser);
+
 
    }
 
