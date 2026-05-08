@@ -1,7 +1,11 @@
 package com.sprint.mission;
 
+import com.sprint.mission.discodeit.entity.Channel;
+import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.service.ChannelService;
 import com.sprint.mission.discodeit.service.UserService;
+import com.sprint.mission.discodeit.service.jcf.JCFChannelService;
 import com.sprint.mission.discodeit.service.jcf.JCFUserService;
 
 import java.util.List;
@@ -10,7 +14,29 @@ public class JavaApplication {
    
    public static void main(String[] args) {
       UserService userService = new JCFUserService();
+      ChannelService channelService = new JCFChannelService();
 
+      runUserServiceCrudTest(userService);
+
+      //1. 채널 단일 등록
+      Channel channel = channelCreate();
+      channelService.save(channel);
+      System.out.println("channel = " + channel);
+
+      //2. 리스트 조회를 위해 다량 등록.
+      for (int i = 1; i <= 10; i++) {
+         channelService.save(channelCreate(i));
+      }
+
+
+
+
+
+   }
+
+
+
+   private static void runUserServiceCrudTest(UserService userService) {
       //1. 유저 단일 등록
       User user = userCreate();
       userService.save(user);
@@ -49,8 +75,6 @@ public class JavaApplication {
       User deleteUser = userService.findById(updateFoundUser.getId());
       System.out.println("deleteUser = " + deleteUser);
       System.out.println("deleteUser = " + (deleteUser == null));
-
-
    }
 
    private static User userCreate(int i) {
@@ -59,6 +83,15 @@ public class JavaApplication {
    }
    private static User userCreate(){
       return  userCreate(0);
+   }
+
+   private static Channel channelCreate(int i) {
+      String count = i == 0 ? "" : ""+i;
+      return new Channel("channelName" + count, "channelDescription" + count, i % 2 == 0 ?  ChannelType.PUBLIC : ChannelType.PRIVATE);
+   }
+
+   private static Channel channelCreate(){
+      return  channelCreate(0);
    }
 
 
