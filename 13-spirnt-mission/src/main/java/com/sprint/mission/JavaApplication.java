@@ -28,6 +28,16 @@ public class JavaApplication {
          channelService.save(channelCreate(i));
       }
 
+      //3. 단일 조회
+      Channel foundChannel = channelService.findById(channel.getId());
+      System.out.println("foundChannel = " + foundChannel);
+
+      //4. 다건 조회
+      List<Channel> channelList = channelService.findAll();
+      for (Channel c : channelList){
+         System.out.println("foundChannel = " + c);
+      }
+
 
 
 
