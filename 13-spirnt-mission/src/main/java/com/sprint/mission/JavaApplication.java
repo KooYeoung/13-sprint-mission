@@ -38,6 +38,16 @@ public class JavaApplication {
          System.out.println("foundChannel = " + c);
       }
 
+      //5. 수정
+      channelService.update(foundChannel.getId()
+            ,"updateChannelName"
+            , foundChannel.getDescription()
+            , foundChannel.getChannelType());
+
+      //6. 수정 조회
+      Channel updateFoundChannel = channelService.findById(foundChannel.getId());
+      System.out.println("updateFoundChannel = " + updateFoundChannel);
+
 
 
 

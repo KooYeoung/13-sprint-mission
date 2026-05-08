@@ -31,6 +31,7 @@ public class JCFChannelService implements ChannelService {
    public void update(UUID channelId, String channelName, String description, ChannelType channelType) {
       Channel byId = findById(channelId);
       if(byId == null) return;
+      System.out.println("byId = " + byId);
 
       byId.update(channelName,description,channelType);
 

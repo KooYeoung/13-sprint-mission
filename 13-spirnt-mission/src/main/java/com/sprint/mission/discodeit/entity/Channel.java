@@ -22,10 +22,23 @@ public class Channel extends BaseEntity{
    public String toString() {
       return "Channel{" +
             "id='" + getId() + '\'' +
+            ", channelName='" + channelName + '\'' +
             ", description='" + description + '\'' +
             ", channelType=" + channelType +
             ", createdAt=" + getCreatedAt() +
             ", updatedAt=" + getUpdatedAt() +
             '}';
+   }
+
+   public String getChannelName() {
+      return channelName;
+   }
+
+   public String getDescription() {
+      return description;
+   }
+
+   public ChannelType getChannelType() {
+      return channelType;
    }
 }
