@@ -1,33 +1,31 @@
 package com.sprint.mission.discodeit.service.jcf;
 
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.repository.jfc.JCFUserRepository;
 import com.sprint.mission.discodeit.service.UserService;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
 public class JCFUserService implements UserService {
-
-   private final static HashMap<UUID, User> userHashMap= new HashMap<>();
+   private final UserRepository userRepository = new JCFUserRepository();
 
    @Override
    public void save(User user) {
-      System.out.println("before userHashMap.size: " + userHashMap.size());
-      userHashMap.put(user.getId(), user);
-      System.out.println("after userHashMap.size: " + userHashMap.size());
+      userRepository.save(user);
    }
 
    @Override
    public User findById(UUID userId) {
 
-      return userHashMap.get(userId);
+      return userRepository.findById(userId);
    }
 
    @Override
    public List<User> findAll() {
 
-      return userHashMap.values().stream().toList();
+      return userRepository.findAll();
    }
 
    @Override
@@ -35,24 +33,20 @@ public class JCFUserService implements UserService {
       User byId = findById(userId);
       if(byId == null) return;
 
-      System.out.println("byId = " + byId);
-
       byId.update(nickname
             , realName
             , password
             , email
             , phoneNumber);
 
-      // Map에서 조회한 User 객체의 필드 값을 직접 수정했기 때문에,
-      // Map에 저장된 객체에도 변경 내용이 이미 반영된다.
-      // 단, 갱신 의도를 명확히 하기 위해 동일한 key로 다시 저장한다.
-
-      userHashMap.put(byId.getId(), byId);
+      userRepository.save(byId);
    }
 
    @Override
    public void delete(UUID userId) {
-      User user = userHashMap.get(userId);
-      if(user != null) userHashMap.remove(user.getId());
+      User user = findById(userId);
+      if(user == null) return;
+
+      userRepository.delete(user.getId());
    }
 }

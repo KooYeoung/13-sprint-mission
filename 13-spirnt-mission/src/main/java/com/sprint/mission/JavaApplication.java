@@ -19,9 +19,9 @@ import java.util.List;
 public class JavaApplication {
    
    public static void main(String[] args) {
-      UserService userService = new FileUserService();
-      ChannelService channelService = new FileChannelService();
-      MessageService messageService = new FileMessageService();
+      UserService userService = new JCFUserService();
+      ChannelService channelService = new JCFChannelService();
+      MessageService messageService = new JCFMessageService(userService, channelService);
 
       runUserServiceCrudTest(userService);
 
