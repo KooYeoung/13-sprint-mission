@@ -39,6 +39,16 @@ public class JavaApplication {
          messageService.save(createMessage(user, channel, i));
       }
 
+      //3. 단일 조회
+      Message foundMessage = messageService.findById(message.getId());
+      System.out.println("foundMessage = " + foundMessage);
+
+      //4. 다건 조회
+      List<Message> messageList = messageService.findAll();
+      for (Message m : messageList){
+         System.out.println("foundMessage = " + m);
+      }
+
 
    }
 
