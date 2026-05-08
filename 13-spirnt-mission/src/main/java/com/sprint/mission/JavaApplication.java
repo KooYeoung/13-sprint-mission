@@ -42,6 +42,14 @@ public class JavaApplication {
       User updateFoundUser = userService.findById(foundUser.getId());
       System.out.println("updateFoundUser = " + updateFoundUser);
 
+      //7. 삭제
+      userService.delete(updateFoundUser.getId());
+
+      //8. 삭제 후 재 조회
+      User deleteUser = userService.findById(updateFoundUser.getId());
+      System.out.println("deleteUser = " + deleteUser);
+      System.out.println("deleteUser = " + (deleteUser == null));
+
 
    }
 
