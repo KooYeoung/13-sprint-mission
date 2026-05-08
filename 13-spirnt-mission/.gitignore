@@ -44,3 +44,5 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+## 메모리 영역에 저장되는 폴더
+data/
