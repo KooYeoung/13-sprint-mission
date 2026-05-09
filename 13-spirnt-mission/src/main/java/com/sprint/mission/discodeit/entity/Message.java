@@ -1,5 +1,7 @@
 package com.sprint.mission.discodeit.entity;
 
+import java.util.UUID;
+
 public class Message extends BaseEntity{
    private String content;
    private User user;
@@ -35,8 +37,14 @@ public class Message extends BaseEntity{
    public User getUser() {
       return user;
    }
+   public UUID getUserId() {
+      return user.getId();
+   }
 
    public Channel getChannel() {
       return channel;
+   }
+   public UUID getChannelId() {
+      return channel.getId();
    }
 }

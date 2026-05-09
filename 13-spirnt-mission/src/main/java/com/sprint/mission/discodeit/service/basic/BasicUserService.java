@@ -31,19 +31,23 @@ public class BasicUserService implements UserService {
 
    @Override
    public void update(UUID userId, String nickname, String realName, String password, String email, String phoneNumber) {
-      User byId = findById(userId);
-      if (byId == null) return;
+      User user = findById(userId);
+      if (notExistUser(user)) return;
 
-      byId.update(nickname, realName, password, email, phoneNumber);
+      user.update(nickname, realName, password, email, phoneNumber);
 
-      userRepository.save(byId);
+      userRepository.save(user);
    }
 
    @Override
    public void delete(UUID userId) {
-      User byId = findById(userId);
-      if (byId == null) return;
+      User user = findById(userId);
+      if (notExistUser(user)) return;
 
-      userRepository.delete(byId.getId());
+      userRepository.delete(user.getId());
+   }
+
+   private boolean notExistUser(User user) {
+      return user == null;
    }
 }

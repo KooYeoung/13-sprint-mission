@@ -33,19 +33,23 @@ public class FileChannelService implements ChannelService {
 
    @Override
    public void update(UUID channelId, String channelName, String description, ChannelType channelType) {
-      Channel byId = findById(channelId);
-      if (byId == null) return;
+      Channel channel = findById(channelId);
+      if (notExistChannel(channel)) return;
 
-      byId.update(channelName, description, channelType);
+      channel.update(channelName, description, channelType);
 
-      channelRepository.save(byId);
+      channelRepository.save(channel);
    }
 
    @Override
    public void delete(UUID channelId) {
-      Channel byId = findById(channelId);
-      if (byId == null) return;
+      Channel channel = findById(channelId);
+      if (notExistChannel(channel)) return;
 
-      channelRepository.delete(byId.getId());
+      channelRepository.delete(channel.getId());
+   }
+
+   private boolean notExistChannel(Channel channel) {
+      return channel == null;
    }
 }

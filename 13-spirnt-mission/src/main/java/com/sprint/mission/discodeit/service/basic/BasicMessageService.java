@@ -41,7 +41,7 @@ public class BasicMessageService implements MessageService {
    @Override
    public void update(UUID messageId, String content) {
       Message message = findById(messageId);
-      if(message == null) return;
+      if(notExistMessage(message)) return;
       if(isUserOrChannelMissing(message)) return;
       message.update(content);
       messageRepository.save(message);
@@ -50,15 +50,19 @@ public class BasicMessageService implements MessageService {
    @Override
    public void delete(UUID messageId) {
       Message message = findById(messageId);
-      if(message == null) return;
+      if(notExistMessage(message)) return;
       if(isUserOrChannelMissing(message)) return;
       messageRepository.delete(messageId);
    }
 
    private boolean isUserOrChannelMissing(Message message) {
-      User user = userRepository.findById(message.getUser().getId());
-      Channel byId = channelRepository.findById(message.getChannel().getId());
-      return user == null || byId == null;
+      User user = userRepository.findById(message.getUserId());
+      Channel channel = channelRepository.findById(message.getChannelId());
+      return user == null || channel == null;
+   }
+
+   private  boolean notExistMessage(Message message) {
+      return message == null;
    }
 
 }

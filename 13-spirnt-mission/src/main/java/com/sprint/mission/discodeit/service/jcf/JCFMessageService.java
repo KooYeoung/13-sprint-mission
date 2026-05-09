@@ -44,21 +44,21 @@ public class JCFMessageService implements MessageService {
 
    @Override
    public void update(UUID messageId, String content) {
-      Message byId = findById(messageId);
-      if (byId == null) return;
-      if (isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
+      Message message = findById(messageId);
+      if (notExistMessage(message)) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
 
-      byId.update(content);
-      messageRepository.save(byId);
+      message.update(content);
+      messageRepository.save(message);
    }
 
    @Override
    public void delete(UUID messageId) {
-      Message byId = findById(messageId);
-      if (byId == null) return;
-      if (isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
+      Message message = findById(messageId);
+      if (notExistMessage(message)) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
 
-      messageRepository.delete(byId.getId());
+      messageRepository.delete(message.getId());
    }
 
    private boolean isUserOrChannelMissing(UUID userId, UUID channelId) {
@@ -66,4 +66,9 @@ public class JCFMessageService implements MessageService {
       Channel channel = channelRepository.findById(channelId);
       return user == null || channel == null;
    }
+
+   private boolean notExistMessage(Message message) {
+      return message == null;
+   }
+
 }
