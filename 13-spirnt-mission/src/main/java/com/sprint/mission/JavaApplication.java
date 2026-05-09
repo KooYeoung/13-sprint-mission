@@ -29,19 +29,19 @@ import com.sprint.mission.discodeit.service.jcf.JCFUserService;
 import java.util.List;
 
 public class JavaApplication {
-   
+
    public static void main(String[] args) {
       UserRepository jcfUserRepository = new JCFUserRepository();
       UserRepository fileUserRepository = new FileUserRepository();
-      UserService userService = new BasicUserService(fileUserRepository);
+      UserService userService = new FileUserService(fileUserRepository);
 
       ChannelRepository jcfChannelRepository = new JCFChannelRepository();
       ChannelRepository fileChannelRepository = new FileChannelRepository();
-      ChannelService channelService = new BasicChannelService(fileChannelRepository);
+      ChannelService channelService = new FileChannelService(fileChannelRepository);
 
       MessageRepository jcfMessageRepository = new JCFMessageRepository();
       MessageRepository fileMessageRepository = new FileMessageRepository();
-      MessageService messageService = new BasicMessageService(fileMessageRepository, fileUserRepository, fileChannelRepository);
+      MessageService messageService = new FileMessageService(fileMessageRepository, fileUserRepository, fileChannelRepository);
 
       runUserServiceCrudTest(userService);
 
@@ -73,13 +73,13 @@ public class JavaApplication {
 
       //4. 다건 조회
       List<Message> messageList = messageService.findAll();
-      for (Message m : messageList){
+      for (Message m : messageList) {
          System.out.println("foundMessage = " + m);
       }
 
       //5. 수정
       messageService.update(foundMessage.getId()
-            ,"updateMessageContent");
+            , "updateMessageContent");
 
       //6. 수정 조회
       Message updateFoundMessage = messageService.findById(foundMessage.getId());
@@ -112,13 +112,13 @@ public class JavaApplication {
 
       //4. 다건 조회
       List<Channel> channelList = channelService.findAll();
-      for (Channel c : channelList){
+      for (Channel c : channelList) {
          System.out.println("foundChannel = " + c);
       }
 
       //5. 수정
       channelService.update(foundChannel.getId()
-            ,"updateChannelName"
+            , "updateChannelName"
             , foundChannel.getDescription()
             , foundChannel.getChannelType());
 
@@ -152,13 +152,13 @@ public class JavaApplication {
 
       //4. 다건 조회
       List<User> userList = userService.findAll();
-      for (User u : userList){
+      for (User u : userList) {
          System.out.println("foundUser = " + u);
       }
 
       //5. 수정
       userService.update(foundUser.getId()
-            ,"updateNickname"
+            , "updateNickname"
             , foundUser.getRealName()
             , foundUser.getPassword()
             , foundUser.getEmail()
@@ -178,25 +178,26 @@ public class JavaApplication {
    }
 
    private static User userCreate(int i) {
-      String count = i == 0 ? "" : ""+i;
-      return new User("username" + count,"password","email@email","000-0000-0000","realName"+ count, "nickname"+ count);
+      String count = i == 0 ? "" : "" + i;
+      return new User("username" + count, "password", "email@email", "000-0000-0000", "realName" + count, "nickname" + count);
    }
-   private static User userCreate(){
-      return  userCreate(0);
+
+   private static User userCreate() {
+      return userCreate(0);
    }
 
    private static Channel channelCreate(int i) {
-      String count = i == 0 ? "" : ""+i;
-      return new Channel("channelName" + count, "channelDescription" + count, i % 2 == 0 ?  ChannelType.PUBLIC : ChannelType.PRIVATE);
+      String count = i == 0 ? "" : "" + i;
+      return new Channel("channelName" + count, "channelDescription" + count, i % 2 == 0 ? ChannelType.PUBLIC : ChannelType.PRIVATE);
    }
 
-   private static Channel channelCreate(){
-      return  channelCreate(0);
+   private static Channel channelCreate() {
+      return channelCreate(0);
    }
 
 
    private static Message createMessage(User user, Channel channel, int i) {
-      String count = i == 0 ? "" : ""+i;
+      String count = i == 0 ? "" : "" + i;
       return new Message("message" + count, user, channel);
    }
 

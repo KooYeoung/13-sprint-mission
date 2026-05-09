@@ -3,28 +3,30 @@ package com.sprint.mission.discodeit.service.jcf;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
-import com.sprint.mission.discodeit.repository.jcf.JCFMessageRepository;
-import com.sprint.mission.discodeit.service.ChannelService;
+import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.MessageService;
-import com.sprint.mission.discodeit.service.UserService;
+
 
 import java.util.List;
 import java.util.UUID;
 
 public class JCFMessageService implements MessageService {
 
-   private final MessageRepository messageRepository = new JCFMessageRepository();
-   private final UserService userService;
-   private final ChannelService channelService;
+   private final MessageRepository messageRepository;
+   private final UserRepository userRepository;
+   private final ChannelRepository channelRepository;
 
-   public JCFMessageService(UserService userService, ChannelService channelService) {
-      this.userService = userService;
-      this.channelService = channelService;
+   public JCFMessageService(MessageRepository messageRepository, UserRepository userRepository, ChannelRepository channelRepository) {
+      this.messageRepository = messageRepository;
+      this.userRepository = userRepository;
+      this.channelRepository = channelRepository;
    }
+
    @Override
    public void save(Message message) {
-      if(isUserOrChannelMissing(message.getUser().getId(), message.getChannel().getId())) return;
+      if (isUserOrChannelMissing(message.getUser().getId(), message.getChannel().getId())) return;
       messageRepository.save(message);
    }
 
@@ -43,8 +45,8 @@ public class JCFMessageService implements MessageService {
    @Override
    public void update(UUID messageId, String content) {
       Message byId = findById(messageId);
-      if(byId == null) return;
-      if(isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
+      if (byId == null) return;
+      if (isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
 
       byId.update(content);
       messageRepository.save(byId);
@@ -53,15 +55,15 @@ public class JCFMessageService implements MessageService {
    @Override
    public void delete(UUID messageId) {
       Message byId = findById(messageId);
-      if(byId == null) return;
-      if(isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
+      if (byId == null) return;
+      if (isUserOrChannelMissing(byId.getUser().getId(), byId.getChannel().getId())) return;
 
       messageRepository.delete(byId.getId());
    }
 
    private boolean isUserOrChannelMissing(UUID userId, UUID channelId) {
-      User user = userService.findById(userId);
-      Channel channel = channelService.findById(channelId);
+      User user = userRepository.findById(userId);
+      Channel channel = channelRepository.findById(channelId);
       return user == null || channel == null;
    }
 }

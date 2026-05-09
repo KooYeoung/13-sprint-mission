@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
+import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.file.FileChannelRepository;
 import com.sprint.mission.discodeit.repository.file.FileMessageRepository;
@@ -14,41 +15,47 @@ import java.util.List;
 import java.util.UUID;
 
 public class FileMessageService implements MessageService {
-   private final FileMessageRepository fileMessageRepository = new FileMessageRepository();
-   private final UserRepository userRepository = new FileUserRepository();
-   private final ChannelRepository channelRepository = new FileChannelRepository();
+   private final MessageRepository messageRepository;
+   private final UserRepository userRepository;
+   private final ChannelRepository channelRepository;
+
+   public FileMessageService(MessageRepository fileMessageRepository, UserRepository userRepository, ChannelRepository channelRepository) {
+      this.messageRepository = fileMessageRepository;
+      this.userRepository = userRepository;
+      this.channelRepository = channelRepository;
+   }
 
    @Override
    public void save(Message message) {
-      if(isUserOrChannelMissing(message)) return;
-      fileMessageRepository.save(message);
+      if (isUserOrChannelMissing(message)) return;
+      messageRepository.save(message);
    }
 
    @Override
    public Message findById(UUID messageId) {
-      return fileMessageRepository.findById(messageId);
+      return messageRepository.findById(messageId);
    }
 
    @Override
    public List<Message> findAll() {
-      return fileMessageRepository.findAll();
+      return messageRepository.findAll();
    }
 
    @Override
    public void update(UUID messageId, String content) {
       Message message = findById(messageId);
-      if(message == null) return;
-      if(isUserOrChannelMissing(message)) return;
+      if (message == null) return;
+      if (isUserOrChannelMissing(message)) return;
       message.update(content);
-      fileMessageRepository.save(message);
+      messageRepository.save(message);
    }
 
    @Override
    public void delete(UUID messageId) {
       Message message = findById(messageId);
-      if(message == null) return;
-      if(isUserOrChannelMissing(message)) return;
-      fileMessageRepository.delete(messageId);
+      if (message == null) return;
+      if (isUserOrChannelMissing(message)) return;
+      messageRepository.delete(messageId);
 
    }
 
