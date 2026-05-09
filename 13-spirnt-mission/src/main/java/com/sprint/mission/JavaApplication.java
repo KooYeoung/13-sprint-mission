@@ -32,23 +32,36 @@ public class JavaApplication {
 
    public static void main(String[] args) {
       UserRepository jcfUserRepository = new JCFUserRepository();
-      UserRepository fileUserRepository = new FileUserRepository();
-      UserService userService = new FileUserService(fileUserRepository);
+      UserService jcfUserService = new BasicUserService(jcfUserRepository);
 
       ChannelRepository jcfChannelRepository = new JCFChannelRepository();
-      ChannelRepository fileChannelRepository = new FileChannelRepository();
-      ChannelService channelService = new FileChannelService(fileChannelRepository);
+      ChannelService jcfChannelService = new BasicChannelService(jcfChannelRepository);
 
       MessageRepository jcfMessageRepository = new JCFMessageRepository();
+      MessageService jcfMessageService = new BasicMessageService(jcfMessageRepository, jcfUserRepository, jcfChannelRepository);
+
+      System.out.println("========================= JCF TEST START =========================");
+      runServiceIntegrationTest(jcfUserService, jcfChannelService, jcfMessageService);
+      System.out.println("========================= JCF TEST END =========================");
+
+      UserRepository fileUserRepository = new FileUserRepository();
+      UserService fileUserService = new BasicUserService(fileUserRepository);
+
+      ChannelRepository fileChannelRepository = new FileChannelRepository();
+      ChannelService fileChannelService = new BasicChannelService(fileChannelRepository);
+
       MessageRepository fileMessageRepository = new FileMessageRepository();
-      MessageService messageService = new FileMessageService(fileMessageRepository, fileUserRepository, fileChannelRepository);
+      MessageService fileMessageService = new BasicMessageService(fileMessageRepository, fileUserRepository, fileChannelRepository);
 
+      System.out.println("========================= FILE TEST START =========================");
+      runServiceIntegrationTest(fileUserService, fileChannelService, fileMessageService);
+      System.out.println("========================= FILE TEST END =========================");
+   }
+
+   private static void runServiceIntegrationTest(UserService userService, ChannelService channelService, MessageService messageService) {
       runUserServiceCrudTest(userService);
-
       runChannelServiceCrudTest(channelService);
-
       runMessageServiceCrudTest(userService, channelService, messageService);
-
    }
 
    private static void runMessageServiceCrudTest(UserService userService, ChannelService channelService, MessageService messageService) {
