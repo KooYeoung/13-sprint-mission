@@ -26,20 +26,31 @@ public class JCFMessageService implements MessageService {
 
    @Override
    public void save(Message message) {
-      if (isUserOrChannelMissing(message.getUser().getId(), message.getChannel().getId())) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
       messageRepository.save(message);
    }
 
 
    @Override
    public Message findById(UUID messageId) {
+      Message message = messageRepository.findById(messageId);
+      if (notExistMessage(message)) return null;
+      User user = getUser(message.getUserId());
+      Channel channel = getChannel(message.getChannelId());
+      if (user == null || channel == null) return null;
 
-      return messageRepository.findById(messageId);
+      message.attach(user,channel);
+
+      return message;
    }
 
    @Override
    public List<Message> findAll() {
-      return messageRepository.findAll();
+
+      List<Message> all = messageRepository.findAll();
+      all.forEach(message -> message.attach(getUser(message.getUserId()),getChannel(message.getChannelId())));
+
+      return all;
    }
 
    @Override
@@ -62,9 +73,17 @@ public class JCFMessageService implements MessageService {
    }
 
    private boolean isUserOrChannelMissing(UUID userId, UUID channelId) {
-      User user = userRepository.findById(userId);
-      Channel channel = channelRepository.findById(channelId);
+      User user = getUser(userId);
+      Channel channel = getChannel(channelId);
       return user == null || channel == null;
+   }
+
+   private Channel getChannel(UUID channelId) {
+      return channelRepository.findById(channelId);
+   }
+
+   private User getUser(UUID userId) {
+      return userRepository.findById(userId);
    }
 
    private boolean notExistMessage(Message message) {

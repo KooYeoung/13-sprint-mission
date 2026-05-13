@@ -24,25 +24,36 @@ public class BasicMessageService implements MessageService {
 
    @Override
    public void save(Message message) {
-      if(isUserOrChannelMissing(message)) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
       messageRepository.save(message);
    }
 
    @Override
    public Message findById(UUID messageId) {
-      return messageRepository.findById(messageId);
+      Message message = messageRepository.findById(messageId);
+      if (notExistMessage(message)) return null;
+      User user = getUser(message.getUserId());
+      Channel channel = getChannel(message.getChannelId());
+      if (user == null || channel == null) return null;
+
+      message.attach(user,channel);
+
+      return message;
    }
 
    @Override
    public List<Message> findAll() {
-      return messageRepository.findAll();
+      List<Message> all = messageRepository.findAll();
+      all.forEach(message -> message.attach(getUser(message.getUserId()),getChannel(message.getChannelId())));
+
+      return all;
    }
 
    @Override
    public void update(UUID messageId, String content) {
       Message message = findById(messageId);
       if(notExistMessage(message)) return;
-      if(isUserOrChannelMissing(message)) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
       message.update(content);
       messageRepository.save(message);
    }
@@ -51,14 +62,22 @@ public class BasicMessageService implements MessageService {
    public void delete(UUID messageId) {
       Message message = findById(messageId);
       if(notExistMessage(message)) return;
-      if(isUserOrChannelMissing(message)) return;
+      if (isUserOrChannelMissing(message.getUserId(), message.getChannelId())) return;
       messageRepository.delete(messageId);
    }
 
-   private boolean isUserOrChannelMissing(Message message) {
-      User user = userRepository.findById(message.getUserId());
-      Channel channel = channelRepository.findById(message.getChannelId());
+   private boolean isUserOrChannelMissing(UUID userId, UUID channelId) {
+      User user = getUser(userId);
+      Channel channel = getChannel(channelId);
       return user == null || channel == null;
+   }
+
+   private Channel getChannel(UUID channelId) {
+      return channelRepository.findById(channelId);
+   }
+
+   private User getUser(UUID userId) {
+      return userRepository.findById(userId);
    }
 
    private  boolean notExistMessage(Message message) {
