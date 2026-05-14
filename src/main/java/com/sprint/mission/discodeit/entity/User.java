@@ -57,7 +57,7 @@ public class User extends BaseEntity{
             "username='" + username + '\'' +
             ", nickname='" + nickname + '\'' +
             ", realName='" + realName + '\'' +
-            ", password='" + password + '\'' +
+            ", password='" + "******" + '\'' +
             ", email='" + email + '\'' +
             ", phoneNumber='" + phoneNumber + '\'' +
             ", createdAt='" + getCreatedAt() + '\'' +

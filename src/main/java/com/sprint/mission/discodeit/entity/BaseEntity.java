@@ -4,8 +4,8 @@ import java.io.Serializable;
 import java.util.UUID;
 
 public class BaseEntity implements Serializable {
-   private UUID id; // 식별자
-   private Long createdAt;
+   private final UUID id; // 식별자
+   private final Long createdAt;
    private Long updatedAt;
 
    BaseEntity(){
