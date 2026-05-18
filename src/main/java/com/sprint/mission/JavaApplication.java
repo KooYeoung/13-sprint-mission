@@ -1,5 +1,7 @@
 package com.sprint.mission;
 
+import com.sprint.mission.discodeit.config.AppConfig;
+import com.sprint.mission.discodeit.config.RepositoryType;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.Message;
@@ -31,27 +33,24 @@ import java.util.List;
 public class JavaApplication {
 
    public static void main(String[] args) {
-      UserRepository jcfUserRepository = new JCFUserRepository();
-      UserService jcfUserService = new BasicUserService(jcfUserRepository);
 
-      ChannelRepository jcfChannelRepository = new JCFChannelRepository();
-      ChannelService jcfChannelService = new BasicChannelService(jcfChannelRepository);
+      AppConfig appConfig = new AppConfig();
 
-      MessageRepository jcfMessageRepository = new JCFMessageRepository();
-      MessageService jcfMessageService = new BasicMessageService(jcfMessageRepository, jcfUserRepository, jcfChannelRepository);
+      UserService jcfUserService = appConfig.userService(RepositoryType.JCF);
+
+      ChannelService jcfChannelService = appConfig.channelService(RepositoryType.JCF);
+
+      MessageService jcfMessageService = appConfig.messageService(RepositoryType.JCF);
 
       System.out.println("========================= JCF TEST START =========================");
       runServiceIntegrationTest(jcfUserService, jcfChannelService, jcfMessageService);
       System.out.println("========================= JCF TEST END =========================");
 
-      UserRepository fileUserRepository = new FileUserRepository();
-      UserService fileUserService = new BasicUserService(fileUserRepository);
+      UserService fileUserService = appConfig.userService(RepositoryType.FILE);
 
-      ChannelRepository fileChannelRepository = new FileChannelRepository();
-      ChannelService fileChannelService = new BasicChannelService(fileChannelRepository);
+      ChannelService fileChannelService = appConfig.channelService(RepositoryType.FILE);
 
-      MessageRepository fileMessageRepository = new FileMessageRepository();
-      MessageService fileMessageService = new BasicMessageService(fileMessageRepository, fileUserRepository, fileChannelRepository);
+      MessageService fileMessageService = appConfig.messageService(RepositoryType.FILE);
 
       System.out.println("========================= FILE TEST START =========================");
       runServiceIntegrationTest(fileUserService, fileChannelService, fileMessageService);
