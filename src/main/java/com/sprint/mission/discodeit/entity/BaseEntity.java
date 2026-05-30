@@ -8,7 +8,7 @@ public class BaseEntity implements Serializable {
    private final Long createdAt;
    private Long updatedAt;
 
-   BaseEntity(){
+   public BaseEntity(){
       id = UUID.randomUUID();
       createdAt = System.currentTimeMillis();
    }
