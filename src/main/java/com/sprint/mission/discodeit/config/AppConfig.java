@@ -17,27 +17,28 @@ import com.sprint.mission.discodeit.service.basic.BasicMessageService;
 import com.sprint.mission.discodeit.service.basic.BasicUserService;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import static com.sprint.mission.discodeit.config.RepositoryType.*;
 
 public class AppConfig {
-   private final HashMap<RepositoryType, UserRepository> userRepositoryHashMap = new HashMap<>();
-   private final HashMap<RepositoryType, ChannelRepository> channelRepositoryHashMap = new HashMap<>();
-   private final HashMap<RepositoryType, MessageRepository>  messageRepositoryHashMap= new HashMap<>();
+   private final Map<RepositoryType, UserRepository> userRepositoryMap = new HashMap<>();
+   private final Map<RepositoryType, ChannelRepository> channelRepositoryMap = new HashMap<>();
+   private final Map<RepositoryType, MessageRepository> messageRepositoryMap = new HashMap<>();
 
    public AppConfig() {
-      userRepositoryHashMap.put(FILE, new FileUserRepository());
-      userRepositoryHashMap.put(JCF,  new JCFUserRepository());
+      userRepositoryMap.put(FILE, new FileUserRepository());
+      userRepositoryMap.put(JCF,  new JCFUserRepository());
 
-      channelRepositoryHashMap.put(FILE, new FileChannelRepository());
-      channelRepositoryHashMap.put(JCF, new JCFChannelRepository());
+      channelRepositoryMap.put(FILE, new FileChannelRepository());
+      channelRepositoryMap.put(JCF, new JCFChannelRepository());
 
-      messageRepositoryHashMap.put(FILE, new FileMessageRepository());
-      messageRepositoryHashMap.put(FILE, new JCFMessageRepository());
+      messageRepositoryMap.put(FILE, new FileMessageRepository());
+      messageRepositoryMap.put(JCF, new JCFMessageRepository());
    }
 
    private UserRepository userRepository(RepositoryType repositoryType) {
-      return userRepositoryHashMap.get(repositoryType);
+      return userRepositoryMap.get(repositoryType);
    }
 
    public UserService userService(RepositoryType repositoryType) {
@@ -45,7 +46,7 @@ public class AppConfig {
    }
 
    private ChannelRepository channelRepository(RepositoryType repositoryType) {
-      return channelRepositoryHashMap.get(repositoryType);
+      return channelRepositoryMap.get(repositoryType);
    }
 
    public ChannelService channelService(RepositoryType repositoryType) {
@@ -53,7 +54,7 @@ public class AppConfig {
    }
 
    private MessageRepository messageRepository(RepositoryType repositoryType) {
-      return messageRepositoryHashMap.get(repositoryType);
+      return messageRepositoryMap.get(repositoryType);
    }
 
    public MessageService messageService(RepositoryType repositoryType) {
