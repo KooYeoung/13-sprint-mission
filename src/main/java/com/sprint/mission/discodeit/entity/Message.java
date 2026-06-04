@@ -1,58 +1,57 @@
 package com.sprint.mission.discodeit.entity;
 
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
+import lombok.With;
+
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
-public class Message extends BaseEntity{
-   private String content;
-   private UUID userId;
-   private UUID channelId;
-   private transient User user;
-   private transient Channel channel;
+@Getter
+@ToString
+public class Message extends UpdatableEntity {
+   @With
+   private final String content;
+   private final UUID userId;
+   private final UUID channelId;
+   @With
+   private final List<UUID> fileIds;
 
-   public Message(String content, User user, Channel channel){
+   @Builder
+   public Message(String content, UUID userId, UUID channelId, List<UUID> fileIds) {
+      super(Instant.now());
       this.content = content;
-      this.user = user;
-      this.userId = user.getId();
-      this.channel = channel;
-      this.channelId = channel.getId();
+      this.userId = userId;
+      this.channelId = channelId;
+      this.fileIds = fileIds;
    }
 
-   public void update(String content){
-      super.update();
+   private Message(UUID id
+         , Instant createdAt
+         , Instant updatedAt
+         , String content
+         , UUID userId
+         , UUID channelId
+         , List<UUID> fileIds) {
+      super(id, createdAt, updatedAt);
       this.content = content;
+      this.userId = userId;
+      this.channelId = channelId;
+      this.fileIds = fileIds;
    }
 
-   public void attach( User user, Channel channel){
-      this.user = user;
-      this.channel = channel;
+   public Message withUpdatedAt(Instant now){
+      return new Message(
+            getId(),
+            getCreatedAt(),
+            now,
+            content,
+            userId,
+            channelId,
+            fileIds
+      );
    }
 
-   @Override
-   public String toString() {
-      return "Message{" +
-            "content='" + content + '\'' +
-            ", userId=" + userId +
-            ", channelId=" + channelId +
-            ", user=" + user +
-            ", channel=" + channel +
-            '}';
-   }
-
-   public String getContent() {
-      return content;
-   }
-
-   public User getUser() {
-      return user;
-   }
-   public UUID getUserId() {
-      return userId;
-   }
-
-   public Channel getChannel() {
-      return channel;
-   }
-   public UUID getChannelId() {
-      return channelId;
-   }
 }

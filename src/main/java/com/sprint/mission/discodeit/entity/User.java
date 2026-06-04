@@ -1,67 +1,91 @@
 package com.sprint.mission.discodeit.entity;
 
-public class User extends BaseEntity{
-   private String username; // 로그인 id
-   private String nickname; // 별명
-   private String realName; // 실명
-   private String password; // 비밀번호
-   private String email; // 이메일
-   private String phoneNumber; // 핸드폰 번호
+import lombok.*;
 
-   public User(String username, String password, String email, String phoneNumber, String realName,String nickname){
+import java.time.Instant;
+import java.util.UUID;
+
+@Getter
+@ToString(exclude = "password")
+public class User extends UpdatableEntity {
+
+   private final String username;
+   @With
+   private final String nickname;
+   @With
+   private final String realName;
+   @With
+   private final String password;
+   @With
+   private final String email;
+   @With
+   private final String phoneNumber;
+   @With
+   private final UUID profileImageId;
+
+   @Builder
+   public User(
+         String username,
+         String nickname,
+         String realName,
+         String password,
+         String email,
+         String phoneNumber,
+         UUID profileImageId
+   ) {
+      super(Instant.now());
       this.username = username;
-      this.password = password;
-      this.email = email;
-      this.phoneNumber = phoneNumber;
-      this.realName = realName;
-      this.nickname = nickname;
-   }
-
-   public void update(String nickname,String realName, String password, String email, String phoneNumber){
-      super.update();
       this.nickname = nickname;
       this.realName = realName;
       this.password = password;
       this.email = email;
       this.phoneNumber = phoneNumber;
+      this.profileImageId = profileImageId;
    }
 
-   public String getUsername() {
-      return username;
+   private User(
+         UUID id,
+         Instant createdAt,
+         Instant updatedAt,
+         String username,
+         String nickname,
+         String realName,
+         String password,
+         String email,
+         String phoneNumber,
+         UUID profileImageId
+   ) {
+      super(id, createdAt, updatedAt);
+      this.username = username;
+      this.nickname = nickname;
+      this.realName = realName;
+      this.password = password;
+      this.email = email;
+      this.phoneNumber = phoneNumber;
+      this.profileImageId = profileImageId;
    }
 
-   public String getNickname() {
-      return nickname;
+   public boolean isProfileImageExist(){
+      return profileImageId != null;
    }
 
-   public String getRealName() {
-      return realName;
+   public boolean hasEmail(String email){
+      return this.email.equals(email);
    }
 
-   public String getPassword() {
-      return password;
+   public User withUpdatedAt(Instant now){
+      return new User(
+            getId(),
+            getCreatedAt(),
+            now,
+            username,
+            nickname,
+            realName,
+            password,
+            email,
+            phoneNumber,
+            profileImageId
+      );
    }
 
-   public String getEmail() {
-      return email;
-   }
-
-   public String getPhoneNumber() {
-      return phoneNumber;
-   }
-
-   @Override
-   public String toString() {
-      return "User{" +
-            "id='" + getId() + '\'' +
-            "username='" + username + '\'' +
-            ", nickname='" + nickname + '\'' +
-            ", realName='" + realName + '\'' +
-            ", password='" + "******" + '\'' +
-            ", email='" + email + '\'' +
-            ", phoneNumber='" + phoneNumber + '\'' +
-            ", createdAt='" + getCreatedAt() + '\'' +
-            ", updatedAt='" + getUpdatedAt() + '\'' +
-            '}';
-   }
 }
