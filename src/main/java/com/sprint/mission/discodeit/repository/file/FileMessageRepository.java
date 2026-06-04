@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository.file;
 
+import com.sprint.mission.discodeit.config.RepositoryProperties;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,7 +17,13 @@ import java.util.UUID;
       havingValue = "file"
 )
 public class FileMessageRepository implements MessageRepository {
-   private final FileObjectStorage<Message> storage = new FileObjectStorage<>("data/messages");
+   private final FileObjectStorage<Message> storage ;
+
+   public FileMessageRepository(RepositoryProperties properties) {
+      this. storage = new FileObjectStorage<>(
+              properties.getFileDirectory().resolve("messages")
+      );
+   }
 
    @Override
    public void save(Message message) {

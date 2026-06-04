@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository.file;
 
+import com.sprint.mission.discodeit.config.RepositoryProperties;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,8 +15,14 @@ import java.util.*;
       havingValue = "file"
 )
 public class FileBinaryContentRepository implements BinaryContentRepository {
-   private final FileObjectStorage<BinaryContent> storage =
-         new FileObjectStorage<>("data/binary-content");
+   private final FileObjectStorage<BinaryContent> storage;
+
+
+   public FileBinaryContentRepository(RepositoryProperties properties) {
+      this. storage = new FileObjectStorage<>(
+              properties.getFileDirectory().resolve("binary-content")
+              );
+   }
 
    @Override
    public BinaryContent save(BinaryContent binaryContent) {

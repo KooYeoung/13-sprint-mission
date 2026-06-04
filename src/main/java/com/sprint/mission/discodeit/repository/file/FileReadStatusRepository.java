@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository.file;
 
+import com.sprint.mission.discodeit.config.RepositoryProperties;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,8 +17,13 @@ import java.util.UUID;
       havingValue = "file"
 )
 public class FileReadStatusRepository implements ReadStatusRepository {
-   private final FileObjectStorage<ReadStatus> storage =
-         new FileObjectStorage<>("data/read-status");
+   private final FileObjectStorage<ReadStatus> storage;
+
+   public FileReadStatusRepository(RepositoryProperties properties) {
+      this. storage = new FileObjectStorage<>(
+              properties.getFileDirectory().resolve("read-status")
+      );
+   }
 
    @Override
    public ReadStatus save(ReadStatus readStatus) {

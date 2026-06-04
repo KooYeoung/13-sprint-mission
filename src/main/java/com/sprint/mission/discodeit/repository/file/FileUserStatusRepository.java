@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository.file;
 
+import com.sprint.mission.discodeit.config.RepositoryProperties;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,8 +15,13 @@ import java.util.*;
       havingValue = "file"
 )
 public class FileUserStatusRepository implements UserStatusRepository {
-   private final FileObjectStorage<UserStatus> storage =
-         new FileObjectStorage<>("data/user-status");
+   private final FileObjectStorage<UserStatus> storage ;
+
+   public FileUserStatusRepository(RepositoryProperties properties) {
+      this. storage = new FileObjectStorage<>(
+              properties.getFileDirectory().resolve("user-status")
+      );
+   }
 
    @Override
    public UserStatus save(UserStatus userStatus) {

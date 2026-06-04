@@ -41,6 +41,7 @@ public class DiscodeitApplication {
 
 
       log.info("========================= FILE TEST START =========================");
+
       runServiceIntegrationTest(userService, channelService, messageService);
       log.info("========================= FILE TEST END =========================");
 
@@ -151,7 +152,13 @@ public class DiscodeitApplication {
    private static void runUserServiceCrudTest(UserService userService) {
       //1. 유저 단일 등록
       UserCreateRequest requestDto = userCreate();
-      UserResponse user = userService.create(requestDto);
+      UserResponse user;
+      try {
+         user = userService.create(requestDto);
+      }catch (IllegalArgumentException e){
+         log.error("IllegalArgumentException = {}", e.getMessage());
+         return;
+      }
 
       //2. 리스트 조회를 위해 다량 등록.
       for (int i = 1; i <= 10; i++) {

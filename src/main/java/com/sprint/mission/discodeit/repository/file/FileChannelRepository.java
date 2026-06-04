@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository.file;
 
+import com.sprint.mission.discodeit.config.RepositoryProperties;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,8 +18,13 @@ import java.util.UUID;
 )
 public class FileChannelRepository implements ChannelRepository {
 
-   private final FileObjectStorage<Channel> storage =
-         new FileObjectStorage<>("data/channels");
+   private final FileObjectStorage<Channel> storage ;
+
+   public FileChannelRepository(RepositoryProperties properties) {
+      this. storage = new FileObjectStorage<>(
+              properties.getFileDirectory().resolve("channels")
+      );
+   }
 
    @Override
    public void save(Channel channel) {
