@@ -1,10 +1,8 @@
 package com.sprint.mission.discodeit.dto.request;
 
 import com.sprint.mission.discodeit.entity.User;
-import lombok.With;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.UUID;
 
 public record UserCreateRequest(

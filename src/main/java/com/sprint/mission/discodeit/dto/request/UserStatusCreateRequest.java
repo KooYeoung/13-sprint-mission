@@ -1,6 +1,5 @@
 package com.sprint.mission.discodeit.dto.request;
 
-import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.UserStatus;
 
 import java.time.Instant;

@@ -17,9 +17,7 @@ public class BinaryContentService {
    private final BinaryContentRepository binaryContentRepository;
 
    public void create(BinaryContentCreateRequest request){
-      /**
-       * [ ] DTO를 활용해 파라미터를 그룹화합니다.
-       */
+
       BinaryContent binaryContent = request.toBinaryContent();
       binaryContentRepository.save(binaryContent);
 

@@ -1,9 +1,6 @@
 package com.sprint.mission.discodeit.dto.response;
 
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.entity.Channel;
-
-import java.util.ArrayList;
 import java.util.UUID;
 
 public record BinaryContentResponse(

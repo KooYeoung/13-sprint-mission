@@ -1,6 +1,5 @@
 package com.sprint.mission.discodeit.dto.response;
 
-import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 
 import java.time.Instant;
