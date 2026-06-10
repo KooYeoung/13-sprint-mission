@@ -15,13 +15,22 @@ public class BinaryContent extends BaseEntity{
 
    @Builder
    public BinaryContent(
-         String fileName
-         , String originalFileName
+          String originalFileName
          , String contentType) {
       super(Instant.now());
-      this.fileName = fileName;
       this.originalFileName = originalFileName;
       this.contentType = contentType;
+      this.fileName = createFileName();
+   }
+
+   private String createFileName(){
+      String formattedId = this.getId().toString().replace("-", "");
+      int lastDotIndex = this.originalFileName.lastIndexOf(".");
+      if(lastDotIndex < 0){
+         return formattedId;
+      }
+      String expansion = this.originalFileName.substring(lastDotIndex);
+      return formattedId + expansion;
    }
 
 }

@@ -9,7 +9,6 @@ import java.nio.file.Path;
 
 @Getter
 @Setter
-@Component
 @ConfigurationProperties(prefix = "discodeit.repository")
 public class RepositoryProperties {
     private String type = "jcf";

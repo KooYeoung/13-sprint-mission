@@ -1,7 +1,9 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.UserLoginRequest;
-import com.sprint.mission.discodeit.dto.response.UserResponse;
+import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -18,11 +20,11 @@ public class AuthService {
    private final UserRepository userRepository;
    private final UserStatusRepository userStatusRepository;
 
-   public UserResponse login(UserLoginRequest requestDto) {
+   public UserDto login(UserDto userDto) {
       User user = userRepository.findAll()
             .stream()
-            .filter(u -> u.getUsername().equals(requestDto.username()))
-            .filter(u -> u.getPassword().equals(requestDto.password()))
+            .filter(u -> u.getUsername().equals(userDto.username()))
+            .filter(u -> u.getPassword().equals(userDto.password()))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("아이디 와 비밀번호를 다시한번 확인해 주세요."));
 
@@ -32,13 +34,13 @@ public class AuthService {
       UserStatus userStatus;
 
       if (optionalUserStatus.isPresent()) {
-         userStatus = optionalUserStatus.get().withUpdatedAt(now);
-         userStatusRepository.update(userStatus);
+         UserStatus status = optionalUserStatus.get().updateInfo(new UserStatusUpdateCommand(now));
+         userStatus = userStatusRepository.update(status);
       } else {
-         userStatus = new UserStatus( now, user.getId());
-         userStatusRepository.save(userStatus);
+         UserStatus status = new UserStatus(new UserStatusCreateCommand(user.getId(), now));
+         userStatus = userStatusRepository.save(status);
       }
 
-      return UserResponse.from(user).withOnline(userStatus.isOnline());
+      return UserDto.from(user).withOnline(userStatus.isOnline());
    }
 }

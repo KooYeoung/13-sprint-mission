@@ -5,14 +5,14 @@ import com.sprint.mission.discodeit.entity.UserStatus;
 import java.time.Instant;
 import java.util.UUID;
 
-public record UserStatusResponse(
+public record UserStatusDto(
       UUID id
       , UUID userId
       , boolean isOnline
       , Instant lastOnlineAt
 ) {
-   public static UserStatusResponse from(UserStatus userStatus) {
-      return new UserStatusResponse(
+   public static UserStatusDto from(UserStatus userStatus) {
+      return new UserStatusDto(
             userStatus.getId()
             , userStatus.getUserId()
             , userStatus.isOnline()

@@ -13,6 +13,6 @@ public record UserUpdateRequest(
    ,  String password
    ,  String email
    ,  String phoneNumber
-   ,  MultipartFile image)
+)
 {
 }

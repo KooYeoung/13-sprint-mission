@@ -1,7 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
-import com.sprint.mission.discodeit.dto.response.BinaryContentResponse;
+import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,25 +15,30 @@ import java.util.UUID;
 public class BinaryContentService {
    private final BinaryContentRepository binaryContentRepository;
 
-   public void create(BinaryContentCreateRequest request){
+   public BinaryContentDto create(BinaryContentDto binaryContentDto){
 
-      BinaryContent binaryContent = request.toBinaryContent();
-      binaryContentRepository.save(binaryContent);
+      BinaryContent binaryContent = new BinaryContent(
+              binaryContentDto.originalFileName()
+              ,binaryContentDto.contentType()
+      );
 
+      BinaryContent save = binaryContentRepository.save(binaryContent);
+
+      return BinaryContentDto.from(save);
    }
 
-   public BinaryContentResponse findById(UUID id){
+   public BinaryContentDto findById(UUID id){
 
       BinaryContent binaryContent = binaryContentRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("존재 하지 않는 파일입니다."));
-      return BinaryContentResponse.from(binaryContent);
+      return BinaryContentDto.from(binaryContent);
    }
 
-   public List<BinaryContentResponse> findAllByIdIn(List<UUID> ids){
+   public List<BinaryContentDto> findAllByIdIn(List<UUID> ids){
 
       return binaryContentRepository
             .findAllByIdIn(ids)
             .stream()
-            .map(BinaryContentResponse::from)
+            .map(BinaryContentDto::from)
             .toList();
    }
 

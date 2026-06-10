@@ -1,8 +1,8 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.dto.request.MessageCreateRequest;
-import com.sprint.mission.discodeit.dto.request.MessageUpdateRequest;
-import com.sprint.mission.discodeit.dto.response.MessageResponse;
+import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
+import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
+import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.entity.*;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,19 +26,17 @@ public class BasicMessageService implements MessageService {
 
 
    @Override
-   public MessageResponse save(MessageCreateRequest messageCreateRequest) {
-      getChannelRequireThrow(messageCreateRequest.channelId());
-      User user = getUserRequireThrow(messageCreateRequest.userId());
+   public MessageDto save(MessageDto messageDto, List<MultipartFile> files) {
+      getChannelRequireThrow(messageDto.channelId());
+      User user = getUserRequireThrow(messageDto.userId());
 
-      Message message = messageCreateRequest.toMessage();
-      List<MultipartFile> files = messageCreateRequest.files();
-      if (!files.isEmpty()) {
+      MessageCreateCommand command = MessageCreateCommand.from(messageDto);
+      if (files!=null && !files.isEmpty()) {
          List<UUID> attachedFileIds = new ArrayList<>();
          for (MultipartFile file : files) {
             if (file != null && !file.isEmpty()) {
                BinaryContent binaryContent = BinaryContent.builder()
                      .originalFileName(file.getOriginalFilename())
-                     .fileName(UUID.randomUUID().toString().replace("-", ""))
                      .contentType(file.getContentType())
                      .build();
 
@@ -47,26 +44,28 @@ public class BasicMessageService implements MessageService {
                attachedFileIds.add(binaryContent.getId());
             }
          }
-         message = message.withFileIds(attachedFileIds);
+         command = command.withFileIds(attachedFileIds);
       }
+
+      Message message = new Message(command);
 
       messageRepository.save(message);
 
-      return MessageResponse.from(message, user.getNickname());
+      return MessageDto.from(message, user.getNickname());
    }
 
    @Override
-   public MessageResponse findById(UUID messageId) {
+   public MessageDto findById(UUID messageId) {
       Message message = getMessageRequireThrow(messageId);
 
       User user = getUserRequireThrow(message.getUserId());
       getChannelRequireThrow(message.getChannelId());
 
-      return MessageResponse.from(message, user.getNickname());
+      return MessageDto.from(message, user.getNickname());
    }
 
    @Override
-   public List<MessageResponse> findAll() {
+   public List<MessageDto> findAll() {
       Map<UUID, User> userIdMap = userRepository.findAll()
             .stream()
             .collect(Collectors.toMap(User::getId, u -> u));
@@ -74,12 +73,12 @@ public class BasicMessageService implements MessageService {
       return messageRepository.findAll()
             .stream()
             .filter(m -> userIdMap.get(m.getUserId()) != null)
-            .map(m -> MessageResponse.from(m, userIdMap.get(m.getUserId()).getNickname()))
+            .map(m -> MessageDto.from(m, userIdMap.get(m.getUserId()).getNickname()))
             .toList();
    }
 
    @Override
-   public List<MessageResponse> findAllByChannelId(UUID channelId) {
+   public List<MessageDto> findAllByChannelId(UUID channelId) {
 
       return findAll()
             .stream()
@@ -88,15 +87,14 @@ public class BasicMessageService implements MessageService {
    }
 
    @Override
-   public MessageResponse update(MessageUpdateRequest messageUpdateRequest) {
+   public MessageDto update(MessageDto dto) {
 
-      Message message = getMessageRequireThrow(messageUpdateRequest.messageId());
+      Message message = getMessageRequireThrow(dto.messageId());
 
       getChannelRequireThrow(message.getChannelId());
       getUserRequireThrow(message.getUserId());
 
-      Message updatedMessage = message.withContent(messageUpdateRequest.content())
-            .withUpdatedAt(Instant.now());
+      Message updatedMessage = message.updateInfo(MessageUpdateCommand.from(dto));
 
       messageRepository.save(updatedMessage);
 

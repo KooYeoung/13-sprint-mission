@@ -8,10 +8,7 @@ public record ChannelUpdateRequest(
       UUID channelId
       , String channelName
       , String channelDescription
-      , ChannelType channelType
+      , String channelType
 ) {
 
-   public boolean isPrivate() {
-      return channelType.equals(ChannelType.PRIVATE);
-   }
 }

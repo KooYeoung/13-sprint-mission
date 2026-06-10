@@ -1,8 +1,10 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.command.ReadStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.ReadStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.ReadStatusCreateRequest;
 import com.sprint.mission.discodeit.dto.request.ReadStatusUpdateRequest;
-import com.sprint.mission.discodeit.dto.response.ReadStatusResponse;
+import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.repository.*;
@@ -20,48 +22,45 @@ public class ReadStatusService {
    private final UserRepository userRepository;
    private final ChannelRepository channelRepository;
 
-   public ReadStatusResponse save(ReadStatusCreateRequest request) {
-      validateChannelAndReadStatus(request.userId(), request.channelId());
+   public ReadStatusDto save(ReadStatusDto dto) {
+      validateChannelAndReadStatus(dto.userId(), dto.channelId());
 
-      ReadStatus readStatus = request.toReadStatus();
-      readStatusRepository.save(readStatus);
+      ReadStatus readStatus = new ReadStatus(ReadStatusCreateCommand.from(dto));
+      ReadStatus save = readStatusRepository.save(readStatus);
 
-      return ReadStatusResponse.from(readStatus);
+      return ReadStatusDto.from(save);
    }
 
-   public ReadStatusResponse findById(UUID id) {
+   public ReadStatusDto findById(UUID id) {
       ReadStatus readStatus = getReadStatusRequireThrow(id);
-      return ReadStatusResponse.from(readStatus);
+      return ReadStatusDto.from(readStatus);
    }
 
-   public List<ReadStatusResponse> findAllByUserId(UUID userId) {
+   public List<ReadStatusDto> findAllByUserId(UUID userId) {
 
       return readStatusRepository.findByUserId(userId)
             .stream()
-            .map(ReadStatusResponse::from)
+            .map(ReadStatusDto::from)
             .toList();
 
    }
 
-   public ReadStatusResponse update(ReadStatusUpdateRequest request) {
+   public ReadStatusDto update(ReadStatusDto dto) {
 
-      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(request.id());
+      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(dto.id());
       ReadStatus result;
       if (optionalReadStatus.isPresent()) {
          ReadStatus currentStatus = optionalReadStatus.get();
-         result = currentStatus.withUpdatedAt(request.readAt());
-         readStatusRepository.update(result);
+         ReadStatus readStatus = currentStatus.updateInfo(ReadStatusUpdateCommand.from(dto));
+         result = readStatusRepository.update(readStatus);
       } else {
-         validateChannelAndReadStatus(request.userId(), request.channelId());
+         validateChannelAndReadStatus(dto.userId(), dto.channelId());
 
-         result = new ReadStatus(
-               request.readAt()
-               , request.userId()
-               , request.channelId());
-         readStatusRepository.save(result);
+         ReadStatus readStatus = new ReadStatus(ReadStatusCreateCommand.from(dto));
+         result = readStatusRepository.save(readStatus);
       }
 
-      return ReadStatusResponse.from(result);
+      return ReadStatusDto.from(result);
    }
 
    public void delete(UUID id) {

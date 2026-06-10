@@ -1,30 +1,38 @@
 package com.sprint.mission.discodeit.entity;
 
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
-import lombok.With;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Getter
 @ToString
-@With
 public class Channel extends UpdatableEntity {
    private  final String channelName;
    private  final String description;
    private  final ChannelType channelType;
 
    @Builder
-   public Channel(
-         String channelName
-         , String description
-         , ChannelType channelType) {
+   public Channel(ChannelCreateCommand command) {
       super(Instant.now());
-      this.channelName = channelName;
-      this.description = description;
-      this.channelType = channelType;
+      this.channelName = command.channelName();
+      this.description = command.channelDescription();
+      this.channelType = command.channelType();
+   }
+
+   public Channel updateInfo(ChannelUpdateCommand command){
+      return new Channel(
+              getId()
+              ,getCreatedAt()
+              ,Instant.now()
+              , command.channelName()
+              , command.channelDescription()
+              ,command.channelType()
+      );
    }
 
    private Channel(UUID id
@@ -37,17 +45,6 @@ public class Channel extends UpdatableEntity {
       this.channelName = channelName;
       this.description = description;
       this.channelType = channelType;
-   }
-
-   public Channel withUpdatedAt(Instant now){
-      return new Channel(
-            getId(),
-            getCreatedAt(),
-            now,
-            channelName,
-            description,
-            channelType
-      );
    }
 
    public boolean isPrivate() {

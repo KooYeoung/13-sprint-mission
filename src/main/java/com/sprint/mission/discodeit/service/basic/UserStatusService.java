@@ -1,8 +1,10 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.UserStatusCreateRequest;
 import com.sprint.mission.discodeit.dto.request.UserStatusUpdateRequest;
-import com.sprint.mission.discodeit.dto.response.UserStatusResponse;
+import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -21,66 +23,70 @@ public class UserStatusService {
    private final UserStatusRepository userStatusRepository;
    private final UserRepository userRepository;
 
-   public UserStatusResponse create(UserStatusCreateRequest request) {
+   public UserStatusDto create(UserStatusDto userStatusDto) {
 
-      getUserRequireThrow(request.userId());
+      getUserRequireThrow(userStatusDto.userId());
       boolean userStatusExists = userStatusRepository.findAll().stream()
-            .anyMatch(u -> u.getUserId().equals(request.userId()));
+            .anyMatch(u -> u.getUserId().equals(userStatusDto.userId()));
 
       if (userStatusExists) throw new IllegalArgumentException("이미 유저 상태가 존재합니다.");
 
-      UserStatus userStatus = request.toUserStatus();
+
+      UserStatus userStatus = new UserStatus(UserStatusCreateCommand.from(userStatusDto));
       userStatusRepository.save(userStatus);
 
-      return UserStatusResponse.from(userStatus);
+      return UserStatusDto.from(userStatus);
    }
 
-   public UserStatusResponse findById(UUID id) {
+   public UserStatusDto findById(UUID id) {
       UserStatus userStatus = getUserStatusRequireThrow(id);
 
-      return UserStatusResponse.from(userStatus);
+      return UserStatusDto.from(userStatus);
    }
 
-   public List<UserStatusResponse> findAll() {
+   public List<UserStatusDto> findAll() {
 
       return userStatusRepository.findAll()
             .stream()
-            .map(UserStatusResponse::from)
+            .map(UserStatusDto::from)
             .toList();
 
    }
 
-   public void update(UserStatusUpdateRequest request) {
+   public UserStatusDto update(UserStatusDto dto){
 
-      Optional<UserStatus> statusOptional = userStatusRepository.findById(request.id());
+      Optional<UserStatus> statusOptional = userStatusRepository.findById(dto.id());
+      UserStatus status;
       if (statusOptional.isPresent()) {
          UserStatus currentStatus = statusOptional.get();
-         UserStatus updatedUserStatus = currentStatus.withUpdatedAt(request.lastOnlineAt());
-         userStatusRepository.update(updatedUserStatus);
+         UserStatus updatedUserStatus = currentStatus.updateInfo(new UserStatusUpdateCommand(dto.lastOnlineAt()));
+         status = userStatusRepository.update(updatedUserStatus);
       } else {
-         getUserRequireThrow(request.userId());
-         UserStatus userStatus = new UserStatus( request.lastOnlineAt() , request.userId());
-         userStatusRepository.save(userStatus);
+         getUserRequireThrow(dto.userId());
+         UserStatus userStatus = new UserStatus( new UserStatusCreateCommand(dto.userId(), dto.lastOnlineAt()));
+         status = userStatusRepository.save(userStatus);
       }
 
+      return UserStatusDto.from(status);
    }
 
-   public void updateByUserId(UUID userId) {
+   public UserStatusDto updateByUserId(UUID userId) {
 
       getUserRequireThrow(userId);
       Optional<UserStatus> userStatusResult = userStatusRepository.findByUserId(userId);
 
       Instant now = Instant.now();
 
+      UserStatus status;
       if (userStatusResult.isPresent()) {
          UserStatus userStatus = userStatusResult.get();
-         UserStatus updatedUserStatus = userStatus.withUpdatedAt(now);
-         userStatusRepository.update(updatedUserStatus);
+         UserStatus updatedUserStatus = userStatus.updateInfo(new UserStatusUpdateCommand(now));
+         status = userStatusRepository.update(updatedUserStatus);
       } else {
-         UserStatus userStatus = new UserStatus(now, userId);
-         userStatusRepository.save(userStatus);
+         UserStatus userStatus = new UserStatus(new UserStatusCreateCommand(userId, now));
+         status = userStatusRepository.save(userStatus);
       }
-
+      return UserStatusDto.from(status);
    }
 
    public void delete(UUID id) {

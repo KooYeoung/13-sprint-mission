@@ -11,17 +11,6 @@ public record UserCreateRequest(
       , String realName
       , String password
       , String email
-      , String phoneNumber
-      , MultipartFile image) {
-   public User toUser(UUID profileImageId) {
+      , String phoneNumber) {
 
-      return new User(
-            username
-            , nickname
-            , realName
-            , password
-            , email
-            , phoneNumber
-            , profileImageId);
-   }
 }

@@ -1,5 +1,7 @@
 package com.sprint.mission.discodeit.entity;
 
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
 import lombok.*;
 
 import java.time.Duration;
@@ -12,10 +14,18 @@ import java.util.UUID;
 public class UserStatus extends UpdatableEntity {
 
    private final UUID userId;
-   public UserStatus(Instant now,
-                      UUID userId) {
-      super(now);
-      this.userId = userId;
+   public UserStatus(UserStatusCreateCommand command) {
+      super(command.createdAt());
+      this.userId = command.userId();
+   }
+
+   public UserStatus updateInfo(UserStatusUpdateCommand command){
+      return new UserStatus(
+              getId()
+              , getCreatedAt()
+              , command.updateAt()
+              , userId
+      );
    }
 
    private UserStatus(UUID id,
@@ -31,15 +41,6 @@ public class UserStatus extends UpdatableEntity {
       return getUpdatedAt()
             .plus(Duration.ofMinutes(5))
             .isAfter(Instant.now());
-   }
-
-   public UserStatus withUpdatedAt(Instant now) {
-      return new UserStatus(
-            getId(),
-            getCreatedAt(),
-            now,
-            userId
-      );
    }
 
 }

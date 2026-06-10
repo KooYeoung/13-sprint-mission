@@ -1,8 +1,9 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
-import com.sprint.mission.discodeit.dto.request.UserUpdateRequest;
-import com.sprint.mission.discodeit.dto.response.UserResponse;
+import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
@@ -11,7 +12,9 @@ import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,91 +24,93 @@ import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BasicUserService implements UserService {
    private final UserRepository userRepository;
    private final BinaryContentRepository binaryContentRepository;
    private final UserStatusRepository userStatusRepository;
 
    @Override
-   public UserResponse create(UserCreateRequest requestDto) {
+   public UserDto create(UserDto userDto, MultipartFile file) {
 
       List<User> userList = userRepository.findAll();
       // username 과 email 존재 여부 확인 존재시 저장 x
-      Predicate<User> isExistUsername = user -> user.getUsername().equals(requestDto.username()) ;
-      Predicate<User> isExistEmail = user ->  user.getEmail().equals(requestDto.email());
+      Predicate<User> isExistUsername = user -> user.getUsername().equals(userDto.username()) ;
+      Predicate<User> isExistEmail = user ->  user.getEmail().equals(userDto.email());
 
       existThrow(isExistEmail, userList, "이미 존재하는 이메일 입니다.");
       existThrow(isExistUsername, userList, "이미 존재하는 아이디 입니다.");
 
       // 이미지 저장
       UUID imageId = null;
-      if(requestDto.image() != null && !requestDto.image().isEmpty()){
+      if(file != null && !file.isEmpty()){
 
          BinaryContent binaryContent = BinaryContent.builder()
-               .originalFileName(requestDto.image().getOriginalFilename())
-               .fileName(UUID.randomUUID().toString().replace("-", ""))
-               .contentType(requestDto.image().getContentType())
+               .originalFileName(file.getOriginalFilename())
+               .contentType(file.getContentType())
                .build();
 
          binaryContentRepository.save(binaryContent);
          imageId = binaryContent.getId();
       }
+      UserDto updatedUserDto = userDto.withProfileImageId(imageId);
 
-      User user = requestDto.toUser(imageId);
+      UserCreateCommand newUserCommand = UserCreateCommand.from(updatedUserDto);
+
+      User user = new User(newUserCommand);
       // USER 저장
       userRepository.save(user);
 
       // UserStatus 저장.
       Instant now = Instant.now();
-      UserStatus userStatus = new UserStatus( now,user.getId());
+      UserStatus userStatus = new UserStatus(new UserStatusCreateCommand(user.getId(), now));
       userStatusRepository.save(userStatus);
 
-      return UserResponse.from(user).withOnline(userStatus.isOnline());
+      return UserDto.from(user).withOnline(userStatus.isOnline());
    }
 
    @Override
-   public UserResponse findById(UUID userId) {
+   public UserDto findById(UUID userId) {
 
       User user = getUserRequireThrow(userId);
 
-      UserResponse userResponse = UserResponse.from(user);
-      userResponse = updateUserOnlineStatus(user, userResponse);
+      UserDto userDto = UserDto.from(user);
+      userDto = updateUserOnlineStatus(user, userDto);
 
-      return userResponse;
+      return userDto;
    }
 
 
    @Override
-   public List<UserResponse> findAll() {
+   public List<UserDto> findAll() {
 
       return userRepository.findAll()
             .stream()
             .map( u -> {
-               UserResponse userResponse = UserResponse.from(u);
-               userResponse = updateUserOnlineStatus(u, userResponse);
-               return userResponse;
+               UserDto userDto = UserDto.from(u);
+               userDto = updateUserOnlineStatus(u, userDto);
+               return userDto;
             })
             .toList();
    }
 
 
    @Override
-   public UserResponse update(UserUpdateRequest requestDto) {
-      User user = getUserRequireThrow(requestDto.userId());
+   public UserDto update(UserDto userDto, MultipartFile file) {
+      User user = getUserRequireThrow(userDto.id());
 
       // 이메일 검증.
-      if(!user.hasEmail(requestDto.email())) {
-         Predicate<User> isExistEmail = u -> u.getEmail().equals(requestDto.email());
+      if(!user.hasEmail(userDto.email())) {
+         Predicate<User> isExistEmail = u -> u.getEmail().equals(userDto.email());
          List<User> userList = userRepository.findAll();
          existThrow(isExistEmail,userList,"이미 존재하는 이메일 입니다.");
       }
 
       UUID imageId = user.getProfileImageId();
-      if(requestDto.image() != null && !requestDto.image().isEmpty()){
+      if(file != null && !file.isEmpty()){
          BinaryContent binaryContent = BinaryContent.builder()
-               .originalFileName(requestDto.image().getOriginalFilename())
-               .fileName(UUID.randomUUID().toString().replace("-", ""))
-               .contentType(requestDto.image().getContentType())
+               .originalFileName(file.getOriginalFilename())
+               .contentType(file.getContentType())
                .build();
 
          binaryContentRepository.save(binaryContent);
@@ -115,18 +120,17 @@ public class BasicUserService implements UserService {
       if(user.isProfileImageExist() && !imageId.equals(user.getProfileImageId())) {
          binaryContentRepository.delete(user.getProfileImageId());
       }
+      UserDto updatedUserDto = userDto.withProfileImageId(imageId);
 
-      User updatedUser = user.withNickname(requestDto.nickname())
-            .withRealName(requestDto.realName())
-            .withPassword(requestDto.password().isEmpty() ? user.getPassword() : requestDto.password())
-            .withEmail(requestDto.email())
-            .withPhoneNumber(requestDto.phoneNumber())
-            .withProfileImageId(imageId)
-            .withUpdatedAt(Instant.now());
+      User updatedUser = user.updateInfo(UserUpdateCommand.from(updatedUserDto));
 
       userRepository.save(updatedUser);
 
-      return UserResponse.from(updatedUser);
+      return UserDto.from(updatedUser);
+   }
+
+   private  boolean isBlank(String password) {
+      return password == null || password.isEmpty();
    }
 
    @Override
@@ -150,12 +154,12 @@ public class BasicUserService implements UserService {
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저 입니다."));
    }
 
-   private UserResponse updateUserOnlineStatus(User u, UserResponse userResponse) {
+   private UserDto updateUserOnlineStatus(User u, UserDto userDto) {
       Optional<UserStatus> userStatus = userStatusRepository.findById(u.getId());
       if(userStatus.isPresent()) {
-         userResponse = userResponse.withOnline(userStatus.get().isOnline());
+         userDto = userDto.withOnline(userStatus.get().isOnline());
       }
-      return userResponse;
+      return userDto;
    }
 
 }

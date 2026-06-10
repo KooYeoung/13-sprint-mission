@@ -9,10 +9,5 @@ public record UserStatusCreateRequest(
       UUID userId
       , Instant createdAt
 ) {
-   public UserStatus toUserStatus() {
 
-      return new UserStatus(
-             createdAt
-            , userId);
-   }
 }

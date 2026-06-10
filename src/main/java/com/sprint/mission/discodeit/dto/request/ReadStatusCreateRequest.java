@@ -10,13 +10,6 @@ public record ReadStatusCreateRequest(
       , UUID channelId
       , Instant readAt
 ) {
-   public ReadStatus toReadStatus() {
-
-      return new ReadStatus(
-            readAt
-            , userId
-            , channelId);
-   }
 
 
 }

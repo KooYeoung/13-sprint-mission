@@ -1,48 +1,51 @@
 package com.sprint.mission.discodeit.entity;
 
+import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Getter
-@ToString(exclude = "password")
+@ToString(exclude = "password",callSuper = true)
 public class User extends UpdatableEntity {
 
    private final String username;
-   @With
    private final String nickname;
-   @With
    private final String realName;
-   @With
    private final String password;
-   @With
    private final String email;
-   @With
    private final String phoneNumber;
-   @With
    private final UUID profileImageId;
 
-   @Builder
-   public User(
-         String username,
-         String nickname,
-         String realName,
-         String password,
-         String email,
-         String phoneNumber,
-         UUID profileImageId
-   ) {
+   public User(UserCreateCommand command) {
       super(Instant.now());
-      this.username = username;
-      this.nickname = nickname;
-      this.realName = realName;
-      this.password = password;
-      this.email = email;
-      this.phoneNumber = phoneNumber;
-      this.profileImageId = profileImageId;
+      this.username = command.username();
+      this.nickname = command.nickname();
+      this.realName = command.realName();
+      this.password = command.password();
+      this.email = command.email();
+      this.phoneNumber = command.phoneNumber();
+      this.profileImageId = command.profileImageId();
    }
 
+   public User updateInfo(
+          UserUpdateCommand command
+   ) {
+      return new User(
+              getId(),
+              getCreatedAt(),
+              Instant.now(),
+              username,
+              command.nickname(),
+              command.realName(),
+              command.password(),
+              command.email(),
+              command.phoneNumber(),
+              command.profileImageId()
+      );
+   }
    private User(
          UUID id,
          Instant createdAt,
@@ -71,21 +74,6 @@ public class User extends UpdatableEntity {
 
    public boolean hasEmail(String email){
       return this.email.equals(email);
-   }
-
-   public User withUpdatedAt(Instant now){
-      return new User(
-            getId(),
-            getCreatedAt(),
-            now,
-            username,
-            nickname,
-            realName,
-            password,
-            email,
-            phoneNumber,
-            profileImageId
-      );
    }
 
 }

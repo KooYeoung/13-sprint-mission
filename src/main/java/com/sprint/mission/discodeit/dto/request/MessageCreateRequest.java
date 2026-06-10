@@ -11,13 +11,6 @@ public record MessageCreateRequest(
       String content
       , UUID channelId
       , UUID userId
-      , List<MultipartFile> files
 ) {
-   public Message toMessage() {
-      return new Message(
-            content
-            , userId
-            , channelId
-            , new ArrayList<>());
-   }
+
 }
