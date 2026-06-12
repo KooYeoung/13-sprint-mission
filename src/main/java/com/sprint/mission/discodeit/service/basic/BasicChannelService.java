@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
+import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class BasicChannelService implements ChannelService {
    private final ChannelRepository channelRepository;
    private final ReadStatusRepository readStatusRepository;
    private final MessageRepository messageRepository;
+   private final UserRepository userRepository;
 
 
    @Override
@@ -62,6 +64,8 @@ public class BasicChannelService implements ChannelService {
 
    @Override
    public List<ChannelDto> findAllByUserId(UUID userId) {
+      userRepository.findById(userId).orElseThrow(()-> new IllegalArgumentException("존재하지 않는 유저 입니다."));
+
       List<UUID> channelIds = readStatusRepository.findByUserId(userId)
             .stream()
             .map(ReadStatus::getChannelId)
