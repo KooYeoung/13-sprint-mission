@@ -155,7 +155,7 @@ public class BasicUserService implements UserService {
    }
 
    private UserDto updateUserOnlineStatus(User u, UserDto userDto) {
-      Optional<UserStatus> userStatus = userStatusRepository.findById(u.getId());
+      Optional<UserStatus> userStatus = userStatusRepository.findByUserId(u.getId());
       if(userStatus.isPresent()) {
          userDto = userDto.withOnline(userStatus.get().isOnline());
       }

@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.dto.response;
 
+import com.sprint.mission.discodeit.dto.request.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.entity.UserStatus;
 
 import java.time.Instant;
@@ -18,5 +19,16 @@ public record UserStatusDto(
             , userStatus.isOnline()
             , userStatus.getUpdatedAt()
             );
+   }
+
+   public static UserStatusDto from(UserStatusUpdateRequest request){
+
+       return new UserStatusDto(
+               request.id()
+               ,request.userId()
+               ,false
+               ,request.lastOnlineAt()
+       );
+
    }
 }
