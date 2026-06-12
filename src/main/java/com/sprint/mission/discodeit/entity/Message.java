@@ -48,7 +48,7 @@ public class Message extends UpdatableEntity {
             getId(),
             getCreatedAt(),
             Instant.now(),
-            content,
+            command.content(),
             userId,
             channelId,
             fileIds
