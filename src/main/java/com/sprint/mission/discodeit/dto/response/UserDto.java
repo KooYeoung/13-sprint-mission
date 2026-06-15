@@ -19,7 +19,7 @@ public record UserDto(
       , String phoneNumber
       , @JsonIgnore String password
       , @With UUID profileId
-      , @With boolean isOnline
+      , @With boolean online
       , Instant createdAt
         ,Instant updatedAt
         ) {
