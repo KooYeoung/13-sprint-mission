@@ -10,6 +10,8 @@ public record BinaryContentDto(
       , String fileName
       , String contentType
       , String originalFileName
+      ,Long size
+      ,String savePath
 ) {
 
    public static BinaryContentDto from(BinaryContent binaryContent) {
@@ -18,6 +20,8 @@ public record BinaryContentDto(
             , binaryContent.getFileName()
             , binaryContent.getContentType()
             , binaryContent.getOriginalFileName()
+              , binaryContent.getSize()
+              ,binaryContent.getPath()
             );
    }
 
@@ -27,6 +31,8 @@ public record BinaryContentDto(
                , null
                , file.getContentType()
                , file.getOriginalFilename()
+               , file.getSize()
+               , null
        );
    }
 }
