@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.dto.response.BinaryContentDownloadDto;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.service.basic.BinaryContentService;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,9 @@ public class BinaryContentController {
     }
 
     @RequestMapping(value = "/find",method = RequestMethod.GET)
-    public ResponseEntity<BinaryContentDto> findById(@RequestParam UUID binaryContentId){
-        BinaryContentDto binaryContentDto = binaryContentService.findById(binaryContentId);
+    public ResponseEntity<BinaryContentDownloadDto> findById(@RequestParam UUID binaryContentId){
+        BinaryContentDownloadDto binaryContentDownloadDto = binaryContentService.findById(binaryContentId);
 
-        return ResponseEntity.ok().body(binaryContentDto);
+        return ResponseEntity.ok().body(binaryContentDownloadDto);
     }
 }

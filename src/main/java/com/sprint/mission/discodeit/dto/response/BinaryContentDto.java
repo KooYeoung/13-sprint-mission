@@ -14,14 +14,16 @@ public record BinaryContentDto(
       ,String savePath
 ) {
 
-   public static BinaryContentDto from(BinaryContent binaryContent) {
-      return new BinaryContentDto(
+   public static BinaryContentDto from(BinaryContent binaryContent)  {
+
+       return new BinaryContentDto(
             binaryContent.getId()
             , binaryContent.getFileName()
             , binaryContent.getContentType()
             , binaryContent.getOriginalFileName()
               , binaryContent.getSize()
               ,binaryContent.getPath()
+
             );
    }
 

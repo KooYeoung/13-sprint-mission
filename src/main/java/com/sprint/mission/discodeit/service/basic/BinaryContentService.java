@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.response.BinaryContentDownloadDto;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.exception.CustomFileNotFoundException;
@@ -58,11 +59,24 @@ public class BinaryContentService {
       return Optional.of(BinaryContentDto.from(save));
    }
 
-   public BinaryContentDto findById(UUID id){
+   public BinaryContentDownloadDto findById(UUID id){
 
       BinaryContent binaryContent = binaryContentRepository.findById(id)
               .orElseThrow(() -> new CustomFileNotFoundException("존재 하지 않는 파일입니다."));
-      return BinaryContentDto.from(binaryContent);
+
+      try {
+         byte[] bytes = Files.readAllBytes(Path.of(binaryContent.getPath()));
+
+         return new BinaryContentDownloadDto(
+                 binaryContent.getId(),
+                 binaryContent.getOriginalFileName(),
+                 binaryContent.getContentType(),
+                 binaryContent.getSize(),
+                 bytes
+         );
+      } catch (IOException e) {
+         throw new RuntimeException("파일을 읽는 중 오류가 발생했습니다.", e);
+      }
    }
 
    public List<BinaryContentDto> findAllByIdIn(List<UUID> ids){
