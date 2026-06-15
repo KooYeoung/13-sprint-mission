@@ -1,13 +1,15 @@
 package com.sprint.mission.discodeit.dto.request;
 
+import lombok.With;
+
 import java.time.Instant;
 import java.util.UUID;
 
 public record ReadStatusUpdateRequest (
-      UUID id
+      @With UUID id
       , Instant readAt
       , UUID userId
-      , UUID channelId
+      , @With UUID channelId
       ){
 
 }
