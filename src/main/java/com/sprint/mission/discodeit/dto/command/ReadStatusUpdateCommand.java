@@ -3,7 +3,6 @@ package com.sprint.mission.discodeit.dto.command;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 
 import java.time.Instant;
-import java.util.UUID;
 
 public record ReadStatusUpdateCommand(
 Instant readAt

@@ -1,6 +1,5 @@
 package com.sprint.mission.discodeit.dto.request;
 
-import com.sprint.mission.discodeit.entity.ChannelType;
 import lombok.With;
 
 import java.util.UUID;

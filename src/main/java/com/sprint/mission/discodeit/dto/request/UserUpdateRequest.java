@@ -1,8 +1,6 @@
 package com.sprint.mission.discodeit.dto.request;
 
 import lombok.With;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.UUID;
 
 @With

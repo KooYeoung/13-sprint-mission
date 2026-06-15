@@ -5,7 +5,6 @@ import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
-import lombok.With;
 
 import java.time.Instant;
 import java.util.List;
