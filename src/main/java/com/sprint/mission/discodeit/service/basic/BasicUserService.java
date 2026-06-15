@@ -3,11 +3,10 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
-import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import com.sprint.mission.discodeit.service.UserService;
@@ -27,8 +26,8 @@ import java.util.function.Predicate;
 @Slf4j
 public class BasicUserService implements UserService {
    private final UserRepository userRepository;
-   private final BinaryContentRepository binaryContentRepository;
    private final UserStatusRepository userStatusRepository;
+   private final BinaryContentService binaryContentService;
 
    @Override
    public UserDto create(UserDto userDto, MultipartFile file) {
@@ -41,18 +40,12 @@ public class BasicUserService implements UserService {
       existThrow(isExistEmail, userList, "이미 존재하는 이메일 입니다.");
       existThrow(isExistUsername, userList, "이미 존재하는 아이디 입니다.");
 
-      // 이미지 저장
       UUID imageId = null;
-      if(file != null && !file.isEmpty()){
-
-         BinaryContent binaryContent = BinaryContent.builder()
-               .originalFileName(file.getOriginalFilename())
-               .contentType(file.getContentType())
-               .build();
-
-         binaryContentRepository.save(binaryContent);
-         imageId = binaryContent.getId();
+      Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
+      if(binaryContentDto.isPresent()){
+         imageId = binaryContentDto.get().id();
       }
+
       UserDto updatedUserDto = userDto.withProfileImageId(imageId);
 
       UserCreateCommand newUserCommand = UserCreateCommand.from(updatedUserDto);
@@ -80,7 +73,6 @@ public class BasicUserService implements UserService {
       return userDto;
    }
 
-
    @Override
    public List<UserDto> findAll() {
 
@@ -94,7 +86,6 @@ public class BasicUserService implements UserService {
             .toList();
    }
 
-
    @Override
    public UserDto update(UserDto userDto, MultipartFile file) {
       User user = getUserRequireThrow(userDto.id());
@@ -106,31 +97,25 @@ public class BasicUserService implements UserService {
          existThrow(isExistEmail,userList,"이미 존재하는 이메일 입니다.");
       }
 
-      UUID imageId = user.getProfileImageId();
-      if(file != null && !file.isEmpty()){
-         BinaryContent binaryContent = BinaryContent.builder()
-               .originalFileName(file.getOriginalFilename())
-               .contentType(file.getContentType())
-               .build();
+      UUID oldImageId = user.getProfileImageId();
+      UUID newImageId = oldImageId;
 
-         binaryContentRepository.save(binaryContent);
-         imageId = binaryContent.getId();
+      Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
+
+      if (binaryContentDto.isPresent()) {
+         newImageId = binaryContentDto.get().id();
       }
 
-      if(user.isProfileImageExist() && !imageId.equals(user.getProfileImageId())) {
-         binaryContentRepository.delete(user.getProfileImageId());
-      }
-      UserDto updatedUserDto = userDto.withProfileImageId(imageId);
-
+      UserDto updatedUserDto = userDto.withProfileImageId(newImageId);
       User updatedUser = user.updateInfo(UserUpdateCommand.from(updatedUserDto));
 
       userRepository.save(updatedUser);
 
-      return UserDto.from(updatedUser);
-   }
+      if (oldImageId != null && !oldImageId.equals(newImageId)) {
+         binaryContentService.delete(oldImageId);
+      }
 
-   private  boolean isBlank(String password) {
-      return password == null || password.isEmpty();
+      return UserDto.from(updatedUser);
    }
 
    @Override
@@ -139,7 +124,7 @@ public class BasicUserService implements UserService {
 
       userRepository.delete(user.getId());
       if(user.isProfileImageExist()) {
-         binaryContentRepository.delete(user.getProfileImageId());
+         binaryContentService.delete(user.getProfileImageId());
       }
    }
 

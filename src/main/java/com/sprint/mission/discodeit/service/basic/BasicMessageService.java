@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
+import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.entity.*;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
@@ -22,7 +23,7 @@ public class BasicMessageService implements MessageService {
    private final MessageRepository messageRepository;
    private final UserRepository userRepository;
    private final ChannelRepository channelRepository;
-   private final BinaryContentRepository binaryContentRepository;
+   private final BinaryContentService binaryContentService;
 
 
    @Override
@@ -34,15 +35,13 @@ public class BasicMessageService implements MessageService {
       if (files!=null && !files.isEmpty()) {
          List<UUID> attachedFileIds = new ArrayList<>();
          for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-               BinaryContent binaryContent = BinaryContent.builder()
-                     .originalFileName(file.getOriginalFilename())
-                     .contentType(file.getContentType())
-                     .build();
-
-               binaryContentRepository.save(binaryContent);
-               attachedFileIds.add(binaryContent.getId());
+            Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
+            if(binaryContentDto.isEmpty()){
+               continue;
             }
+            BinaryContentDto savedBinaryContent = binaryContentDto.get();
+            attachedFileIds.add(savedBinaryContent.id());
+
          }
          command = command.withFileIds(attachedFileIds);
       }
@@ -111,7 +110,7 @@ public class BasicMessageService implements MessageService {
       messageRepository.delete(messageId);
       if (!message.getFileIds().isEmpty()) {
          message.getFileIds()
-               .forEach(binaryContentRepository::delete);
+               .forEach(binaryContentService::delete);
       }
    }
 
