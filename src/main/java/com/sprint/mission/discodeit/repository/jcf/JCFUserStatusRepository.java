@@ -19,7 +19,9 @@ public class JCFUserStatusRepository implements UserStatusRepository {
 
    @Override
    public UserStatus save(UserStatus userStatus) {
-      return userStatusMap.put(userStatus.getId(), userStatus);
+      userStatusMap.put(userStatus.getId(), userStatus);
+      return userStatus;
+
    }
 
    @Override
@@ -42,7 +44,7 @@ public class JCFUserStatusRepository implements UserStatusRepository {
 
    @Override
    public UserStatus update(UserStatus userStatus) {
-      return userStatusMap.put(userStatus.getId(), userStatus);
+      return save(userStatus);
    }
 
    @Override
