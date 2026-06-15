@@ -5,6 +5,9 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.UserStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.UserStatusNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +30,7 @@ public class UserStatusService {
       boolean userStatusExists = userStatusRepository.findAll().stream()
             .anyMatch(u -> u.getUserId().equals(userStatusDto.userId()));
 
-      if (userStatusExists) throw new IllegalArgumentException("이미 유저 상태가 존재합니다.");
+      if (userStatusExists) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
 
 
       UserStatus userStatus = new UserStatus(UserStatusCreateCommand.from(userStatusDto));
@@ -94,11 +97,11 @@ public class UserStatusService {
    }
 
    private UserStatus getUserStatusRequireThrow(UUID id) {
-      return userStatusRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("유저 상태가 존재하지 않습니다."));
+      return userStatusRepository.findById(id).orElseThrow(UserStatusNotFoundException::new);
    }
 
    private User getUserRequireThrow(UUID userId) {
-      return userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("존재 하지 않는 유저 입니다."));
+      return userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
    }
 
 }

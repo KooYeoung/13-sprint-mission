@@ -7,6 +7,8 @@ import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
+import com.sprint.mission.discodeit.exception.UserBadRequestException;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import com.sprint.mission.discodeit.service.UserService;
@@ -46,7 +48,7 @@ public class BasicUserService implements UserService {
          imageId = binaryContentDto.get().id();
       }
 
-      UserDto updatedUserDto = userDto.withProfileImageId(imageId);
+      UserDto updatedUserDto = userDto.withProfileId(imageId);
 
       UserCreateCommand newUserCommand = UserCreateCommand.from(updatedUserDto);
 
@@ -106,7 +108,7 @@ public class BasicUserService implements UserService {
          newImageId = binaryContentDto.get().id();
       }
 
-      UserDto updatedUserDto = userDto.withProfileImageId(newImageId);
+      UserDto updatedUserDto = userDto.withProfileId(newImageId);
       User updatedUser = user.updateInfo(UserUpdateCommand.from(updatedUserDto));
 
       userRepository.save(updatedUser);
@@ -131,12 +133,12 @@ public class BasicUserService implements UserService {
    private void existThrow(Predicate<User> p, List<User> userList, String message) {
       boolean exist = userList.stream()
             .anyMatch(p);
-      if(exist) throw new IllegalArgumentException(message);
+      if(exist) throw new UserBadRequestException(message);
    }
 
    private User getUserRequireThrow(UUID userId) {
       return userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저 입니다."));
+            .orElseThrow(UserNotFoundException::new);
    }
 
    private UserDto updateUserOnlineStatus(User u, UserDto userDto) {

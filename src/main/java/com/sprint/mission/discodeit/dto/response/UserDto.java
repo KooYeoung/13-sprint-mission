@@ -7,19 +7,22 @@ import com.sprint.mission.discodeit.dto.request.UserUpdateRequest;
 import com.sprint.mission.discodeit.entity.User;
 import lombok.With;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public record UserDto(
-      UUID id
+        UUID id
       , String username
       , String nickname
       , String realName
       , String email
       , String phoneNumber
       , @JsonIgnore String password
-      , @With UUID profileImageId
+      , @With UUID profileId
       , @With boolean isOnline
-) {
+      , Instant createdAt
+        ,Instant updatedAt
+        ) {
    public static UserDto from(User user) {
       return new UserDto(
               user.getId()
@@ -30,7 +33,10 @@ public record UserDto(
             , user.getPhoneNumber()
               ,user.getPassword()
             , user.getProfileImageId()
-            , false);
+            , false
+            ,user.getCreatedAt()
+              ,user.getUpdatedAt()
+      );
    }
 
    public static UserDto from(UserCreateRequest request){
@@ -44,6 +50,8 @@ public record UserDto(
               ,request.password()
               ,null
               ,false
+              ,null
+              ,null
       );
    }
 
@@ -58,6 +66,8 @@ public record UserDto(
               ,request.password()
               ,null
               ,false
+              ,null
+              ,null
       );
    }
 
@@ -72,6 +82,8 @@ public record UserDto(
               ,request.password()
               ,null
               ,false
+              ,null
+              ,null
       );
    }
 

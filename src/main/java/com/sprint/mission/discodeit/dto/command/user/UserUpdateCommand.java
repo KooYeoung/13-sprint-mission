@@ -21,7 +21,7 @@ public record UserUpdateCommand(
                 , userDto.password()
                 , userDto.email()
                 , userDto.phoneNumber()
-                , userDto.profileImageId()
+                , userDto.profileId()
                 ,Instant.now()
         );
     }

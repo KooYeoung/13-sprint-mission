@@ -2,8 +2,8 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.exception.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -60,7 +60,8 @@ public class BinaryContentService {
 
    public BinaryContentDto findById(UUID id){
 
-      BinaryContent binaryContent = binaryContentRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("존재 하지 않는 파일입니다."));
+      BinaryContent binaryContent = binaryContentRepository.findById(id)
+              .orElseThrow(() -> new CustomFileNotFoundException("존재 하지 않는 파일입니다."));
       return BinaryContentDto.from(binaryContent);
    }
 

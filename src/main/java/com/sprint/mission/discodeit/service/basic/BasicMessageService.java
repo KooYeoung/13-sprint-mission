@@ -5,7 +5,9 @@ import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.entity.*;
-import com.sprint.mission.discodeit.repository.BinaryContentRepository;
+import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.MessageNotFountException;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -120,7 +122,7 @@ public class BasicMessageService implements MessageService {
 
    private Channel getChannelRequireThrow(UUID channelId) {
       return getChannel(channelId)
-            .orElseThrow(() -> new IllegalArgumentException("존재 하지 않는 채널 입니다."));
+            .orElseThrow(ChannelNotFoundException::new);
    }
 
    private Optional<User> getUser(UUID userId) {
@@ -129,11 +131,11 @@ public class BasicMessageService implements MessageService {
 
    private User getUserRequireThrow(UUID userId) {
       return getUser(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저 입니다."));
+            .orElseThrow(UserNotFoundException::new);
    }
 
    private Message getMessageRequireThrow(UUID messageId) {
       return messageRepository.findById(messageId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 메시지 입니다."));
+            .orElseThrow(MessageNotFountException::new);
    }
 }

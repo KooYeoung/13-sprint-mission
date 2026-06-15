@@ -5,6 +5,10 @@ import com.sprint.mission.discodeit.dto.command.ReadStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
+import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.ReadStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.ReadStatusNotFoundException;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,17 +73,17 @@ public class ReadStatusService {
    }
 
    private ReadStatus getReadStatusRequireThrow(UUID id) {
-      return readStatusRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("읽음 상태가 존재 하지 않습니다."));
+      return readStatusRepository.findById(id).orElseThrow(ReadStatusNotFoundException::new);
    }
 
    private Channel getChannelRequireThrow(UUID channelId) {
       return channelRepository.findById(channelId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채널입니다."));
+            .orElseThrow(ChannelNotFoundException::new);
    }
 
    private void getUserRequireThrow(UUID userId) {
       userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(UserNotFoundException::new);
    }
 
    private void validateChannelAndReadStatus(UUID userId, UUID channelId) {
@@ -87,12 +91,12 @@ public class ReadStatusService {
 
       Channel channel = getChannelRequireThrow(channelId);
 
-      if (!channel.isPrivate()) throw new IllegalArgumentException("비공개 채널만 등록 가능합니다.");
+      if (!channel.isPrivate()) throw new ReadStatusBadRequestException("비공개 채널만 등록 가능합니다.");
 
       boolean hasReadStatus = readStatusRepository.findByUserId(userId).stream()
             .anyMatch(r -> r.getChannelId().equals(channelId));
 
-      if (hasReadStatus) throw new IllegalArgumentException("이미 읽음 상태가 존재합니다.");
+      if (hasReadStatus) throw new ReadStatusBadRequestException("이미 읽음 상태가 존재합니다.");
    }
 
 

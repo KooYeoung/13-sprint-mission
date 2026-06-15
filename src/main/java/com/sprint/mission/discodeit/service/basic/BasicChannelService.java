@@ -7,6 +7,9 @@ import com.sprint.mission.discodeit.entity.BaseEntity;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
+import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.ChannelUpdateFailException;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
@@ -64,7 +67,7 @@ public class BasicChannelService implements ChannelService {
 
    @Override
    public List<ChannelDto> findAllByUserId(UUID userId) {
-      userRepository.findById(userId).orElseThrow(()-> new IllegalArgumentException("존재하지 않는 유저 입니다."));
+      userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
       List<UUID> channelIds = readStatusRepository.findByUserId(userId)
             .stream()
@@ -112,7 +115,7 @@ public class BasicChannelService implements ChannelService {
    public ChannelDto update(ChannelDto channelDto) {
       Channel channel = getChannelRequireThrow(channelDto.id());
 
-      if(channel.isPrivate()) throw new IllegalArgumentException("PRIVATE 채널은 수정할 수 없습니다.");
+      if(channel.isPrivate()) throw new ChannelUpdateFailException("PRIVATE 채널은 수정할 수 없습니다.");
 
       Channel updatedChannel = channel.updateInfo(ChannelUpdateCommand.from(channelDto));
 
@@ -133,7 +136,7 @@ public class BasicChannelService implements ChannelService {
 
    private Channel getChannelRequireThrow(UUID channelId) {
       return channelRepository.findById(channelId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채널 입니다."));
+            .orElseThrow(ChannelNotFoundException::new);
    }
 
 }

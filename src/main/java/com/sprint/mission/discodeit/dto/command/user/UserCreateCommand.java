@@ -21,7 +21,7 @@ public record UserCreateCommand(
                 , userDto.password()
                 , userDto.email()
                 , userDto.phoneNumber()
-                , userDto.profileImageId()
+                , userDto.profileId()
         );
     }
 }
