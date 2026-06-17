@@ -1,53 +1,135 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
+import com.sprint.mission.discodeit.dto.response.ChannelDto;
+import com.sprint.mission.discodeit.entity.BaseEntity;
 import com.sprint.mission.discodeit.entity.Channel;
-import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.entity.Message;
+import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
+import com.sprint.mission.discodeit.repository.MessageRepository;
+import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
+@Service
+@RequiredArgsConstructor
 public class BasicChannelService implements ChannelService {
    private final ChannelRepository channelRepository;
-   public BasicChannelService(ChannelRepository channelRepository) {
-      this.channelRepository = channelRepository;
-   }
+   private final ReadStatusRepository readStatusRepository;
+   private final MessageRepository messageRepository;
+
 
    @Override
-   public void save(Channel channel) {
+   public ChannelDto save(ChannelDto channelDto) {
+
+      Channel channel = new Channel(ChannelCreateCommand.from(channelDto));
       channelRepository.save(channel);
+
+      return ChannelDto.from(channel);
    }
 
    @Override
-   public Channel findById(UUID channelId) {
-      return channelRepository.findById(channelId);
+   public ChannelDto findById(UUID channelId) {
+      Channel channel = getChannelRequireThrow(channelId);
+
+      ChannelDto channelDto = ChannelDto.from(channel);
+
+      if(channel.isPrivate()){
+         List<UUID> userIds = readStatusRepository.findByChannelId(channelId)
+               .stream()
+               .map(ReadStatus::getUserId)
+               .toList();
+
+         channelDto = channelDto.withUserIds(userIds);
+
+      }
+
+      Optional<Message> max = messageRepository.findAllByChannelId(channelId)
+            .stream().max(Comparator.comparing(BaseEntity::getCreatedAt));
+
+      if(max.isPresent()) {
+         channelDto = channelDto.withLastMessageAt(max.get().getCreatedAt());
+      }
+
+      return channelDto;
    }
 
    @Override
-   public List<Channel> findAll() {
-      return channelRepository.findAll();
+   public List<ChannelDto> findAllByUserId(UUID userId) {
+      List<UUID> channelIds = readStatusRepository.findByUserId(userId)
+            .stream()
+            .map(ReadStatus::getChannelId)
+            .toList();
+
+      Map<UUID, List<UUID>> readStatusByChannelId = readStatusRepository.findAll()
+            .stream()
+            .filter(r -> channelIds.contains(r.getChannelId()))
+            .collect(Collectors.groupingBy(ReadStatus::getChannelId
+                  ,Collectors.mapping(ReadStatus::getUserId,Collectors.toList())));
+
+      Map<UUID, Optional<Message>> channelLatestMessages = messageRepository.findAll()
+            .stream()
+            .filter(m -> channelIds.contains(m.getChannelId()))
+            .collect(Collectors.groupingBy(Message::getChannelId, Collectors.maxBy(Comparator.comparing(Message::getCreatedAt))));
+
+      return channelRepository.findAll()
+            .stream()
+            .filter(c -> c.isPrivate() && channelIds.contains(c.getId()) || c.isPublic())
+            .map(c ->{
+               ChannelDto channelDto = ChannelDto.from(c);
+               if(c.isPrivate()) {
+                  List<UUID> userIds = readStatusByChannelId.getOrDefault(c.getId(), new ArrayList<>());
+                  channelDto = channelDto.withUserIds(userIds);
+               }
+               Optional<Message> optionalLatestMessage = channelLatestMessages.getOrDefault(c.getId(), Optional.empty());
+
+               if(optionalLatestMessage.isPresent()) {
+                  channelDto = channelDto.withLastMessageAt(optionalLatestMessage.get().getCreatedAt());
+               }
+               return channelDto;
+            })
+            .toList();
    }
 
    @Override
-   public void update(UUID channelId, String channelName, String description, ChannelType channelType) {
-      Channel channel = findById(channelId);
-      if(notExistChannel(channel)) return;
+   public List<ChannelDto> findAll() {
+      return channelRepository.findAll().stream()
+            .map(ChannelDto::from)
+            .toList();
+   }
 
-      channel.update(channelName,description,channelType);
+   @Override
+   public ChannelDto update(ChannelDto channelDto) {
+      Channel channel = getChannelRequireThrow(channelDto.id());
 
-      channelRepository.save(channel);
+      if(channel.isPrivate()) throw new IllegalArgumentException("PRIVATE 채널은 수정할 수 없습니다.");
+
+      Channel updatedChannel = channel.updateInfo(ChannelUpdateCommand.from(channelDto));
+
+      channelRepository.save(updatedChannel);
+
+      return findById(updatedChannel.getId());
    }
 
    @Override
    public void delete(UUID channelId) {
-      Channel channel = findById(channelId);
-      if(notExistChannel(channel)) return;
+      Channel channel = getChannelRequireThrow(channelId);
 
       channelRepository.delete(channel.getId());
+      readStatusRepository.deleteByChannelId(channelId);
+      messageRepository.deleteAllByChannelId(channelId);
+
    }
 
-   private boolean notExistChannel(Channel channel) {
-      return channel == null;
+   private Channel getChannelRequireThrow(UUID channelId) {
+      return channelRepository.findById(channelId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 채널 입니다."));
    }
+
 }

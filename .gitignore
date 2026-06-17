@@ -1,3 +1,4 @@
+HELP.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -45,7 +46,7 @@ bin/
 .DS_Store
 
 ## 메모리 영역에 저장되는 폴더
-data/
+.discodeit/
 
 ## etc
 analysis/

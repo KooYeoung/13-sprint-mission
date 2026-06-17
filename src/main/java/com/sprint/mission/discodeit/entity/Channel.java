@@ -1,44 +1,57 @@
 package com.sprint.mission.discodeit.entity;
 
-public class Channel extends BaseEntity{
-   private String channelName;
-   private String description;
-   private ChannelType channelType;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
-   public Channel(String channelName, String description, ChannelType channelType){
+import java.time.Instant;
+import java.util.UUID;
+
+@Getter
+@ToString
+public class Channel extends UpdatableEntity {
+   private  final String channelName;
+   private  final String description;
+   private  final ChannelType channelType;
+
+   @Builder
+   public Channel(ChannelCreateCommand command) {
+      super(Instant.now());
+      this.channelName = command.channelName();
+      this.description = command.channelDescription();
+      this.channelType = command.channelType();
+   }
+
+   public Channel updateInfo(ChannelUpdateCommand command){
+      return new Channel(
+              getId()
+              ,getCreatedAt()
+              ,Instant.now()
+              , command.channelName()
+              , command.channelDescription()
+              ,command.channelType()
+      );
+   }
+
+   private Channel(UUID id
+         , Instant createdAt
+         , Instant updatedAt
+         , String channelName
+         , String description
+         , ChannelType channelType) {
+      super(id, createdAt, updatedAt);
       this.channelName = channelName;
       this.description = description;
       this.channelType = channelType;
    }
 
-   public void update(String channelName, String description, ChannelType channelType){
-      super.update();
-      this.channelName = channelName;
-      this.description = description;
-      this.channelType = channelType;
+   public boolean isPrivate() {
+      return ChannelType.PRIVATE.equals(channelType);
+   }
+   public boolean isPublic() {
+      return ChannelType.PUBLIC.equals(channelType);
    }
 
-   @Override
-   public String toString() {
-      return "Channel{" +
-            "id='" + getId() + '\'' +
-            ", channelName='" + channelName + '\'' +
-            ", description='" + description + '\'' +
-            ", channelType=" + channelType +
-            ", createdAt=" + getCreatedAt() +
-            ", updatedAt=" + getUpdatedAt() +
-            '}';
-   }
-
-   public String getChannelName() {
-      return channelName;
-   }
-
-   public String getDescription() {
-      return description;
-   }
-
-   public ChannelType getChannelType() {
-      return channelType;
-   }
 }
