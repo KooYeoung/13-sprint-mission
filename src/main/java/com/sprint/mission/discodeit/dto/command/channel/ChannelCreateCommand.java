@@ -8,13 +8,19 @@ public record ChannelCreateCommand (
         , String channelDescription
         , ChannelType channelType
 ){
+    @Override
+    public String channelName() {
+        return isPrivate() ? "" : channelName;
+    }
 
-    public static ChannelCreateCommand from(ChannelDto dto){
-        return new ChannelCreateCommand(
-                dto.isPrivate() ? "" : dto.channelName()
-                , dto.isPrivate() ? "" : dto.description()
-                , dto.channelType()
-        );
+    @Override
+    public String channelDescription() {
+        return isPrivate() ? "" : channelDescription;
+
+    }
+
+    public boolean isPrivate(){
+        return ChannelType.PRIVATE.equals(channelType);
     }
 
 }

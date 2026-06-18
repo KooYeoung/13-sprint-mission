@@ -1,7 +1,5 @@
 package com.sprint.mission.discodeit.dto.response;
 
-import com.sprint.mission.discodeit.dto.request.ChannelCreateRequest;
-import com.sprint.mission.discodeit.dto.request.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import lombok.With;
@@ -27,27 +25,6 @@ public record ChannelDto(
             , channel.getChannelType()
             , null
             ,  new ArrayList<>());
-   }
-
-   public static ChannelDto from(ChannelCreateRequest request){
-      return new ChannelDto(
-              null
-              , request.channelName()
-              , request.channelDescription()
-              , ChannelType.valueOf(request.channelType())
-              , null
-              ,new ArrayList<>()
-      );
-   }
-   public static ChannelDto from(ChannelUpdateRequest request){
-      return new ChannelDto(
-              request.channelId()
-              , request.channelName()
-              , request.channelDescription()
-              , ChannelType.valueOf(request.channelType())
-              , null
-              ,new ArrayList<>()
-      );
    }
 
    public boolean isPrivate() {

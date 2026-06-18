@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.controller;
 
-import com.sprint.mission.discodeit.dto.request.ChannelCreateRequest;
-import com.sprint.mission.discodeit.dto.request.ChannelUpdateRequest;
+import com.sprint.mission.discodeit.dto.request.channel.ChannelCreateRequest;
+import com.sprint.mission.discodeit.dto.request.channel.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
 import com.sprint.mission.discodeit.service.ChannelService;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +23,13 @@ public class ChannelController {
 
     @RequestMapping(method = RequestMethod.POST)
     public ResponseEntity<ChannelDto> create(@RequestBody ChannelCreateRequest request){
-        ChannelDto save = channelService.save(ChannelDto.from(request));
+        ChannelDto save = channelService.save(request.toCommand());
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
     @RequestMapping(value = "/{id}",method = RequestMethod.PUT)
     public ResponseEntity<ChannelDto> update(@PathVariable UUID id, @RequestBody ChannelUpdateRequest request){
-        request =  request.withChannelId(id);
-        ChannelDto update = channelService.update(ChannelDto.from(request));
+        ChannelDto update = channelService.update(id, request.toCommand());
         return ResponseEntity.ok().body(update);
     }
 

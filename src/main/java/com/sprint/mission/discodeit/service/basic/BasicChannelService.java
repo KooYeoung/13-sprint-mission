@@ -31,9 +31,9 @@ public class BasicChannelService implements ChannelService {
 
 
    @Override
-   public ChannelDto save(ChannelDto channelDto) {
+   public ChannelDto save(ChannelCreateCommand command) {
 
-      Channel channel = new Channel(ChannelCreateCommand.from(channelDto));
+      Channel channel = new Channel(command);
       channelRepository.save(channel);
 
       return ChannelDto.from(channel);
@@ -112,12 +112,12 @@ public class BasicChannelService implements ChannelService {
    }
 
    @Override
-   public ChannelDto update(ChannelDto channelDto) {
-      Channel channel = getChannelRequireThrow(channelDto.id());
+   public ChannelDto update(UUID channelId,  ChannelUpdateCommand command) {
+      Channel channel = getChannelRequireThrow(channelId);
 
       if(channel.isPrivate()) throw new ChannelUpdateFailException("PRIVATE 채널은 수정할 수 없습니다.");
 
-      Channel updatedChannel = channel.updateInfo(ChannelUpdateCommand.from(channelDto));
+      Channel updatedChannel = channel.updateInfo(command);
 
       channelRepository.save(updatedChannel);
 

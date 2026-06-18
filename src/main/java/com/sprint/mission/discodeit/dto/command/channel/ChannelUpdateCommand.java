@@ -8,11 +8,18 @@ public record ChannelUpdateCommand (
         , String channelDescription
         , ChannelType channelType
 ){
-    public static ChannelUpdateCommand from(ChannelDto dto){
-        return new ChannelUpdateCommand(
-                dto.isPrivate() ? "" : dto.channelName()
-                , dto.isPrivate() ? "" : dto.description()
-                , dto.channelType()
-        );
+    @Override
+    public String channelName() {
+        return isPrivate() ? "" : channelName;
+    }
+
+    @Override
+    public String channelDescription() {
+        return isPrivate() ? "" : channelDescription;
+
+    }
+
+    public boolean isPrivate(){
+        return ChannelType.PRIVATE.equals(channelType);
     }
 }
