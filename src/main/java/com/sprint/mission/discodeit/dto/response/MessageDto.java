@@ -1,7 +1,5 @@
 package com.sprint.mission.discodeit.dto.response;
 
-import com.sprint.mission.discodeit.dto.request.MessageCreateRequest;
-import com.sprint.mission.discodeit.dto.request.MessageUpdateRequest;
 import com.sprint.mission.discodeit.entity.Message;
 
 import java.util.List;
@@ -25,25 +23,4 @@ public record MessageDto(
             , message.getChannelId()
             );
    }
-
-   public static MessageDto from(MessageCreateRequest request){
-       return new MessageDto(
-               null
-               ,request.content()
-               ,null
-               ,null
-               ,request.userId()
-               ,request.channelId()
-       );
-   }
-    public static MessageDto from(MessageUpdateRequest request){
-        return new MessageDto(
-                request.messageId()
-                ,request.content()
-                ,null
-                ,null
-                ,request.userId()
-                ,request.channelId()
-        );
-    }
 }

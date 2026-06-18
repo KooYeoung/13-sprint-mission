@@ -20,12 +20,12 @@ public class Message extends UpdatableEntity {
    private final List<UUID> fileIds;
 
    @Builder
-   public Message(MessageCreateCommand command) {
+   public Message(MessageCreateCommand command, List<UUID> fileIds) {
       super(Instant.now());
       this.content = command.content();
       this.userId = command.userId();
       this.channelId = command.channelId();
-      this.fileIds = command.fileIds();
+      this.fileIds = fileIds;
    }
 
    private Message(UUID id

@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.controller;
 
-import com.sprint.mission.discodeit.dto.request.MessageCreateRequest;
-import com.sprint.mission.discodeit.dto.request.MessageUpdateRequest;
+import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
+import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
@@ -23,15 +23,14 @@ public class MessageController {
 
     @RequestMapping(method = RequestMethod.POST)
     public ResponseEntity<MessageDto> create(@RequestPart MessageCreateRequest request, @RequestPart(required = false) List<MultipartFile> files){
-        MessageDto save = messageService.save(MessageDto.from(request), files);
+        MessageDto save = messageService.save(request.toCommand(), files);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
     @RequestMapping(value = "/{id}",method = RequestMethod.PUT)
     public ResponseEntity<MessageDto> update(@RequestBody MessageUpdateRequest request, @PathVariable UUID id){
-        request = request.withMessageId(id);
-        MessageDto update = messageService.update(MessageDto.from(request));
+        MessageDto update = messageService.update(id, request.toCommand());
         return ResponseEntity.ok().body(update);
     }
 
