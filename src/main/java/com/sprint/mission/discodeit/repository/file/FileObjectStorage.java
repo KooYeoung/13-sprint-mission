@@ -7,36 +7,63 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 public class FileObjectStorage <T extends BaseEntity>{
    private final Path path;
+   private final Map<UUID, T> dataMap = new ConcurrentHashMap<>();
 
    public FileObjectStorage(Path directoryPath){
 
       this.path = directoryPath;
-      // 저장할 경로의 파일 초기화
-      if (!Files.exists(path)) {
+
          try {
             Files.createDirectories(path);
+             loadAllFromDisk();
          } catch (IOException e) {
             throw new RuntimeException(e);
          }
-      }
 
    }
 
-   public void save(T entity){
+    private void loadAllFromDisk() throws IOException {
+        try (var paths = Files.list(path)) {
+            paths
+                    .filter(Files::isRegularFile)
+                    .filter(filePath -> filePath.toString().endsWith(".ser"))
+                    .forEach(filePath -> {
+                        try (
+                                FileInputStream fis = new FileInputStream(filePath.toFile());
+                                ObjectInputStream ois = new ObjectInputStream(fis)
+                        ) {
+                            Object data = ois.readObject();
+                            T entity = (T) data;
+                            dataMap.put(entity.getId(), entity);
+                        } catch (IOException | ClassNotFoundException e) {
+                            log.error("file load mapping error. path={}", filePath, e);
+                        }
+                    });
+        } catch (IOException e) {
+            log.error("file loadAll error", e);
+            throw new RuntimeException(e);
+        }
+    }
 
-      Path filePath = getFilePath(entity.getId());
+    public void save(T entity){
+      UUID entityId = entity.getId();
+      Path filePath = getFilePath(entityId);
 
       try(FileOutputStream fos = new FileOutputStream(filePath.toFile());
           ObjectOutputStream oos = new ObjectOutputStream(fos);
       ){
          oos.writeObject(entity);
+         dataMap.put(entityId,entity);
       }catch (IOException e){
          log.error("file save error ",e);
+         throw new RuntimeException("파일 저장 실패", e);
       }
    }
 
@@ -45,41 +72,13 @@ public class FileObjectStorage <T extends BaseEntity>{
    }
 
    public T load(UUID id){
-      Path filePath = getFilePath(id);
-
-      try(
-            FileInputStream fis = new FileInputStream(filePath.toFile());
-            ObjectInputStream ois = new ObjectInputStream(fis)
-      ) {
-         Object data = ois.readObject();
-
-         return (T) data;
-      }catch (IOException | ClassNotFoundException e){
-         log.error("file load error ",e);
-         return null;
-      }
+      T t = dataMap.get(id);
+      return t;
    }
 
    public List<T> loadAll(){
-      try {
-         return Files.list(path)
-               .map(path ->{
-                  try(
-                        FileInputStream fis = new FileInputStream(path.toFile());
-                        ObjectInputStream ois = new ObjectInputStream(fis)
-                  ) {
-                     Object data = ois.readObject();
-                     return (T) data;
-                  }catch (IOException | ClassNotFoundException e){
-                     log.error("file loadAll mapping error ",e);
-                     return null;
-                  }
-               }).toList();
-      } catch (IOException e) {
-         log.error("file loadAll error ",e);
-         throw new RuntimeException(e);
-      }
 
+      return dataMap.values().stream().toList();
    }
 
    public void delete(UUID id){
@@ -90,7 +89,7 @@ public class FileObjectStorage <T extends BaseEntity>{
           log.error("file delete error ",e);
            throw new RuntimeException(e);
        }
-
+       dataMap.remove(id);
    }
 
 
