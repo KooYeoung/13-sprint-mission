@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.dto.command.user.UserLoginCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
@@ -20,11 +21,11 @@ public class AuthService {
    private final UserRepository userRepository;
    private final UserStatusRepository userStatusRepository;
 
-   public UserDto login(UserDto userDto) {
+   public UserDto login(UserLoginCommand command) {
       User user = userRepository.findAll()
             .stream()
-            .filter(u -> u.getUsername().equals(userDto.username()))
-            .filter(u -> u.getPassword().equals(userDto.password()))
+            .filter(u -> u.getUsername().equals(command.username()))
+            .filter(u -> u.getPassword().equals(command.password()))
             .findFirst()
             .orElseThrow(() -> new LoginFailException("아이디 와 비밀번호를 다시한번 확인해 주세요."));
 
@@ -37,7 +38,7 @@ public class AuthService {
          UserStatus status = optionalUserStatus.get().updateInfo(new UserStatusUpdateCommand(now));
          userStatus = userStatusRepository.update(status);
       } else {
-         UserStatus status = new UserStatus(new UserStatusCreateCommand(user.getId(), now));
+         UserStatus status = new UserStatus( user.getId(), new UserStatusCreateCommand( now));
          userStatus = userStatusRepository.save(status);
       }
 

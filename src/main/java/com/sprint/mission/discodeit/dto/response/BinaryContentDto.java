@@ -27,14 +27,4 @@ public record BinaryContentDto(
             );
    }
 
-   public static BinaryContentDto from(MultipartFile file){
-       return new BinaryContentDto(
-               null
-               , null
-               , file.getContentType()
-               , file.getOriginalFilename()
-               , file.getSize()
-               , null
-       );
-   }
 }

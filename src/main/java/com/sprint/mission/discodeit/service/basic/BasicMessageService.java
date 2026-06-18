@@ -29,13 +29,12 @@ public class BasicMessageService implements MessageService {
 
 
    @Override
-   public MessageDto save(MessageDto messageDto, List<MultipartFile> files) {
-      getChannelRequireThrow(messageDto.channelId());
-      User user = getUserRequireThrow(messageDto.userId());
+   public MessageDto save(MessageCreateCommand command, List<MultipartFile> files) {
+      getChannelRequireThrow(command.channelId());
+      User user = getUserRequireThrow(command.userId());
 
-      MessageCreateCommand command = MessageCreateCommand.from(messageDto);
+      List<UUID> attachedFileIds = new ArrayList<>();
       if (files!=null && !files.isEmpty()) {
-         List<UUID> attachedFileIds = new ArrayList<>();
          for (MultipartFile file : files) {
             Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
             if(binaryContentDto.isEmpty()){
@@ -45,10 +44,9 @@ public class BasicMessageService implements MessageService {
             attachedFileIds.add(savedBinaryContent.id());
 
          }
-         command = command.withFileIds(attachedFileIds);
       }
 
-      Message message = new Message(command);
+      Message message = new Message(command, attachedFileIds);
 
       messageRepository.save(message);
 
@@ -88,14 +86,14 @@ public class BasicMessageService implements MessageService {
    }
 
    @Override
-   public MessageDto update(MessageDto dto) {
+   public MessageDto update(UUID messageId,MessageUpdateCommand command) {
 
-      Message message = getMessageRequireThrow(dto.messageId());
+      Message message = getMessageRequireThrow(messageId);
 
       getChannelRequireThrow(message.getChannelId());
       getUserRequireThrow(message.getUserId());
 
-      Message updatedMessage = message.updateInfo(MessageUpdateCommand.from(dto));
+      Message updatedMessage = message.updateInfo(command);
 
       messageRepository.save(updatedMessage);
 

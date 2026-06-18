@@ -32,33 +32,29 @@ public class BasicUserService implements UserService {
    private final BinaryContentService binaryContentService;
 
    @Override
-   public UserDto create(UserDto userDto, MultipartFile file) {
+   public UserDto create(UserCreateCommand command, MultipartFile file) {
 
       List<User> userList = userRepository.findAll();
       // username 과 email 존재 여부 확인 존재시 저장 x
-      Predicate<User> isExistUsername = user -> user.getUsername().equals(userDto.username()) ;
-      Predicate<User> isExistEmail = user ->  user.getEmail().equals(userDto.email());
+      Predicate<User> isExistUsername = user -> user.getUsername().equals(command.username()) ;
+      Predicate<User> isExistEmail = user ->  user.getEmail().equals(command.email());
 
       existThrow(isExistEmail, userList, "이미 존재하는 이메일 입니다.");
       existThrow(isExistUsername, userList, "이미 존재하는 아이디 입니다.");
 
-      UUID imageId = null;
+      UUID profileImageId = null;
       Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
       if(binaryContentDto.isPresent()){
-         imageId = binaryContentDto.get().id();
+         profileImageId = binaryContentDto.get().id();
       }
 
-      UserDto updatedUserDto = userDto.withProfileId(imageId);
-
-      UserCreateCommand newUserCommand = UserCreateCommand.from(updatedUserDto);
-
-      User user = new User(newUserCommand);
+      User user = new User(command, profileImageId);
       // USER 저장
       userRepository.save(user);
 
       // UserStatus 저장.
       Instant now = Instant.now();
-      UserStatus userStatus = new UserStatus(new UserStatusCreateCommand(user.getId(), now));
+      UserStatus userStatus = new UserStatus(user.getId(), new UserStatusCreateCommand(now));
       userStatusRepository.save(userStatus);
 
       return UserDto.from(user).withOnline(userStatus.isOnline());
@@ -89,12 +85,12 @@ public class BasicUserService implements UserService {
    }
 
    @Override
-   public UserDto update(UserDto userDto, MultipartFile file) {
-      User user = getUserRequireThrow(userDto.id());
+   public UserDto update(UUID userId,UserUpdateCommand command, MultipartFile file) {
+      User user = getUserRequireThrow(userId);
 
       // 이메일 검증.
-      if(!user.hasEmail(userDto.email())) {
-         Predicate<User> isExistEmail = u -> u.getEmail().equals(userDto.email());
+      if(!user.hasEmail(command.email())) {
+         Predicate<User> isExistEmail = u -> u.getEmail().equals(command.email());
          List<User> userList = userRepository.findAll();
          existThrow(isExistEmail,userList,"이미 존재하는 이메일 입니다.");
       }
@@ -108,8 +104,7 @@ public class BasicUserService implements UserService {
          newImageId = binaryContentDto.get().id();
       }
 
-      UserDto updatedUserDto = userDto.withProfileId(newImageId);
-      User updatedUser = user.updateInfo(UserUpdateCommand.from(updatedUserDto));
+      User updatedUser = user.updateInfo(command, newImageId);
 
       userRepository.save(updatedUser);
 
