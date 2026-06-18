@@ -24,23 +24,22 @@ public class UserStatusService {
    private final UserStatusRepository userStatusRepository;
    private final UserRepository userRepository;
 
-   public UserStatusDto create(UserStatusDto userStatusDto) {
+   public UserStatusDto create(UUID userId, UserStatusCreateCommand command) {
 
-      getUserRequireThrow(userStatusDto.userId());
+      getUserRequireThrow(userId);
       boolean userStatusExists = userStatusRepository.findAll().stream()
-            .anyMatch(u -> u.getUserId().equals(userStatusDto.userId()));
+            .anyMatch(u -> u.getUserId().equals(userId));
 
       if (userStatusExists) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
 
-
-      UserStatus userStatus = new UserStatus(UserStatusCreateCommand.from(userStatusDto));
+      UserStatus userStatus = new UserStatus(userId, command);
       userStatusRepository.save(userStatus);
 
       return UserStatusDto.from(userStatus);
    }
 
-   public UserStatusDto findById(UUID id) {
-      UserStatus userStatus = getUserStatusRequireThrow(id);
+   public UserStatusDto findById(UUID userStatusId, UUID userId) {
+      UserStatus userStatus = getUserStatusRequireThrow(userStatusId,userId);
 
       return UserStatusDto.from(userStatus);
    }
@@ -54,18 +53,15 @@ public class UserStatusService {
 
    }
 
-   public UserStatusDto update(UserStatusDto dto){
-
-      Optional<UserStatus> statusOptional = userStatusRepository.findById(dto.id());
+   public UserStatusDto update(UUID userStatusId ,UUID userId, UserStatusUpdateCommand command){
+      Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUserId(userStatusId, userId);
       UserStatus status;
       if (statusOptional.isPresent()) {
          UserStatus currentStatus = statusOptional.get();
-         UserStatus updatedUserStatus = currentStatus.updateInfo(new UserStatusUpdateCommand(dto.lastOnlineAt()));
+         UserStatus updatedUserStatus = currentStatus.updateInfo(command);
          status = userStatusRepository.update(updatedUserStatus);
       } else {
-         getUserRequireThrow(dto.userId());
-         UserStatus userStatus = new UserStatus( new UserStatusCreateCommand(dto.userId(), dto.lastOnlineAt()));
-         status = userStatusRepository.save(userStatus);
+         return create(userId, new UserStatusCreateCommand(command.updateAt()));
       }
 
       return UserStatusDto.from(status);
@@ -84,20 +80,20 @@ public class UserStatusService {
          UserStatus updatedUserStatus = userStatus.updateInfo(new UserStatusUpdateCommand(now));
          status = userStatusRepository.update(updatedUserStatus);
       } else {
-         UserStatus userStatus = new UserStatus(new UserStatusCreateCommand(userId, now));
+         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand( now));
          status = userStatusRepository.save(userStatus);
       }
       return UserStatusDto.from(status);
    }
 
-   public void delete(UUID id) {
-      getUserStatusRequireThrow(id);
-      userStatusRepository.delete(id);
+   public void delete(UUID userStatusId, UUID userId) {
+      getUserStatusRequireThrow(userStatusId, userId);
+      userStatusRepository.delete(userStatusId);
 
    }
 
-   private UserStatus getUserStatusRequireThrow(UUID id) {
-      return userStatusRepository.findById(id).orElseThrow(UserStatusNotFoundException::new);
+   private UserStatus getUserStatusRequireThrow(UUID userStatusId, UUID userId) {
+      return userStatusRepository.findByIdAndUserId(userStatusId, userId).orElseThrow(UserStatusNotFoundException::new);
    }
 
    private User getUserRequireThrow(UUID userId) {
