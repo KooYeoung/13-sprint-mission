@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.dto.command.ReadStatusCreateCommand;
-import com.sprint.mission.discodeit.dto.command.ReadStatusUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
@@ -26,10 +26,10 @@ public class ReadStatusService {
    private final UserRepository userRepository;
    private final ChannelRepository channelRepository;
 
-   public ReadStatusDto save(ReadStatusDto dto) {
-      validateChannelAndReadStatus(dto.userId(), dto.channelId());
+   public ReadStatusDto save(UUID channelId,ReadStatusCreateCommand command) {
+      validateChannelAndReadStatus(command.userId(),channelId);
 
-      ReadStatus readStatus = new ReadStatus(ReadStatusCreateCommand.from(dto));
+      ReadStatus readStatus = new ReadStatus(channelId, command);
       ReadStatus save = readStatusRepository.save(readStatus);
 
       return ReadStatusDto.from(save);
@@ -49,22 +49,18 @@ public class ReadStatusService {
 
    }
 
-   public ReadStatusDto update(ReadStatusDto dto) {
+   public ReadStatusDto update(UUID readStatusId,UUID userId, UUID channelId, ReadStatusUpdateCommand command) {
 
-      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(dto.id());
-      ReadStatus result;
-      if (optionalReadStatus.isPresent()) {
-         ReadStatus currentStatus = optionalReadStatus.get();
-         ReadStatus readStatus = currentStatus.updateInfo(ReadStatusUpdateCommand.from(dto));
-         result = readStatusRepository.update(readStatus);
-      } else {
-         validateChannelAndReadStatus(dto.userId(), dto.channelId());
-
-         ReadStatus readStatus = new ReadStatus(ReadStatusCreateCommand.from(dto));
-         result = readStatusRepository.save(readStatus);
+      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(readStatusId);
+      if(optionalReadStatus.isEmpty()){
+         return save(channelId ,new ReadStatusCreateCommand(userId, command.readAt()));
       }
 
-      return ReadStatusDto.from(result);
+      ReadStatus currentStatus = optionalReadStatus.get();
+      ReadStatus readStatus = currentStatus.updateInfo(command);
+      readStatus = readStatusRepository.update(readStatus);
+
+      return ReadStatusDto.from(readStatus);
    }
 
    public void delete(UUID id) {

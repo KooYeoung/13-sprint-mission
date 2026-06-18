@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.controller;
 
-import com.sprint.mission.discodeit.dto.request.ReadStatusCreateRequest;
-import com.sprint.mission.discodeit.dto.request.ReadStatusUpdateRequest;
+import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusCreateRequest;
+import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.service.basic.ReadStatusService;
 import lombok.RequiredArgsConstructor;
@@ -23,18 +23,15 @@ public class ReadStatusController {
 
     @RequestMapping(value = "/channels/{channelId}/read-statuses",method = RequestMethod.POST)
     public ResponseEntity<ReadStatusDto> save(@PathVariable UUID channelId, @RequestBody ReadStatusCreateRequest request){
-        request = request.withChannelId(channelId);
-        ReadStatusDto save = readStatusService.save(ReadStatusDto.from(request));
+        ReadStatusDto save = readStatusService.save(channelId, request.toCommand());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
     @RequestMapping(value ="/channels/{channelId}/read-statuses/{readStatusId}" ,method = RequestMethod.PUT)
     public ResponseEntity<ReadStatusDto> update(@PathVariable UUID channelId, @PathVariable UUID readStatusId, @RequestBody ReadStatusUpdateRequest request){
-        request = request.withChannelId(channelId)
-                .withId(readStatusId);
 
-        ReadStatusDto update = readStatusService.update(ReadStatusDto.from(request));
+        ReadStatusDto update = readStatusService.update(readStatusId, request.userId(), channelId, request.toCommand());
 
         return ResponseEntity.ok().body(update);
     }

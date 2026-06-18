@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.entity;
 
-import com.sprint.mission.discodeit.dto.command.ReadStatusCreateCommand;
-import com.sprint.mission.discodeit.dto.command.ReadStatusUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateCommand;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -14,10 +14,10 @@ public class ReadStatus extends UpdatableEntity {
    private final UUID userId;
    private final UUID channelId;
 
-   public ReadStatus(ReadStatusCreateCommand command) {
+   public ReadStatus( UUID channelId, ReadStatusCreateCommand command) {
       super(command.readAt());
       this.userId = command.userId();
-      this.channelId = command.channelId();
+      this.channelId = channelId;
    }
 
    private ReadStatus(UUID id, Instant createdAt, Instant updatedAt, UUID userId, UUID channelId) {
