@@ -1,8 +1,8 @@
 package com.sprint.mission.discodeit.controller;
 
-import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
-import com.sprint.mission.discodeit.dto.request.UserLoginRequest;
-import com.sprint.mission.discodeit.dto.request.UserUpdateRequest;
+import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
+import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
+import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.service.UserService;
@@ -31,7 +31,7 @@ public class UserController {
     public ResponseEntity<UserDto> create(@RequestPart UserCreateRequest request
             , @RequestPart(required = false) MultipartFile file){
 
-        UserDto userDto = userService.create(UserDto.from(request), file);
+        UserDto userDto = userService.create(request.toCommand(), file);
         return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
     }
 
@@ -50,8 +50,7 @@ public class UserController {
 
     @RequestMapping(value = "/{id}", method = RequestMethod.PUT)
     public ResponseEntity<UserDto> update(@PathVariable UUID id, @RequestPart UserUpdateRequest request, @RequestPart(required = false) MultipartFile file){
-        request = request.withUserId(id);
-        UserDto update = userService.update(UserDto.from(request), file);
+        UserDto update = userService.update(id, request.toCommand(), file);
 
         return ResponseEntity.ok().body(update);
     }
@@ -73,7 +72,7 @@ public class UserController {
 
     @RequestMapping(value = "/login",method = RequestMethod.POST)
     public ResponseEntity<UserDto> login(@RequestBody UserLoginRequest request){
-        UserDto login = authService.login(UserDto.from(request));
+        UserDto login = authService.login(request.toCommand());
         return ResponseEntity.ok().body(login);
     }
 }
