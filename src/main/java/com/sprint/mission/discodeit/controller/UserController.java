@@ -1,12 +1,11 @@
 package com.sprint.mission.discodeit.controller;
 
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
-import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
+import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.service.UserService;
-import com.sprint.mission.discodeit.service.basic.AuthService;
 import com.sprint.mission.discodeit.service.basic.UserStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,62 +16,47 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
-
-@RequestMapping("/api/user")
+@RequestMapping("/api/users")
 @RestController
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
+
     private final UserService userService;
     private final UserStatusService userStatusService;
-    private final AuthService authService;
 
-    @RequestMapping(method = RequestMethod.POST)
-    public ResponseEntity<UserDto> create(@RequestPart UserCreateRequest request
-            , @RequestPart(required = false) MultipartFile file){
-
-        UserDto userDto = userService.create(request.toCommand(), file);
+    @PostMapping
+    public ResponseEntity<UserDto> create(
+            @RequestPart UserCreateRequest userCreateRequest,
+            @RequestPart( required = false) MultipartFile profile
+    ) {
+        UserDto userDto = userService.create(userCreateRequest.toCommand(), profile);
         return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
     }
 
-    @RequestMapping(value = "/findAll", method = RequestMethod.GET)
-    public ResponseEntity<List<UserDto>> list(){
-        List<UserDto> all = userService.findAll();
-        return ResponseEntity.ok().body(all);
+    @GetMapping
+    public ResponseEntity<List<UserDto>> list() {
+        return ResponseEntity.ok(userService.findAll());
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET)
-    public ResponseEntity<UserDto> detailFind(@PathVariable UUID id){
-        UserDto byId = userService.findById(id);
-
-        return ResponseEntity.ok().body(byId);
+    @PatchMapping("/{userId}")
+    public ResponseEntity<UserDto> update(
+            @PathVariable UUID userId,
+            @RequestPart UserUpdateRequest userUpdateRequest,
+            @RequestPart(required = false) MultipartFile profile
+    ) {
+        return ResponseEntity.ok(userService.update(userId, userUpdateRequest.toCommand(), profile));
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.PUT)
-    public ResponseEntity<UserDto> update(@PathVariable UUID id, @RequestPart UserUpdateRequest request, @RequestPart(required = false) MultipartFile file){
-        UserDto update = userService.update(id, request.toCommand(), file);
-
-        return ResponseEntity.ok().body(update);
-    }
-
-    @RequestMapping(value = "/{id}", method = RequestMethod.DELETE)
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
-        userService.delete(id);
-
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> delete(@PathVariable UUID userId) {
+        userService.delete(userId);
         return ResponseEntity.noContent().build();
     }
 
-    @RequestMapping(value = "/{userId}", method = RequestMethod.PATCH)
-    public ResponseEntity<UserStatusDto> statusUpdate(@PathVariable UUID userId){
-
-        UserStatusDto update = userStatusService.updateByUserId(userId);
-
-        return ResponseEntity.ok().body(update);
-    }
-
-    @RequestMapping(value = "/login",method = RequestMethod.POST)
-    public ResponseEntity<UserDto> login(@RequestBody UserLoginRequest request){
-        UserDto login = authService.login(request.toCommand());
-        return ResponseEntity.ok().body(login);
+    @PatchMapping("/{userId}/userStatus")
+    public ResponseEntity<UserStatusDto> statusUpdate(@PathVariable UUID userId,
+                                                      @RequestBody UserStatusUpdateRequest request) {
+        return ResponseEntity.ok(userStatusService.updateByUserId(userId, request.toCommand()));
     }
 }

@@ -12,32 +12,36 @@ import java.util.List;
 import java.util.UUID;
 
 public record ChannelDto(
-      UUID id
-      , String channelName
-      , String description
-      , ChannelType channelType
-      , @With OffsetDateTime lastMessageAt
-      , @With List<UUID> userIds
+        UUID id,
+        ChannelType type,
+        String name,
+        String description,
+        List<UUID> participantIds,
+        OffsetDateTime lastMessageAt
 ) {
-
    public static ChannelDto from(Channel channel) {
-      return new ChannelDto(channel.getId()
-            , channel.getChannelName()
-            , channel.getDescription()
-            , channel.getChannelType()
-            , null
-            ,  new ArrayList<>());
+      return new ChannelDto(
+              channel.getId(),
+              channel.getChannelType(),
+              channel.getChannelName(),
+              channel.getDescription(),
+              new ArrayList<>(),
+              null
+      );
    }
-   public static ChannelDto from(Channel channel, Instant lastMessageAt, List<UUID> userIds) {
-      return new ChannelDto(channel.getId()
-              , channel.getChannelName()
-              , channel.getDescription()
-              , channel.getChannelType()
-              , RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
-              ,  userIds);
+
+   public static ChannelDto from(Channel channel, Instant lastMessageAt, List<UUID> participantIds) {
+      return new ChannelDto(
+              channel.getId(),
+              channel.getChannelType(),
+              channel.getChannelName(),
+              channel.getDescription(),
+              participantIds,
+              RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
+      );
    }
 
    public boolean isPrivate() {
-      return channelType.equals(ChannelType.PRIVATE);
+      return  ChannelType.PRIVATE.equals(type);
    }
 }

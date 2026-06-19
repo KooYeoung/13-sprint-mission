@@ -16,30 +16,36 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@RequestMapping("/api")
+@RequestMapping("/api/readStatuses")
 public class ReadStatusController {
 
     private final ReadStatusService readStatusService;
 
-    @RequestMapping(value = "/channels/{channelId}/read-statuses",method = RequestMethod.POST)
-    public ResponseEntity<ReadStatusDto> save(@PathVariable UUID channelId, @RequestBody ReadStatusCreateRequest request){
-        ReadStatusDto save = readStatusService.save(channelId, request.toCommand());
+    @PostMapping
+    public ResponseEntity<ReadStatusDto> save(@RequestBody ReadStatusCreateRequest request) {
+        ReadStatusDto save = readStatusService.save(
+                request.channelId(),
+                request.toCommand()
+        );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
-    @RequestMapping(value ="/channels/{channelId}/read-statuses/{readStatusId}" ,method = RequestMethod.PUT)
-    public ResponseEntity<ReadStatusDto> update(@PathVariable UUID channelId, @PathVariable UUID readStatusId, @RequestBody ReadStatusUpdateRequest request){
-
-        ReadStatusDto update = readStatusService.update(readStatusId, request.userId(), channelId, request.toCommand());
-
-        return ResponseEntity.ok().body(update);
+    @GetMapping
+    public ResponseEntity<List<ReadStatusDto>> listByUserId(@RequestParam UUID userId) {
+        return ResponseEntity.ok(readStatusService.findAllByUserId(userId));
     }
 
-    @RequestMapping(value = "/users/{userId}/read-statuses",method = RequestMethod.GET)
-    public ResponseEntity<List<ReadStatusDto>> listByUserId(@PathVariable UUID userId){
-        List<ReadStatusDto> allByUserId = readStatusService.findAllByUserId(userId);
+    @PatchMapping("/{readStatusId}")
+    public ResponseEntity<ReadStatusDto> update(
+            @PathVariable UUID readStatusId,
+            @RequestBody ReadStatusUpdateRequest request
+    ) {
+        ReadStatusDto update = readStatusService.update(
+                readStatusId,
+                request.toCommand()
+        );
 
-        return ResponseEntity.ok().body(allByUserId);
+        return ResponseEntity.ok(update);
     }
 }

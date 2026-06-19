@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,7 +32,7 @@ public class Channel extends UpdatableEntity {
               ,Instant.now()
               , command.channelName()
               , command.channelDescription()
-              ,command.channelType()
+              , getChannelType()
       );
    }
 

@@ -27,11 +27,10 @@ public class BasicMessageService implements MessageService {
    private final ChannelRepository channelRepository;
    private final BinaryContentService binaryContentService;
 
-
    @Override
    public MessageDto save(MessageCreateCommand command, List<MultipartFile> files) {
       getChannelRequireThrow(command.channelId());
-      User user = getUserRequireThrow(command.userId());
+      getUserRequireThrow(command.userId());
 
       List<UUID> attachedFileIds = new ArrayList<>();
       if (files!=null && !files.isEmpty()) {
@@ -50,29 +49,25 @@ public class BasicMessageService implements MessageService {
 
       messageRepository.save(message);
 
-      return MessageDto.from(message, user.getNickname());
+      return MessageDto.from(message);
    }
 
    @Override
    public MessageDto findById(UUID messageId) {
       Message message = getMessageRequireThrow(messageId);
 
-      User user = getUserRequireThrow(message.getUserId());
+      getUserRequireThrow(message.getUserId());
       getChannelRequireThrow(message.getChannelId());
 
-      return MessageDto.from(message, user.getNickname());
+      return MessageDto.from(message);
    }
 
    @Override
    public List<MessageDto> findAll() {
-      Map<UUID, User> userIdMap = userRepository.findAll()
-            .stream()
-            .collect(Collectors.toMap(User::getId, u -> u));
 
       return messageRepository.findAll()
             .stream()
-            .filter(m -> userIdMap.get(m.getUserId()) != null)
-            .map(m -> MessageDto.from(m, userIdMap.get(m.getUserId()).getNickname()))
+            .map(MessageDto::from)
             .toList();
    }
 
