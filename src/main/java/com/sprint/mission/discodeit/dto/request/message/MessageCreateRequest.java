@@ -5,12 +5,11 @@ import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import java.util.UUID;
 
 public record MessageCreateRequest(
-      String content
-      , UUID channelId
-      , UUID userId
+        String content,
+        UUID channelId,
+        UUID authorId
 ) {
-    public MessageCreateCommand toCommand(){
-        return new MessageCreateCommand(content, userId, channelId);
+    public MessageCreateCommand toCommand() {
+        return new MessageCreateCommand(content, authorId, channelId);
     }
-
 }

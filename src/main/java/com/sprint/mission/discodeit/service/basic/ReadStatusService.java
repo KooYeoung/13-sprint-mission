@@ -49,11 +49,11 @@ public class ReadStatusService {
 
    }
 
-   public ReadStatusDto update(UUID readStatusId,UUID userId, UUID channelId, ReadStatusUpdateCommand command) {
+   public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
 
       Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(readStatusId);
       if(optionalReadStatus.isEmpty()){
-         return save(channelId ,new ReadStatusCreateCommand(userId, command.readAt()));
+         throw new IllegalArgumentException("읽음 상태를 찾을수 없습니다.");
       }
 
       ReadStatus currentStatus = optionalReadStatus.get();

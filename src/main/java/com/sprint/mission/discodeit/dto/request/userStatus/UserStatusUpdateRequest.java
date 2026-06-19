@@ -1,15 +1,14 @@
 package com.sprint.mission.discodeit.dto.request.userStatus;
 
-import lombok.With;
+import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
 
 import java.time.Instant;
-import java.util.UUID;
 
-@With
 public record UserStatusUpdateRequest(
-      UUID id
-      , UUID userId
-      , Instant lastOnlineAt
+        Instant newLastActiveAt
 ) {
 
+    public UserStatusUpdateCommand toCommand(){
+        return new UserStatusUpdateCommand(newLastActiveAt);
+    }
 }

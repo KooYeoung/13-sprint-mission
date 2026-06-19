@@ -67,20 +67,18 @@ public class UserStatusService {
       return UserStatusDto.from(status);
    }
 
-   public UserStatusDto updateByUserId(UUID userId) {
+   public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
 
       getUserRequireThrow(userId);
       Optional<UserStatus> userStatusResult = userStatusRepository.findByUserId(userId);
 
-      Instant now = Instant.now();
-
       UserStatus status;
       if (userStatusResult.isPresent()) {
          UserStatus userStatus = userStatusResult.get();
-         UserStatus updatedUserStatus = userStatus.updateInfo(new UserStatusUpdateCommand(now));
+         UserStatus updatedUserStatus = userStatus.updateInfo(command);
          status = userStatusRepository.update(updatedUserStatus);
       } else {
-         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand( now));
+         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand(command.updateAt()));
          status = userStatusRepository.save(userStatus);
       }
       return UserStatusDto.from(status);
