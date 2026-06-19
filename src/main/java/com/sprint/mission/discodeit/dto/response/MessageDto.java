@@ -1,7 +1,9 @@
 package com.sprint.mission.discodeit.dto.response;
 
 import com.sprint.mission.discodeit.entity.Message;
+import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +14,8 @@ public record MessageDto(
       , String nickname
       , UUID userId
       , UUID channelId
+      , OffsetDateTime createdAt
+      , OffsetDateTime updatedAt
 ){
    public static MessageDto from(Message message, String nickname) {
       return new MessageDto(
@@ -21,6 +25,8 @@ public record MessageDto(
             , nickname
             , message.getUserId()
             , message.getChannelId()
+              , RequestTimeZoneUtils.toOffsetDateTime(message.getCreatedAt())
+              ,RequestTimeZoneUtils.toOffsetDateTime(message.getUpdatedAt())
             );
    }
 }

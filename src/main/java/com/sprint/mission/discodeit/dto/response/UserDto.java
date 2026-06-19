@@ -2,9 +2,10 @@ package com.sprint.mission.discodeit.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 import lombok.With;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record UserDto(
@@ -14,11 +15,10 @@ public record UserDto(
       , String realName
       , String email
       , String phoneNumber
-      , @JsonIgnore String password
       , @With UUID profileId
       , @With boolean online
-      , Instant createdAt
-        ,Instant updatedAt
+      , OffsetDateTime createdAt
+        ,OffsetDateTime updatedAt
         ) {
 
    public static UserDto from(User user) {
@@ -29,12 +29,13 @@ public record UserDto(
             , user.getRealName()
             , user.getEmail()
             , user.getPhoneNumber()
-              ,user.getPassword()
             , user.getProfileImageId()
             , false
-            ,user.getCreatedAt()
-              ,user.getUpdatedAt()
+            ,RequestTimeZoneUtils.toOffsetDateTime(user.getCreatedAt())
+              ,RequestTimeZoneUtils.toOffsetDateTime(user.getUpdatedAt())
       );
    }
+
+
 
 }

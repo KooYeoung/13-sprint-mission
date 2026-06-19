@@ -16,8 +16,10 @@ import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,26 +45,25 @@ public class BasicChannelService implements ChannelService {
    public ChannelDto findById(UUID channelId) {
       Channel channel = getChannelRequireThrow(channelId);
 
-      ChannelDto channelDto = ChannelDto.from(channel);
+      List<UUID> userIds = channel.isPrivate() ?
+                 getReadStatusUserIds(channelId)
+                 : new ArrayList<>();
 
-      if(channel.isPrivate()){
-         List<UUID> userIds = readStatusRepository.findByChannelId(channelId)
-               .stream()
-               .map(ReadStatus::getUserId)
-               .toList();
+      Instant lastMessageAt = messageRepository.findAllByChannelId(channelId)
+              .stream()
+              .max(Comparator.comparing(BaseEntity::getCreatedAt))
+              .map(Message::getCreatedAt)
+              .orElse(null);
 
-         channelDto = channelDto.withUserIds(userIds);
+      return ChannelDto.from(channel, lastMessageAt, userIds);
+   }
 
-      }
-
-      Optional<Message> max = messageRepository.findAllByChannelId(channelId)
-            .stream().max(Comparator.comparing(BaseEntity::getCreatedAt));
-
-      if(max.isPresent()) {
-         channelDto = channelDto.withLastMessageAt(max.get().getCreatedAt());
-      }
-
-      return channelDto;
+   @NonNull
+   private List<UUID> getReadStatusUserIds(UUID channelId) {
+      return readStatusRepository.findByChannelId(channelId)
+              .stream()
+              .map(ReadStatus::getUserId)
+              .toList();
    }
 
    @Override
@@ -89,17 +90,15 @@ public class BasicChannelService implements ChannelService {
             .stream()
             .filter(c -> c.isPrivate() && channelIds.contains(c.getId()) || c.isPublic())
             .map(c ->{
-               ChannelDto channelDto = ChannelDto.from(c);
-               if(c.isPrivate()) {
-                  List<UUID> userIds = readStatusByChannelId.getOrDefault(c.getId(), new ArrayList<>());
-                  channelDto = channelDto.withUserIds(userIds);
-               }
-               Optional<Message> optionalLatestMessage = channelLatestMessages.getOrDefault(c.getId(), Optional.empty());
+               List<UUID> userIds = c.isPrivate() ? 
+                       readStatusByChannelId.getOrDefault(c.getId(), new ArrayList<>())
+                       :new ArrayList<>();
+               
+               Instant lastMessageAt = channelLatestMessages.getOrDefault(c.getId(), Optional.empty())
+                       .map(Message::getCreatedAt)
+                       .orElse(null);
 
-               if(optionalLatestMessage.isPresent()) {
-                  channelDto = channelDto.withLastMessageAt(optionalLatestMessage.get().getCreatedAt());
-               }
-               return channelDto;
+               return ChannelDto.from(c, lastMessageAt, userIds);
             })
             .toList();
    }
