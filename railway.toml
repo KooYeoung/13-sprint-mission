@@ -11,7 +11,7 @@
 
 [build]
 builder = "RAILPACK"
-buildCommand = "./gradlew clean build -x check -x test -Pproduction"
+buildCommand = "chmod +x gradlew && ./gradlew clean build -x check -x test -Pproduction"
 
 [deploy]
 startCommand = "java $JAVA_OPTS -Dserver.port=$PORT -jar $(ls -1 build/libs/*.jar | grep -v plain)"
