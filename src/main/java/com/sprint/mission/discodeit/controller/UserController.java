@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.controller.swagger.UserApi;
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
@@ -16,11 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
+
 @RequestMapping("/api/users")
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-public class UserController {
+public class UserController implements UserApi {
 
     private final UserService userService;
     private final UserStatusService userStatusService;
@@ -28,7 +30,7 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserDto> create(
             @RequestPart UserCreateRequest userCreateRequest,
-            @RequestPart( required = false) MultipartFile profile
+            @RequestPart(required = false) MultipartFile profile
     ) {
         UserDto userDto = userService.create(userCreateRequest.toCommand(), profile);
         return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
