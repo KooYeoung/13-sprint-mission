@@ -1,6 +1,5 @@
 package com.sprint.mission.discodeit.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 import lombok.With;

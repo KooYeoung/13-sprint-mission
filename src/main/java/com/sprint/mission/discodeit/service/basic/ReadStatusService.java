@@ -51,16 +51,13 @@ public class ReadStatusService {
 
    public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
 
-      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(readStatusId);
-      if(optionalReadStatus.isEmpty()){
-         throw new IllegalArgumentException("읽음 상태를 찾을수 없습니다.");
-      }
+      ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
 
-      ReadStatus currentStatus = optionalReadStatus.get();
-      ReadStatus readStatus = currentStatus.updateInfo(command);
-      readStatus = readStatusRepository.update(readStatus);
+      ReadStatus updatedReadStatus = readStatus.updateInfo(command);
 
-      return ReadStatusDto.from(readStatus);
+      ReadStatus savedReadStatus = readStatusRepository.update(updatedReadStatus);
+
+      return ReadStatusDto.from(savedReadStatus);
    }
 
    public void delete(UUID id) {
@@ -69,7 +66,8 @@ public class ReadStatusService {
    }
 
    private ReadStatus getReadStatusRequireThrow(UUID id) {
-      return readStatusRepository.findById(id).orElseThrow(ReadStatusNotFoundException::new);
+      return readStatusRepository.findById(id)
+              .orElseThrow(ReadStatusNotFoundException::new);
    }
 
    private Channel getChannelRequireThrow(UUID channelId) {
