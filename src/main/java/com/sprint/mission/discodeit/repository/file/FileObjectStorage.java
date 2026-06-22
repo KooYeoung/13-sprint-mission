@@ -1,6 +1,8 @@
 package com.sprint.mission.discodeit.repository.file;
 
 import com.sprint.mission.discodeit.entity.BaseEntity;
+import com.sprint.mission.discodeit.exception.CustomInternalServerException;
+import com.sprint.mission.discodeit.exception.FileError;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -24,7 +26,7 @@ public class FileObjectStorage <T extends BaseEntity>{
             Files.createDirectories(path);
              loadAllFromDisk();
          } catch (IOException e) {
-            throw new RuntimeException(e);
+             throw new CustomInternalServerException(FileError.DIRECTORY.getMessage(),e);
          }
 
    }
@@ -47,8 +49,7 @@ public class FileObjectStorage <T extends BaseEntity>{
                         }
                     });
         } catch (IOException e) {
-            log.error("file loadAll error", e);
-            throw new RuntimeException(e);
+            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
         }
     }
 
@@ -62,8 +63,7 @@ public class FileObjectStorage <T extends BaseEntity>{
          oos.writeObject(entity);
          dataMap.put(entityId,entity);
       }catch (IOException e){
-         log.error("file save error ",e);
-         throw new RuntimeException("파일 저장 실패", e);
+         throw new CustomInternalServerException(FileError.SAVE.getMessage(), e);
       }
    }
 
@@ -86,8 +86,7 @@ public class FileObjectStorage <T extends BaseEntity>{
        try {
            Files.deleteIfExists(filePath);
        } catch (IOException e) {
-          log.error("file delete error ",e);
-           throw new RuntimeException(e);
+          throw new CustomInternalServerException(FileError.DELETE.getMessage(), e);
        }
        dataMap.remove(id);
    }
