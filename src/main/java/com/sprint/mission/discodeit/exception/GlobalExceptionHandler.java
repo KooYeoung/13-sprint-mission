@@ -44,6 +44,13 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("요청 본문에 일부 필드가 유효하지 않습니다.",fieldsMap));
     }
 
+    @ExceptionHandler(CustomInternalServerException.class)
+    public ResponseEntity<ErrorResponse> internalServerError(CustomInternalServerException e) {
+        log.error("internal server error: {}", e.getMessage(), e);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ErrorResponse.of(e.getMessage()));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> exception(Exception e){
