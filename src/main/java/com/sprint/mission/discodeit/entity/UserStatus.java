@@ -2,7 +2,8 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateCommand;
-import lombok.*;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.Duration;
 import java.time.Instant;

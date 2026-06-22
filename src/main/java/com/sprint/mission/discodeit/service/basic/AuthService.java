@@ -7,6 +7,7 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.exception.LoginFailException;
+import com.sprint.mission.discodeit.exception.UserError;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class AuthService {
             .filter(u -> u.getUsername().equals(command.username()))
             .filter(u -> u.getPassword().equals(command.password()))
             .findFirst()
-            .orElseThrow(() -> new LoginFailException("아이디 와 비밀번호를 다시한번 확인해 주세요."));
+            .orElseThrow(() -> new LoginFailException(UserError.LOGIN.getMessage()));
 
       Instant now = Instant.now();
 

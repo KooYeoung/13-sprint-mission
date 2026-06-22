@@ -2,10 +2,10 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
-import lombok.*;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 @Getter
@@ -75,6 +75,10 @@ public class User extends UpdatableEntity {
 
    public boolean hasEmail(String email){
       return this.email.equals(email);
+   }
+
+   public boolean hasUsername(String username) {
+      return this.username.equals(username);
    }
 
    private String keepIfBlank(String newValue, String oldValue) {

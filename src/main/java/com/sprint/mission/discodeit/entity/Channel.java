@@ -1,7 +1,6 @@
 package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
-import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import lombok.Builder;
 import lombok.Getter;
