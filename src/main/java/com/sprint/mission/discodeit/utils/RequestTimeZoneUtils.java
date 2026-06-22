@@ -31,7 +31,6 @@ public final class RequestTimeZoneUtils {
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
 
         if(attributes == null){
-            System.out.println("attributes = " + attributes);
             return DEFAULT_ZONE_ID;
         }
 
@@ -44,12 +43,10 @@ public final class RequestTimeZoneUtils {
 
     private static ZoneId pareZoneId(String timeZoneHeader) {
         if(timeZoneHeader == null || timeZoneHeader.isBlank()){
-            System.out.println("timeZoneHeader = " + timeZoneHeader);
             return DEFAULT_ZONE_ID;
         }
 
         try {
-            System.out.println("timeZoneHeader = " + timeZoneHeader);
             return ZoneId.of(timeZoneHeader);
         }catch (DateTimeException e){
             return DEFAULT_ZONE_ID;
