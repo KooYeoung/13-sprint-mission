@@ -7,6 +7,7 @@ import com.sprint.mission.discodeit.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,7 +25,27 @@ import java.util.UUID;
 @Tag(name = "Message", description = "Message API")
 public interface MessageApi {
 
-    @Operation(summary = "Message 생성")
+
+    @Operation(
+            summary = "Message 생성",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(implementation = MessageCreateMultipartRequest.class),
+                            encoding = {
+                                    @Encoding(
+                                            name = "messageCreateRequest",
+                                            contentType = MediaType.APPLICATION_JSON_VALUE
+                                    ),
+                                    @Encoding(
+                                            name = "attachments",
+                                            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE
+                                    )
+                            }
+                    )
+            )
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Message가 성공적으로 생성됨"),
             @ApiResponse(
@@ -38,10 +59,10 @@ public interface MessageApi {
             )
     })
     ResponseEntity<MessageDto> create(
-            @Parameter(description = "Message 생성 정보", required = true)
+            @Parameter(hidden = true)
             @RequestPart("messageCreateRequest") MessageCreateRequest messageCreateRequest,
 
-            @Parameter(description = "Message 첨부 파일 목록")
+            @Parameter(hidden = true)
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     );
 

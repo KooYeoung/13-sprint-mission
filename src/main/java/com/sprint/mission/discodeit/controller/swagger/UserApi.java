@@ -9,6 +9,7 @@ import com.sprint.mission.discodeit.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,7 +31,26 @@ public interface UserApi {
     @ApiResponse(responseCode = "200", description = "User 목록 조회 성공")
     ResponseEntity<List<UserDto>> list();
 
-    @Operation(summary = "User 등록")
+    @Operation(
+            summary = "User 등록",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(implementation = UserCreateMultipartRequest.class),
+                            encoding = {
+                                    @Encoding(
+                                            name = "userCreateRequest",
+                                            contentType = MediaType.APPLICATION_JSON_VALUE
+                                    ),
+                                    @Encoding(
+                                            name = "profile",
+                                            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE
+                                    )
+                            }
+                    )
+            )
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User가 성공적으로 생성됨"),
             @ApiResponse(
@@ -44,14 +64,33 @@ public interface UserApi {
             )
     })
     ResponseEntity<UserDto> create(
-            @Parameter(description = "User 생성 정보", required = true)
+            @Parameter(hidden = true)
             @RequestPart("userCreateRequest") UserCreateRequest userCreateRequest,
 
-            @Parameter(description = "User 프로필 이미지")
+            @Parameter(hidden = true)
             @RequestPart(value = "profile", required = false) MultipartFile profile
     );
 
-    @Operation(summary = "User 정보 수정")
+    @Operation(
+            summary = "User 정보 수정",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(implementation = UserUpdateMultipartRequest.class),
+                            encoding = {
+                                    @Encoding(
+                                            name = "userUpdateRequest",
+                                            contentType = MediaType.APPLICATION_JSON_VALUE
+                                    ),
+                                    @Encoding(
+                                            name = "profile",
+                                            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE
+                                    )
+                            }
+                    )
+            )
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User 정보가 성공적으로 수정됨"),
             @ApiResponse(
@@ -77,10 +116,10 @@ public interface UserApi {
             @Parameter(description = "수정할 User ID", required = true)
             UUID userId,
 
-            @Parameter(description = "수정할 User 정보", required = true)
+            @Parameter(hidden = true)
             @RequestPart("userUpdateRequest") UserUpdateRequest userUpdateRequest,
 
-            @Parameter(description = "수정할 User 프로필 이미지")
+            @Parameter(hidden = true)
             @RequestPart(value = "profile", required = false) MultipartFile profile
     );
 
