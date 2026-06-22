@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.controller.swagger.ReadStatusApi;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusCreateRequest;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @RequestMapping("/api/readStatuses")
-public class ReadStatusController {
+public class ReadStatusController implements ReadStatusApi {
 
     private final ReadStatusService readStatusService;
 

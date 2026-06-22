@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.controller.swagger.BinaryContentApi;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.service.basic.BinaryContentService;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-public class BinaryContentController {
+public class BinaryContentController implements BinaryContentApi {
 
     private final BinaryContentService binaryContentService;
 

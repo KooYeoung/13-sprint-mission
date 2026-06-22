@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.controller.swagger.MessageApi;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor
 @Slf4j
-public class MessageController {
+public class MessageController implements MessageApi {
 
     private final MessageService messageService;
 

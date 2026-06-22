@@ -77,6 +77,7 @@ public class BasicMessageService implements MessageService {
 
    @Override
    public List<MessageDto> findAllByChannelId(UUID channelId) {
+      getChannelRequireThrow(channelId);
 
       return findAll()
             .stream()
