@@ -9,6 +9,7 @@ import com.sprint.mission.discodeit.entity.BaseEntity;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
+import com.sprint.mission.discodeit.exception.ChannelError;
 import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
 import com.sprint.mission.discodeit.exception.ChannelUpdateFailException;
 import com.sprint.mission.discodeit.exception.UserNotFoundException;
@@ -122,7 +123,7 @@ public class BasicChannelService implements ChannelService {
    public ChannelDto update(UUID channelId,  ChannelUpdateCommand command) {
       Channel channel = getChannelRequireThrow(channelId);
 
-      if(channel.isPrivate()) throw new ChannelUpdateFailException("PRIVATE 채널은 수정할 수 없습니다.");
+      if(channel.isPrivate()) throw new ChannelUpdateFailException(ChannelError.PRIVATE_NOT_UPDATE.getMessage());
 
       Channel updatedChannel = channel.updateInfo(command);
 
