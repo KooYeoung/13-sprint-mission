@@ -1,12 +1,12 @@
 package com.sprint.mission.discodeit.dto.response;
 
-import com.sprint.mission.discodeit.dto.request.ChannelCreateRequest;
-import com.sprint.mission.discodeit.dto.request.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 import lombok.With;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -16,7 +16,7 @@ public record ChannelDto(
       , String channelName
       , String description
       , ChannelType channelType
-      , @With Instant lastMessageAt
+      , @With OffsetDateTime lastMessageAt
       , @With List<UUID> userIds
 ) {
 
@@ -28,26 +28,13 @@ public record ChannelDto(
             , null
             ,  new ArrayList<>());
    }
-
-   public static ChannelDto from(ChannelCreateRequest request){
-      return new ChannelDto(
-              null
-              , request.channelName()
-              , request.channelDescription()
-              , ChannelType.valueOf(request.channelType())
-              , null
-              ,new ArrayList<>()
-      );
-   }
-   public static ChannelDto from(ChannelUpdateRequest request){
-      return new ChannelDto(
-              request.channelId()
-              , request.channelName()
-              , request.channelDescription()
-              , ChannelType.valueOf(request.channelType())
-              , null
-              ,new ArrayList<>()
-      );
+   public static ChannelDto from(Channel channel, Instant lastMessageAt, List<UUID> userIds) {
+      return new ChannelDto(channel.getId()
+              , channel.getChannelName()
+              , channel.getDescription()
+              , channel.getChannelType()
+              , RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
+              ,  userIds);
    }
 
    public boolean isPrivate() {

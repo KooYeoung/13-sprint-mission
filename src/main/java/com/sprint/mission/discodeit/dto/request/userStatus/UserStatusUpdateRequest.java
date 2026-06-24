@@ -1,8 +1,11 @@
-package com.sprint.mission.discodeit.dto.request;
+package com.sprint.mission.discodeit.dto.request.userStatus;
+
+import lombok.With;
 
 import java.time.Instant;
 import java.util.UUID;
 
+@With
 public record UserStatusUpdateRequest(
       UUID id
       , UUID userId

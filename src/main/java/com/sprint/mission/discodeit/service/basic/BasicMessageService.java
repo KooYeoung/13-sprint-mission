@@ -2,9 +2,12 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
+import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.entity.*;
-import com.sprint.mission.discodeit.repository.BinaryContentRepository;
+import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.MessageNotFountException;
+import com.sprint.mission.discodeit.exception.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -22,32 +25,28 @@ public class BasicMessageService implements MessageService {
    private final MessageRepository messageRepository;
    private final UserRepository userRepository;
    private final ChannelRepository channelRepository;
-   private final BinaryContentRepository binaryContentRepository;
+   private final BinaryContentService binaryContentService;
 
 
    @Override
-   public MessageDto save(MessageDto messageDto, List<MultipartFile> files) {
-      getChannelRequireThrow(messageDto.channelId());
-      User user = getUserRequireThrow(messageDto.userId());
+   public MessageDto save(MessageCreateCommand command, List<MultipartFile> files) {
+      getChannelRequireThrow(command.channelId());
+      User user = getUserRequireThrow(command.userId());
 
-      MessageCreateCommand command = MessageCreateCommand.from(messageDto);
+      List<UUID> attachedFileIds = new ArrayList<>();
       if (files!=null && !files.isEmpty()) {
-         List<UUID> attachedFileIds = new ArrayList<>();
          for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-               BinaryContent binaryContent = BinaryContent.builder()
-                     .originalFileName(file.getOriginalFilename())
-                     .contentType(file.getContentType())
-                     .build();
-
-               binaryContentRepository.save(binaryContent);
-               attachedFileIds.add(binaryContent.getId());
+            Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
+            if(binaryContentDto.isEmpty()){
+               continue;
             }
+            BinaryContentDto savedBinaryContent = binaryContentDto.get();
+            attachedFileIds.add(savedBinaryContent.id());
+
          }
-         command = command.withFileIds(attachedFileIds);
       }
 
-      Message message = new Message(command);
+      Message message = new Message(command, attachedFileIds);
 
       messageRepository.save(message);
 
@@ -87,14 +86,14 @@ public class BasicMessageService implements MessageService {
    }
 
    @Override
-   public MessageDto update(MessageDto dto) {
+   public MessageDto update(UUID messageId,MessageUpdateCommand command) {
 
-      Message message = getMessageRequireThrow(dto.messageId());
+      Message message = getMessageRequireThrow(messageId);
 
       getChannelRequireThrow(message.getChannelId());
       getUserRequireThrow(message.getUserId());
 
-      Message updatedMessage = message.updateInfo(MessageUpdateCommand.from(dto));
+      Message updatedMessage = message.updateInfo(command);
 
       messageRepository.save(updatedMessage);
 
@@ -111,7 +110,7 @@ public class BasicMessageService implements MessageService {
       messageRepository.delete(messageId);
       if (!message.getFileIds().isEmpty()) {
          message.getFileIds()
-               .forEach(binaryContentRepository::delete);
+               .forEach(binaryContentService::delete);
       }
    }
 
@@ -121,7 +120,7 @@ public class BasicMessageService implements MessageService {
 
    private Channel getChannelRequireThrow(UUID channelId) {
       return getChannel(channelId)
-            .orElseThrow(() -> new IllegalArgumentException("존재 하지 않는 채널 입니다."));
+            .orElseThrow(ChannelNotFoundException::new);
    }
 
    private Optional<User> getUser(UUID userId) {
@@ -130,11 +129,11 @@ public class BasicMessageService implements MessageService {
 
    private User getUserRequireThrow(UUID userId) {
       return getUser(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저 입니다."));
+            .orElseThrow(UserNotFoundException::new);
    }
 
    private Message getMessageRequireThrow(UUID messageId) {
       return messageRepository.findById(messageId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 메시지 입니다."));
+            .orElseThrow(MessageNotFountException::new);
    }
 }

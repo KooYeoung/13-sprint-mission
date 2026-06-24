@@ -1,0 +1,48 @@
+package com.sprint.mission.discodeit.exception;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(CustomBadRequestException.class)
+    public ResponseEntity<?> badRequest(RuntimeException e){
+        log.warn(e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(e.getMessage()));
+    }
+
+    @ExceptionHandler(CustomNotFoundException.class)
+    public ResponseEntity<?> notFound(RuntimeException e){
+        log.warn(e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.of(e.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException e){
+        Map<String, String> fieldsMap = new HashMap<>();
+
+        e.getBindingResult()
+                .getFieldErrors()
+                .forEach(ee -> fieldsMap.put(ee.getField(),ee.getDefaultMessage()));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("요청 본문에 일부 필드가 유효하지 않습니다.",fieldsMap));
+    }
+
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> exception(Exception e){
+        log.error("",e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorResponse.of("알수 없는 오류"));
+    }
+
+}

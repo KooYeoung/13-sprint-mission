@@ -1,6 +1,5 @@
 package com.sprint.mission.discodeit.entity;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -12,25 +11,17 @@ public class BinaryContent extends BaseEntity{
    private final String fileName;
    private final String originalFileName;
    private final String contentType;
+   private final Long size;
+   private final String path;
 
-   @Builder
-   public BinaryContent(
-          String originalFileName
-         , String contentType) {
+   public BinaryContent(String originalFileName, String fileName, String contentType, Long size, String path) {
       super(Instant.now());
+      this.fileName = fileName;
       this.originalFileName = originalFileName;
       this.contentType = contentType;
-      this.fileName = createFileName();
+      this.size = size;
+      this.path = path;
    }
 
-   private String createFileName(){
-      String formattedId = this.getId().toString().replace("-", "");
-      int lastDotIndex = this.originalFileName.lastIndexOf(".");
-      if(lastDotIndex < 0){
-         return formattedId;
-      }
-      String expansion = this.originalFileName.substring(lastDotIndex);
-      return formattedId + expansion;
-   }
 
 }

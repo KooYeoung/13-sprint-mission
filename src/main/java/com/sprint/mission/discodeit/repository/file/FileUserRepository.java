@@ -38,7 +38,7 @@ public class FileUserRepository implements UserRepository {
 
    @Override
    public List<User> findAll() {
-      return storage.loadAll();
+      return storage.loadAll().stream().toList();
    }
 
    @Override

@@ -6,7 +6,4 @@ public record MessageUpdateCommand(
         String content
 ) {
 
-    public static MessageUpdateCommand from(MessageDto dto){
-        return new MessageUpdateCommand(dto.content());
-    }
 }

@@ -1,6 +1,4 @@
-package com.sprint.mission.discodeit.dto.request;
-
-import com.sprint.mission.discodeit.entity.UserStatus;
+package com.sprint.mission.discodeit.dto.request.userStatus;
 
 import java.time.Instant;
 import java.util.UUID;

@@ -5,7 +5,6 @@ import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
-import lombok.With;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,12 +20,12 @@ public class Message extends UpdatableEntity {
    private final List<UUID> fileIds;
 
    @Builder
-   public Message(MessageCreateCommand command) {
+   public Message(MessageCreateCommand command, List<UUID> fileIds) {
       super(Instant.now());
       this.content = command.content();
       this.userId = command.userId();
       this.channelId = command.channelId();
-      this.fileIds = command.fileIds();
+      this.fileIds = fileIds;
    }
 
    private Message(UUID id
@@ -48,7 +47,7 @@ public class Message extends UpdatableEntity {
             getId(),
             getCreatedAt(),
             Instant.now(),
-            content,
+            command.content(),
             userId,
             channelId,
             fileIds

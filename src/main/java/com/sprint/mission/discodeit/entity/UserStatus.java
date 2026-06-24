@@ -6,7 +6,6 @@ import lombok.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.TemporalUnit;
 import java.util.UUID;
 
 @Getter
@@ -14,9 +13,9 @@ import java.util.UUID;
 public class UserStatus extends UpdatableEntity {
 
    private final UUID userId;
-   public UserStatus(UserStatusCreateCommand command) {
+   public UserStatus(UUID userId, UserStatusCreateCommand command) {
       super(command.createdAt());
-      this.userId = command.userId();
+      this.userId = userId;
    }
 
    public UserStatus updateInfo(UserStatusUpdateCommand command){

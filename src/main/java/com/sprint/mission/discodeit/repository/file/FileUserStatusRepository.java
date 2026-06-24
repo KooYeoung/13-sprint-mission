@@ -30,9 +30,12 @@ public class FileUserStatusRepository implements UserStatusRepository {
    }
 
    @Override
-   public Optional<UserStatus> findById(UUID id) {
+   public Optional<UserStatus> findByIdAndUserId(UUID userStatusId, UUID userId) {
+      UserStatus load = storage.load(userStatusId);
+      if(load == null ) return Optional.empty();
+      if(!load.getUserId().equals(userId)) return Optional.empty();
 
-      return Optional.ofNullable(storage.load(id));
+      return Optional.of(load);
    }
 
    @Override

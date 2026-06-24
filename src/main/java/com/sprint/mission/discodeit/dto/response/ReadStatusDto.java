@@ -1,15 +1,17 @@
 package com.sprint.mission.discodeit.dto.response;
 
 import com.sprint.mission.discodeit.entity.ReadStatus;
+import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record ReadStatusDto(
       UUID id
       , UUID userId
       , UUID channelId
-      , Instant readAt
+      , OffsetDateTime readAt
 ) {
 
    public static ReadStatusDto from(ReadStatus readStatus) {
@@ -17,7 +19,8 @@ public record ReadStatusDto(
             readStatus.getId()
             , readStatus.getUserId()
             , readStatus.getChannelId()
-            , readStatus.getUpdatedAt()
+            , RequestTimeZoneUtils.toOffsetDateTime(readStatus.getUpdatedAt())
       );
    }
+
 }

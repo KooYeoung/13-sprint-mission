@@ -19,7 +19,7 @@ public class User extends UpdatableEntity {
    private final String phoneNumber;
    private final UUID profileImageId;
 
-   public User(UserCreateCommand command) {
+   public User(UserCreateCommand command, UUID profileImageId) {
       super(Instant.now());
       this.username = command.username();
       this.nickname = command.nickname();
@@ -27,11 +27,11 @@ public class User extends UpdatableEntity {
       this.password = command.password();
       this.email = command.email();
       this.phoneNumber = command.phoneNumber();
-      this.profileImageId = command.profileImageId();
+      this.profileImageId = profileImageId;
    }
 
    public User updateInfo(
-          UserUpdateCommand command
+          UserUpdateCommand command, UUID profileImageId
    ) {
       return new User(
               getId(),
@@ -43,7 +43,7 @@ public class User extends UpdatableEntity {
               command.password(),
               command.email(),
               command.phoneNumber(),
-              command.profileImageId()
+              profileImageId
       );
    }
    private User(
