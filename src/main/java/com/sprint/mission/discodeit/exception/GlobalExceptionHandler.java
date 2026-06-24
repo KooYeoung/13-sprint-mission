@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
 
         e.getBindingResult()
                 .getFieldErrors()
-                .forEach(ee -> fieldsMap.put(ee.getField(),ee.getDefaultMessage()));
+                .forEach(field -> fieldsMap.put(field.getField(),field.getDefaultMessage()));
 
         log.warn("validation errors={}", fieldsMap);
 
