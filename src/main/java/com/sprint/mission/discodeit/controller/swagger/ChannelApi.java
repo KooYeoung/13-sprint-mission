@@ -4,7 +4,7 @@ import com.sprint.mission.discodeit.dto.request.channel.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PrivateChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PublicChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -46,7 +46,7 @@ public interface ChannelApi {
                     description = "Private Channel은 수정할 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"Private channel cannot be updated\",\"fields\":null}")
                     )
             ),
@@ -55,7 +55,7 @@ public interface ChannelApi {
                     description = "Channel을 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"채널이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -75,7 +75,7 @@ public interface ChannelApi {
                     description = "Channel을 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"채널이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )

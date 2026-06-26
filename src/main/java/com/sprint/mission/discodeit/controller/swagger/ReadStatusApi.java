@@ -3,7 +3,7 @@ package com.sprint.mission.discodeit.controller.swagger;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusCreateRequest;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,7 +31,7 @@ public interface ReadStatusApi {
                     description = "이미 읽음 상태가 존재함",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"이미 읽음 상태가 존재합니다.\",\"fields\":null}")
                     )
             ),
@@ -40,7 +40,7 @@ public interface ReadStatusApi {
                     description = "Channel 또는 User를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"채널이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -55,7 +55,7 @@ public interface ReadStatusApi {
                     description = "User를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"유저가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -73,7 +73,7 @@ public interface ReadStatusApi {
                     description = "Message 읽음 상태를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"읽음 상태가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )

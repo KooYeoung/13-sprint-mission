@@ -3,7 +3,7 @@ package com.sprint.mission.discodeit.controller.swagger;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -53,7 +53,7 @@ public interface MessageApi {
                     description = "Channel 또는 Author를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"채널이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -74,7 +74,7 @@ public interface MessageApi {
                     description = "Channel을 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"채널이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -92,7 +92,7 @@ public interface MessageApi {
                     description = "Message를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"메시지가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -112,7 +112,7 @@ public interface MessageApi {
                     description = "Message를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"메시지가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )

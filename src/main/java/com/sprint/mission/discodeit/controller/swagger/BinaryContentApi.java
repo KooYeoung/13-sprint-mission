@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.controller.swagger;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -34,7 +34,7 @@ public interface BinaryContentApi {
                     description = "첨부 파일을 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"첨부 파일이 존재하지 않습니다.\",\"fields\":null}")
                     )
             )

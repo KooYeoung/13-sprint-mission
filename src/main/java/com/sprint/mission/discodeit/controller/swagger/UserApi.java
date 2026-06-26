@@ -5,7 +5,7 @@ import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -58,7 +58,7 @@ public interface UserApi {
                     description = "같은 email 또는 username을 사용하는 User가 이미 존재함",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"같은 email 또는 username을 사용하는 User가 이미 존재합니다.\",\"fields\":null}")
                     )
             )
@@ -98,7 +98,7 @@ public interface UserApi {
                     description = "같은 email 또는 username을 사용하는 User가 이미 존재함",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"같은 email 또는 username을 사용하는 User가 이미 존재합니다.\",\"fields\":null}")
                     )
             ),
@@ -107,7 +107,7 @@ public interface UserApi {
                     description = "User를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"유저가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -132,7 +132,7 @@ public interface UserApi {
                     description = "User를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"유저가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )
@@ -149,7 +149,7 @@ public interface UserApi {
                     description = "해당 User의 UserStatus를 찾을 수 없음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"유저 상태가 존재하지 않습니다.\",\"fields\":null}")
                     )
             )

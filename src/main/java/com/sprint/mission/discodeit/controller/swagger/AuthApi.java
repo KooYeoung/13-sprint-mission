@@ -2,7 +2,7 @@ package com.sprint.mission.discodeit.controller.swagger;
 
 import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
 import com.sprint.mission.discodeit.dto.response.UserDto;
-import com.sprint.mission.discodeit.exception.ErrorResponse;
+import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -25,7 +25,7 @@ public interface AuthApi {
                     description = "아이디 또는 비밀번호가 일치하지 않음",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
-                            schema = @Schema(implementation = ErrorResponse.class),
+                            schema = @Schema(implementation = ApiErrorResponse.class),
                             examples = @ExampleObject(value = "{\"message\":\"아이디 또는 비밀번호가 일치하지 않습니다.\",\"fields\":null}")
                     )
             )
