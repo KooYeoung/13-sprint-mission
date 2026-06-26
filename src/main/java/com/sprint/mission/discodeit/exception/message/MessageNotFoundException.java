@@ -1,4 +1,6 @@
-package com.sprint.mission.discodeit.exception;
+package com.sprint.mission.discodeit.exception.message;
+
+import com.sprint.mission.discodeit.exception.CustomNotFoundException;
 
 public class MessageNotFoundException extends CustomNotFoundException {
     public MessageNotFoundException() {

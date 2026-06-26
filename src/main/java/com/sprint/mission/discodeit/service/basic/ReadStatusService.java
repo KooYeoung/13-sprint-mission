@@ -5,7 +5,11 @@ import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.exception.*;
+import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusError;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

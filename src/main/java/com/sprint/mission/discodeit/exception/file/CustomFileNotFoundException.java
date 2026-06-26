@@ -1,4 +1,6 @@
-package com.sprint.mission.discodeit.exception;
+package com.sprint.mission.discodeit.exception.file;
+
+import com.sprint.mission.discodeit.exception.CustomNotFoundException;
 
 public class CustomFileNotFoundException extends CustomNotFoundException {
     public CustomFileNotFoundException() {

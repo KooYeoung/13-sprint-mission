@@ -2,7 +2,7 @@ package com.sprint.mission.discodeit.repository.file;
 
 import com.sprint.mission.discodeit.entity.BaseEntity;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.FileError;
+import com.sprint.mission.discodeit.exception.file.FileError;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;

@@ -1,4 +1,6 @@
-package com.sprint.mission.discodeit.exception;
+package com.sprint.mission.discodeit.exception.readStatus;
+
+import com.sprint.mission.discodeit.exception.CustomNotFoundException;
 
 public class ReadStatusNotFoundException extends CustomNotFoundException {
     public ReadStatusNotFoundException() {

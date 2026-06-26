@@ -2,9 +2,9 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.CustomFileNotFoundException;
+import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.FileError;
+import com.sprint.mission.discodeit.exception.file.FileError;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;

@@ -6,8 +6,8 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.exception.LoginFailException;
-import com.sprint.mission.discodeit.exception.UserError;
+import com.sprint.mission.discodeit.exception.user.LoginFailException;
+import com.sprint.mission.discodeit.exception.user.UserError;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
