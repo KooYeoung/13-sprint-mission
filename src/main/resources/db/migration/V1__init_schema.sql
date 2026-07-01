@@ -8,12 +8,11 @@ EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE binary_contents
 (
-    id           uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
-    created_at   timestamptz  NOT NULL DEFAULT now(),
-    file_name    varchar(255) NOT NULL,
-    size         bigint       NOT NULL,
-    content_type varchar(100) NOT NULL,
-    bytes        bytea        NOT NULL
+    id                 uuid PRIMARY KEY      DEFAULT gen_random_uuid(),
+    created_at         timestamptz  NOT NULL DEFAULT now(),
+    original_file_name varchar(255) NOT NULL,
+    size               bigint       NOT NULL,
+    content_type       varchar(100) NOT NULL
 );
 
 CREATE TABLE users
@@ -39,7 +38,7 @@ CREATE TABLE channels
     updated_at  timestamptz,
     name        varchar(100),
     description varchar(500),
-    type        varchar(10) NOT NULL,
+    type        varchar(10) NOT NULL
 
     /* 체크 조약 조건 대신 어플리케이션에서 검증 처리
     CONSTRAINT chk_channels_type
@@ -106,20 +105,20 @@ CREATE TABLE messages
 
 CREATE TABLE message_files
 (
-    id            uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
-    message_id    uuid NOT NULL,
-    file_id uuid NOT NULL,
+    id         uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    message_id uuid        NOT NULL,
+    file_id    uuid        NOT NULL,
 
-    CONSTRAINT uk_message_attachments_message_attachment
-        UNIQUE (message_id, attachment_id),
+    CONSTRAINT uk_message_files_message_file
+        UNIQUE (message_id, file_id),
 
-    CONSTRAINT fk_message_attachments_message
+    CONSTRAINT fk_message_files_message
         FOREIGN KEY (message_id)
             REFERENCES messages (id)
             ON DELETE CASCADE,
 
-    CONSTRAINT fk_message_attachments_attachment
-        FOREIGN KEY (attachment_id)
+    CONSTRAINT fk_message_files_file
+        FOREIGN KEY (file_id)
             REFERENCES binary_contents (id)
-            ON DELETE CASCADE
 );
