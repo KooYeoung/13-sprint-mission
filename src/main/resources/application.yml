@@ -11,17 +11,14 @@ spring:
       # ddl-auto=update: 엔티티에 맞춰 테이블을 자동 생성/보강(개발 편의). 운영(prod)에서는 validate 로 막는다.
       ddl-auto: create
     open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
 
   servlet:
     multipart:
       max-request-size: 20MB
       max-file-size: 10MB
-
-discodeit:
-  repository:
-    type: file # jcf | file
-    file-directory: .discodeit
-
 
 springdoc:
   api-docs:
