@@ -2,56 +2,59 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
+import com.sprint.mission.discodeit.entity.base.UpdatableEntity;
+import jakarta.persistence.*;
+import lombok.*;
 
-import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
+
 @Getter
-@ToString
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Entity
+@Table(name = "channels")
+@ToString(exclude = {"readStatusList"}, callSuper = true)
 public class Channel extends UpdatableEntity {
-   private  final String channelName;
-   private  final String description;
-   private  final ChannelType channelType;
 
-   @Builder
-   public Channel(ChannelCreateCommand command) {
-      super(Instant.now());
-      this.channelName = command.channelName();
-      this.description = command.channelDescription();
-      this.channelType = command.channelType();
-   }
+    @Column(length = 100)
+    private String name;
 
-   public Channel updateInfo(ChannelUpdateCommand command){
-      return new Channel(
-              getId()
-              ,getCreatedAt()
-              ,Instant.now()
-              , command.channelName()
-              , command.channelDescription()
-              , getChannelType()
-      );
-   }
+    @Column(length = 500)
+    private String description;
 
-   private Channel(UUID id
-         , Instant createdAt
-         , Instant updatedAt
-         , String channelName
-         , String description
-         , ChannelType channelType) {
-      super(id, createdAt, updatedAt);
-      this.channelName = channelName;
-      this.description = description;
-      this.channelType = channelType;
-   }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private ChannelType type;
 
-   public boolean isPrivate() {
-      return ChannelType.PRIVATE.equals(channelType);
-   }
-   public boolean isPublic() {
-      return ChannelType.PUBLIC.equals(channelType);
-   }
+    @OneToMany(mappedBy = "channel", cascade = CascadeType.REMOVE)
+    private List<ReadStatus> readStatusList = new ArrayList<>();
+
+    @Builder
+    public Channel(ChannelCreateCommand command) {
+        this.name = command.channelName();
+        this.description = command.channelDescription();
+        this.type = command.channelType();
+    }
+
+    public void updateInfo(ChannelUpdateCommand command) {
+        this.name = command.channelName();
+        this.description = command.channelDescription();
+    }
+
+    public boolean isPrivate() {
+        return ChannelType.PRIVATE.equals(type);
+    }
+
+    public boolean isPublic() {
+        return ChannelType.PUBLIC.equals(type);
+    }
+
+    public List<UUID> getReadStatusUserIds() {
+        return readStatusList.stream()
+                .map(ReadStatus::getUserId)
+                .toList();
+    }
 
 }

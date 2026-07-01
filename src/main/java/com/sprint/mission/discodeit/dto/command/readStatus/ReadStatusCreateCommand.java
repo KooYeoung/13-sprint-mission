@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ReadStatusCreateCommand(
-        UUID userId
-        , Instant readAt
+        UUID userId,
+        Instant readAt
 ) {
 
 }

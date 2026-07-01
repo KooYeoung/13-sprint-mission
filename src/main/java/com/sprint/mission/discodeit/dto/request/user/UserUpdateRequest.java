@@ -5,15 +5,11 @@ import lombok.With;
 
 @With
 public record UserUpdateRequest(
-        String newUsername
-        ,String nickname
-   ,  String realName
-   ,  String newPassword
-   ,  String newEmail
-   ,  String phoneNumber
-)
-{
-    public UserUpdateCommand toCommand(){
-        return new UserUpdateCommand(newUsername,nickname, realName, newPassword, newEmail, phoneNumber);
+        String newUsername,
+        String newPassword,
+        String newEmail
+) {
+    public UserUpdateCommand toCommand() {
+        return new UserUpdateCommand(newUsername, newPassword, newEmail);
     }
 }

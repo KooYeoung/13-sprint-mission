@@ -5,15 +5,19 @@ import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
+import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestException;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusError;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
-import com.sprint.mission.discodeit.repository.*;
+import com.sprint.mission.discodeit.repository.ChannelRepository;
+import com.sprint.mission.discodeit.repository.ReadStatusRepository;
+import com.sprint.mission.discodeit.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,77 +25,79 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class ReadStatusService {
-   private final ReadStatusRepository readStatusRepository;
-   private final UserRepository userRepository;
-   private final ChannelRepository channelRepository;
+    private final ReadStatusRepository readStatusRepository;
+    private final UserRepository userRepository;
+    private final ChannelRepository channelRepository;
 
-   public ReadStatusDto save(UUID channelId,ReadStatusCreateCommand command) {
-      validateChannelAndReadStatus(command.userId(),channelId);
+    public ReadStatusDto save(UUID channelId, ReadStatusCreateCommand command) {
+        User user = getUserRequireThrow(command.userId());
+        Channel channel = validateChannelAndReadStatus(command.userId(), channelId);
 
-      ReadStatus readStatus = new ReadStatus(channelId, command);
-      ReadStatus save = readStatusRepository.save(readStatus);
+        ReadStatus save = readStatusRepository.save(new ReadStatus(channel, user, command));
 
-      return ReadStatusDto.from(save);
-   }
+        return ReadStatusDto.from(save);
+    }
 
-   public ReadStatusDto findById(UUID id) {
-      ReadStatus readStatus = getReadStatusRequireThrow(id);
-      return ReadStatusDto.from(readStatus);
-   }
+    @Transactional(readOnly = true)
+    public ReadStatusDto findById(UUID id) {
+        ReadStatus readStatus = getReadStatusRequireThrow(id);
+        return ReadStatusDto.from(readStatus);
+    }
 
-   public List<ReadStatusDto> findAllByUserId(UUID userId) {
+    @Transactional(readOnly = true)
+    public List<ReadStatusDto> findAllByUserId(UUID userId) {
 
-      return readStatusRepository.findByUserId(userId)
-            .stream()
-            .map(ReadStatusDto::from)
-            .toList();
+        return readStatusRepository.findByUser_Id(userId)
+                .stream()
+                .map(ReadStatusDto::from)
+                .toList();
 
-   }
+    }
 
-   public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
+    public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
 
-      ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
+        ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
 
-      ReadStatus updatedReadStatus = readStatus.updateInfo(command);
+        readStatus.updateInfo(command);
 
-      ReadStatus savedReadStatus = readStatusRepository.update(updatedReadStatus);
+        return ReadStatusDto.from(readStatusRepository.save(readStatus));
+    }
 
-      return ReadStatusDto.from(savedReadStatus);
-   }
+    public void delete(UUID id) {
+        if (!readStatusRepository.existsById(id)) throw new ReadStatusNotFoundException();
+        readStatusRepository.deleteById(id);
+    }
 
-   public void delete(UUID id) {
-      getReadStatusRequireThrow(id);
-      readStatusRepository.delete(id);
-   }
+    private ReadStatus getReadStatusRequireThrow(UUID id) {
+        return readStatusRepository.findById(id)
+                .orElseThrow(ReadStatusNotFoundException::new);
+    }
 
-   private ReadStatus getReadStatusRequireThrow(UUID id) {
-      return readStatusRepository.findById(id)
-              .orElseThrow(ReadStatusNotFoundException::new);
-   }
+    private Channel getChannelRequireThrow(UUID channelId) {
+        return channelRepository.findById(channelId)
+                .orElseThrow(ChannelNotFoundException::new);
+    }
 
-   private Channel getChannelRequireThrow(UUID channelId) {
-      return channelRepository.findById(channelId)
-            .orElseThrow(ChannelNotFoundException::new);
-   }
+    private User getUserRequireThrow(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+    }
 
-   private void getUserRequireThrow(UUID userId) {
-      userRepository.findById(userId)
-            .orElseThrow(UserNotFoundException::new);
-   }
+    private Channel validateChannelAndReadStatus(UUID userId, UUID channelId) {
 
-   private void validateChannelAndReadStatus(UUID userId, UUID channelId) {
-      getUserRequireThrow(userId);
+        Channel channel = getChannelRequireThrow(channelId);
 
-      Channel channel = getChannelRequireThrow(channelId);
+        if (!channel.isPrivate())
+            throw new ReadStatusBadRequestException(ReadStatusError.IS_PRIVATE_CHANNEL.getMessage());
 
-      if (!channel.isPrivate()) throw new ReadStatusBadRequestException(ReadStatusError.IS_PRIVATE_CHANNEL.getMessage());
+        boolean hasReadStatus = readStatusRepository.existsByChannel_IdAndUser_Id(channelId, userId);
 
-      boolean hasReadStatus = readStatusRepository.findByUserId(userId).stream()
-            .anyMatch(r -> r.getChannelId().equals(channelId));
+        if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());
 
-      if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());
-   }
+        return channel;
+    }
 
 
 }

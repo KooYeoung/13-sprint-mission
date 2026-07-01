@@ -19,9 +19,9 @@ public record ReadStatusDto(
               readStatus.getId(),
               RequestTimeZoneUtils.toOffsetDateTime(readStatus.getCreatedAt()),
               RequestTimeZoneUtils.toOffsetDateTime(readStatus.getUpdatedAt()),
-              readStatus.getUserId(),
-              readStatus.getChannelId(),
-              RequestTimeZoneUtils.toOffsetDateTime(readStatus.getUpdatedAt())
+              readStatus.getUser().getId(),
+              readStatus.getChannel().getId(),
+              RequestTimeZoneUtils.toOffsetDateTime(readStatus.getLastReadAt())
       );
    }
 }

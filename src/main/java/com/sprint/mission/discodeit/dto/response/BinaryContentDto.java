@@ -9,7 +9,6 @@ import java.util.UUID;
 public record BinaryContentDto(
         UUID id,
         OffsetDateTime createdAt,
-        String fileName,
         Long size,
         String contentType,
         byte[] bytes
@@ -18,7 +17,6 @@ public record BinaryContentDto(
         return new BinaryContentDto(
                 binaryContent.getId(),
                 RequestTimeZoneUtils.toOffsetDateTime(binaryContent.getCreatedAt()),
-                binaryContent.getFileName(),
                 binaryContent.getSize(),
                 binaryContent.getContentType(),
                 bytes

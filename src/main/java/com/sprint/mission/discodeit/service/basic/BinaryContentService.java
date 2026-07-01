@@ -2,114 +2,111 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
+import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.exception.file.FileError;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
+import com.sprint.mission.discodeit.service.BinaryContentStorage;
+import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Transactional
+@RequiredArgsConstructor
 public class BinaryContentService {
-   private final BinaryContentRepository binaryContentRepository;
-   private final Path uploadDir;
+    private final BinaryContentRepository binaryContentRepository;
+    private final BinaryContentStorage binaryContentStorage;
 
-   public BinaryContentService(BinaryContentRepository binaryContentRepository) {
-      this.binaryContentRepository = binaryContentRepository;
-      this.uploadDir = Paths.get("uploads");
-      try {
-         Files.createDirectories(uploadDir);
-      } catch (IOException e) {
-         throw new CustomInternalServerException(FileError.DIRECTORY.getMessage(),e);
-      }
-   }
+    public Optional<BinaryContent> create(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return Optional.empty();
+        }
 
-   public Optional<BinaryContentDto> create(MultipartFile file){
-      if(file == null || file.isEmpty()){
-         return Optional.empty();
-      }
+        String originalFileName = file.getOriginalFilename();
 
-      String originalFileName = file.getOriginalFilename();
-      String storedFileName = UUID.randomUUID() + "_" + originalFileName;
-      Path savePath = uploadDir.resolve(storedFileName);
+        BinaryContent binaryContent = binaryContentRepository.save(new BinaryContent(
+                originalFileName,
+                file.getContentType(),
+                file.getSize()
+        ));
 
-      try {
-         Files.copy(file.getInputStream(), savePath);
-      } catch (IOException e) {
-         throw new CustomInternalServerException(FileError.SAVE.getMessage(), e);
-      }
+        binaryContentStorage.put(binaryContent.getId(), getBytes(file));
 
-      BinaryContent binaryContent = new BinaryContent(
-              originalFileName,
-              storedFileName,
-              file.getContentType(),
-              file.getSize(),
-              savePath.toString()
-      );
+        return Optional.of(binaryContent);
+    }
 
-      BinaryContent save = binaryContentRepository.save(binaryContent);
+    @Transactional(readOnly = true)
+    public BinaryContentDto findById(UUID id) {
 
-      return Optional.of(BinaryContentDto.from(save, getBytes(save)));
-   }
+        BinaryContent binaryContent = binaryContentRepository.findById(id)
+                .orElseThrow(CustomFileNotFoundException::new);
 
-   public BinaryContentDto findById(UUID id){
+        return BinaryContentDto.from(binaryContent, getBytes(binaryContent));
+    }
 
-      BinaryContent binaryContent = binaryContentRepository.findById(id)
-              .orElseThrow(CustomFileNotFoundException::new);
 
-      byte[] bytes = getBytes(binaryContent);
+    @Transactional(readOnly = true)
+    public List<BinaryContentDto> findAllByIdIn(List<UUID> ids) {
 
-      return BinaryContentDto.from(binaryContent, bytes);
-   }
+        return binaryContentRepository
+                .findAllByIdIn(ids)
+                .stream()
+                .map(b -> BinaryContentDto.from(b, getBytes(b)))
+                .toList();
+    }
 
-   @NonNull
-   private static byte[] getBytes(BinaryContent binaryContent) {
-      try {
-         return Files.readAllBytes(Path.of(binaryContent.getPath()));
-      } catch (NoSuchFileException e) {
-         throw new CustomFileNotFoundException();
-      } catch (IOException e) {
-         throw new CustomInternalServerException(FileError.READ.getMessage(), e);
-      }
-   }
+    public void delete(UUID id) {
 
-   public List<BinaryContentDto> findAllByIdIn(List<UUID> ids){
+        Optional<BinaryContent> existingContent = binaryContentRepository.findById(id);
 
-      return binaryContentRepository
-              .findAllByIdIn(ids)
-              .stream()
-              .map(b -> BinaryContentDto.from(b , getBytes(b)))
-              .toList();
-   }
+        if (existingContent.isEmpty()) {
+            return;
+        }
 
-   public void delete(UUID id){
+        BinaryContent binaryContent = existingContent.get();
 
-      Optional<BinaryContent> existingContent = binaryContentRepository.findById(id);
+        binaryContentStorage.delete(binaryContent.getId());
 
-      if (existingContent.isEmpty()) {
-         return;
-      }
+        binaryContentRepository.deleteById(id);
 
-      BinaryContent binaryContent = existingContent.get();
+    }
 
-      try {
-         Files.deleteIfExists(Path.of(binaryContent.getPath()));
-      } catch (IOException e) {
-         throw new CustomInternalServerException(FileError.DELETE.getMessage(), e);
-      }
+    public void delete(BinaryContent binaryContent) {
 
-      binaryContentRepository.delete(id);
+        if (binaryContent == null) return;
 
-   }
+        binaryContentStorage.delete(binaryContent.getId());
 
+        binaryContentRepository.deleteById(binaryContent.getId());
+
+    }
+
+    @NonNull
+    private byte[] getBytes(BinaryContent binaryContent) {
+        try {
+            return binaryContentStorage.get(binaryContent.getId())
+                    .readAllBytes();
+        } catch (NoSuchFileException e) {
+            throw new CustomFileNotFoundException();
+        } catch (IOException e) {
+            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+        }
+    }
+
+    private byte[] getBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+        }
+    }
 }

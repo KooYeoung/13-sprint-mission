@@ -18,29 +18,29 @@ public record ChannelDto(
         List<UUID> participantIds,
         OffsetDateTime lastMessageAt
 ) {
-   public static ChannelDto from(Channel channel) {
-      return new ChannelDto(
-              channel.getId(),
-              channel.getChannelType(),
-              channel.getChannelName(),
-              channel.getDescription(),
-              new ArrayList<>(),
-              null
-      );
-   }
+    public static ChannelDto from(Channel channel) {
+        return new ChannelDto(
+                channel.getId(),
+                channel.getType(),
+                channel.getName(),
+                channel.getDescription(),
+                channel.getReadStatusUserIds(),
+                null
+        );
+    }
 
-   public static ChannelDto from(Channel channel, Instant lastMessageAt, List<UUID> participantIds) {
-      return new ChannelDto(
-              channel.getId(),
-              channel.getChannelType(),
-              channel.getChannelName(),
-              channel.getDescription(),
-              participantIds,
-              RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
-      );
-   }
+    public static ChannelDto from(Channel channel, Instant lastMessageAt) {
+        return new ChannelDto(
+                channel.getId(),
+                channel.getType(),
+                channel.getName(),
+                channel.getDescription(),
+                channel.getReadStatusUserIds(),
+                RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
+        );
+    }
 
-   public boolean isPrivate() {
-      return  ChannelType.PRIVATE.equals(type);
-   }
+    public boolean isPrivate() {
+        return ChannelType.PRIVATE.equals(type);
+    }
 }

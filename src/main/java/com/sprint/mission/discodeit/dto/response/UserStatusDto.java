@@ -19,8 +19,8 @@ public record UserStatusDto(
                 userStatus.getId(),
                 RequestTimeZoneUtils.toOffsetDateTime(userStatus.getCreatedAt()),
                 RequestTimeZoneUtils.toOffsetDateTime(userStatus.getUpdatedAt()),
-                userStatus.getUserId(),
-                RequestTimeZoneUtils.toOffsetDateTime(userStatus.getUpdatedAt()),
+                userStatus.getUser().getId(),
+                RequestTimeZoneUtils.toOffsetDateTime(userStatus.getLastActiveAt()),
                 userStatus.isOnline()
         );
     }

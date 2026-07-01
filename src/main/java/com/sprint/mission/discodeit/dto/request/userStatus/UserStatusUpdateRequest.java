@@ -8,7 +8,7 @@ public record UserStatusUpdateRequest(
         Instant newLastActiveAt
 ) {
 
-    public UserStatusUpdateCommand toCommand(){
+    public UserStatusUpdateCommand toCommand() {
         return new UserStatusUpdateCommand(newLastActiveAt);
     }
 }

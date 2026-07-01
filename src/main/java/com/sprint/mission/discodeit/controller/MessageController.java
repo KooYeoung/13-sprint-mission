@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor
@@ -25,7 +26,7 @@ public class MessageController implements MessageApi {
     @PostMapping
     public ResponseEntity<MessageDto> create(
             @RequestPart MessageCreateRequest messageCreateRequest,
-            @RequestPart( required = false) List<MultipartFile> attachments
+            @RequestPart(required = false) List<MultipartFile> attachments
     ) {
         MessageDto save = messageService.save(messageCreateRequest.toCommand(), attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(save);

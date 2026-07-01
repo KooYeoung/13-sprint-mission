@@ -3,159 +3,120 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
-import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
+import com.sprint.mission.discodeit.dto.response.UserStatusDto;
+import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.exception.user.UserBadRequestException;
 import com.sprint.mission.discodeit.exception.user.UserError;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
-import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class BasicUserService implements UserService {
-   private final UserRepository userRepository;
-   private final UserStatusRepository userStatusRepository;
-   private final BinaryContentService binaryContentService;
+    private final UserRepository userRepository;
+    private final BinaryContentService binaryContentService;
+    private final UserStatusService userStatusService;
 
-   @Override
-   public UserDto create(UserCreateCommand command, MultipartFile file) {
+    @Override
+    public UserDto create(UserCreateCommand command, MultipartFile file) {
 
-      List<User> userList = userRepository.findAll();
-      // username 과 email 존재 여부 확인 존재시 저장 x
-      Predicate<User> isExistUsername = user -> user.getUsername().equals(command.username()) ;
-      Predicate<User> isExistEmail = user ->  user.getEmail().equals(command.email());
+        existThrow(userRepository.existsByEmail(command.email()), UserError.EMAIL.getMessage());
+        existThrow(userRepository.existsByUsername(command.username()), UserError.USERNAME.getMessage());
 
-      existThrow(isExistEmail, userList, UserError.EMAIL.getMessage());
-      existThrow(isExistUsername, userList, UserError.USERNAME.getMessage());
+        BinaryContent profile = binaryContentService.create(file).orElse(null);
 
-      UUID profileImageId = null;
-      Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
-      if(binaryContentDto.isPresent()){
-         profileImageId = binaryContentDto.get().id();
-      }
+        User savedUser = userRepository.save(new User(command, profile));
 
-      User user = new User(command, profileImageId);
-      // USER 저장
-      userRepository.save(user);
+        UserStatusDto userStatusDto = userStatusService.create(savedUser, new UserStatusCreateCommand(Instant.now()));
 
-      // UserStatus 저장.
-      Instant now = Instant.now();
-      UserStatus userStatus = new UserStatus(user.getId(), new UserStatusCreateCommand(now));
-      userStatusRepository.save(userStatus);
+        return UserDto.from(savedUser).withOnline(userStatusDto.online());
+    }
 
-      return UserDto.from(user).withOnline(userStatus.isOnline());
-   }
+    @Transactional(readOnly = true)
+    @Override
+    public UserDto findById(UUID userId) {
+        User user = getUserRequireThrow(userId);
 
-   @Override
-   public UserDto findById(UUID userId) {
+        return UserDto.from(user);
+    }
 
-      User user = getUserRequireThrow(userId);
+    @Transactional(readOnly = true)
+    @Override
+    public List<UserDto> findAll() {
 
-      UserDto userDto = UserDto.from(user);
-      userDto = updateUserOnlineStatus(user, userDto);
+        return userRepository.findAll()
+                .stream()
+                .map(UserDto::from)
+                .toList();
+    }
 
-      return userDto;
-   }
+    @Override
+    public UserDto update(UUID userId, UserUpdateCommand command, MultipartFile file) {
+        User user = getUserRequireThrow(userId);
 
-   @Override
-   public List<UserDto> findAll() {
+        checkUserUpdates(command, user);
 
-      return userRepository.findAll()
-            .stream()
-            .map( u -> {
-               UserDto userDto = UserDto.from(u);
-               userDto = updateUserOnlineStatus(u, userDto);
-               return userDto;
-            })
-            .toList();
-   }
+        BinaryContent oldImage = user.getProfile();
+        BinaryContent newImage = binaryContentService.create(file).orElse(oldImage);
 
-   @Override
-   public UserDto update(UUID userId,UserUpdateCommand command, MultipartFile file) {
-      User user = getUserRequireThrow(userId);
+        user.updateInfo(command, newImage);
 
-      checkUserUpdates(command, user);
+        User updatedUser = userRepository.save(user);
 
-      UUID oldImageId = user.getProfileImageId();
-      UUID newImageId = oldImageId;
+        if (oldImage != null && !oldImage.getId().equals(newImage.getId())) {
+            binaryContentService.delete(oldImage);
+        }
 
-      Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
+        return UserDto.from(updatedUser);
+    }
 
-      if (binaryContentDto.isPresent()) {
-         newImageId = binaryContentDto.get().id();
-      }
+    @Override
+    public void delete(UUID userId) {
+        User user = getUserRequireThrow(userId);
 
-      User updatedUser = user.updateInfo(command, newImageId);
+        userRepository.deleteById(user.getId());
 
-      userRepository.save(updatedUser);
+        if (user.isProfileImageExist()) {
+            binaryContentService.delete(user.getProfile());
+        }
 
-      if (oldImageId != null && !oldImageId.equals(newImageId)) {
-         binaryContentService.delete(oldImageId);
-      }
+    }
 
-      return UserDto.from(updatedUser);
-   }
+    private void existThrow(boolean exist, String message) {
+        if (exist) throw new UserBadRequestException(message);
+    }
 
-   private void checkUserUpdates(UserUpdateCommand command, User user) {
-      if(user.hasUsername(command.username()) && user.hasEmail(command.email())){
-         return;
-      }
-      List<User> userList = userRepository.findAll();
+    private User getUserRequireThrow(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+    }
 
-      // 이메일 검증.
-      if(!user.hasEmail(command.email())) {
-         Predicate<User> isExistEmail = u -> u.getEmail().equals(command.email());
-         existThrow(isExistEmail, userList,UserError.EMAIL.getMessage());
-      }
+    private void checkUserUpdates(UserUpdateCommand command, User user) {
+        if (user.hasUsername(command.username()) && user.hasEmail(command.email())) {
+            return;
+        }
+        // 이메일 검증.
+        if (!user.hasEmail(command.email())) {
+            existThrow(userRepository.existsByEmail(command.email()), UserError.EMAIL.getMessage());
+        }
 
-      if(!user.hasUsername(command.username())){
-         Predicate<User> isExistUsername = u -> u.getUsername().equals(command.username());
-         existThrow(isExistUsername,userList,UserError.USERNAME.getMessage());
-      }
-   }
-
-   @Override
-   public void delete(UUID userId) {
-      User user = getUserRequireThrow(userId);
-
-      userRepository.delete(user.getId());
-      if(user.isProfileImageExist()) {
-         binaryContentService.delete(user.getProfileImageId());
-      }
-   }
-
-   private void existThrow(Predicate<User> p, List<User> userList, String message) {
-      boolean exist = userList.stream()
-            .anyMatch(p);
-      if(exist) throw new UserBadRequestException(message);
-   }
-
-   private User getUserRequireThrow(UUID userId) {
-      return userRepository.findById(userId)
-            .orElseThrow(UserNotFoundException::new);
-   }
-
-   private UserDto updateUserOnlineStatus(User u, UserDto userDto) {
-      Optional<UserStatus> userStatus = userStatusRepository.findByUserId(u.getId());
-      if(userStatus.isPresent()) {
-         userDto = userDto.withOnline(userStatus.get().isOnline());
-      }
-      return userDto;
-   }
+        if (!user.hasUsername(command.username())) {
+            existThrow(userRepository.existsByUsername(command.username()), UserError.USERNAME.getMessage());
+        }
+    }
 
 }

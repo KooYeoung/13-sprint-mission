@@ -5,10 +5,10 @@ import com.sprint.mission.discodeit.entity.ChannelType;
 import java.util.List;
 import java.util.UUID;
 
-public record ChannelCreatePrivateCommand (
-        List<UUID> participantIds
-        , ChannelType channelType
-)implements ChannelCreateCommand{
+public record ChannelCreatePrivateCommand(
+        List<UUID> participantIds,
+        ChannelType channelType
+) implements ChannelCreateCommand {
 
     @Override
     public String channelName() {
