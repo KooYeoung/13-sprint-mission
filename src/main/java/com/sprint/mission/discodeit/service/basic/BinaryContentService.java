@@ -1,15 +1,18 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.dto.response.BinaryContentDownloadDto;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.CustomFileNotFoundException;
+import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
+import com.sprint.mission.discodeit.exception.CustomInternalServerException;
+import com.sprint.mission.discodeit.exception.file.FileError;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -27,7 +30,7 @@ public class BinaryContentService {
       try {
          Files.createDirectories(uploadDir);
       } catch (IOException e) {
-         throw new RuntimeException(e);
+         throw new CustomInternalServerException(FileError.DIRECTORY.getMessage(),e);
       }
    }
 
@@ -43,7 +46,7 @@ public class BinaryContentService {
       try {
          Files.copy(file.getInputStream(), savePath);
       } catch (IOException e) {
-         throw new RuntimeException("파일 저장 중 오류가 발생했습니다.", e);
+         throw new CustomInternalServerException(FileError.SAVE.getMessage(), e);
       }
 
       BinaryContent binaryContent = new BinaryContent(
@@ -56,36 +59,37 @@ public class BinaryContentService {
 
       BinaryContent save = binaryContentRepository.save(binaryContent);
 
-      return Optional.of(BinaryContentDto.from(save));
+      return Optional.of(BinaryContentDto.from(save, getBytes(save)));
    }
 
-   public BinaryContentDownloadDto findById(UUID id){
+   public BinaryContentDto findById(UUID id){
 
       BinaryContent binaryContent = binaryContentRepository.findById(id)
-              .orElseThrow(() -> new CustomFileNotFoundException("존재 하지 않는 파일입니다."));
+              .orElseThrow(CustomFileNotFoundException::new);
 
+      byte[] bytes = getBytes(binaryContent);
+
+      return BinaryContentDto.from(binaryContent, bytes);
+   }
+
+   @NonNull
+   private static byte[] getBytes(BinaryContent binaryContent) {
       try {
-         byte[] bytes = Files.readAllBytes(Path.of(binaryContent.getPath()));
-
-         return new BinaryContentDownloadDto(
-                 binaryContent.getId(),
-                 binaryContent.getOriginalFileName(),
-                 binaryContent.getContentType(),
-                 binaryContent.getSize(),
-                 bytes
-         );
+         return Files.readAllBytes(Path.of(binaryContent.getPath()));
+      } catch (NoSuchFileException e) {
+         throw new CustomFileNotFoundException();
       } catch (IOException e) {
-         throw new RuntimeException("파일을 읽는 중 오류가 발생했습니다.", e);
+         throw new CustomInternalServerException(FileError.READ.getMessage(), e);
       }
    }
 
    public List<BinaryContentDto> findAllByIdIn(List<UUID> ids){
 
       return binaryContentRepository
-            .findAllByIdIn(ids)
-            .stream()
-            .map(BinaryContentDto::from)
-            .toList();
+              .findAllByIdIn(ids)
+              .stream()
+              .map(b -> BinaryContentDto.from(b , getBytes(b)))
+              .toList();
    }
 
    public void delete(UUID id){
@@ -101,7 +105,7 @@ public class BinaryContentService {
       try {
          Files.deleteIfExists(Path.of(binaryContent.getPath()));
       } catch (IOException e) {
-         throw new RuntimeException("파일 삭제 중 오류가 발생했습니다.", e);
+         throw new CustomInternalServerException(FileError.DELETE.getMessage(), e);
       }
 
       binaryContentRepository.delete(id);

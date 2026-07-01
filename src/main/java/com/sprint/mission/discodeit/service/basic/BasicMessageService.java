@@ -4,10 +4,12 @@ import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
-import com.sprint.mission.discodeit.entity.*;
-import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
-import com.sprint.mission.discodeit.exception.MessageNotFountException;
-import com.sprint.mission.discodeit.exception.UserNotFoundException;
+import com.sprint.mission.discodeit.entity.Channel;
+import com.sprint.mission.discodeit.entity.Message;
+import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.message.MessageNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -16,8 +18,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,11 +31,10 @@ public class BasicMessageService implements MessageService {
    private final ChannelRepository channelRepository;
    private final BinaryContentService binaryContentService;
 
-
    @Override
    public MessageDto save(MessageCreateCommand command, List<MultipartFile> files) {
       getChannelRequireThrow(command.channelId());
-      User user = getUserRequireThrow(command.userId());
+      getUserRequireThrow(command.userId());
 
       List<UUID> attachedFileIds = new ArrayList<>();
       if (files!=null && !files.isEmpty()) {
@@ -50,34 +53,31 @@ public class BasicMessageService implements MessageService {
 
       messageRepository.save(message);
 
-      return MessageDto.from(message, user.getNickname());
+      return MessageDto.from(message);
    }
 
    @Override
    public MessageDto findById(UUID messageId) {
       Message message = getMessageRequireThrow(messageId);
 
-      User user = getUserRequireThrow(message.getUserId());
+      getUserRequireThrow(message.getUserId());
       getChannelRequireThrow(message.getChannelId());
 
-      return MessageDto.from(message, user.getNickname());
+      return MessageDto.from(message);
    }
 
    @Override
    public List<MessageDto> findAll() {
-      Map<UUID, User> userIdMap = userRepository.findAll()
-            .stream()
-            .collect(Collectors.toMap(User::getId, u -> u));
 
       return messageRepository.findAll()
             .stream()
-            .filter(m -> userIdMap.get(m.getUserId()) != null)
-            .map(m -> MessageDto.from(m, userIdMap.get(m.getUserId()).getNickname()))
+            .map(MessageDto::from)
             .toList();
    }
 
    @Override
    public List<MessageDto> findAllByChannelId(UUID channelId) {
+      getChannelRequireThrow(channelId);
 
       return findAll()
             .stream()
@@ -134,6 +134,6 @@ public class BasicMessageService implements MessageService {
 
    private Message getMessageRequireThrow(UUID messageId) {
       return messageRepository.findById(messageId)
-            .orElseThrow(MessageNotFountException::new);
+            .orElseThrow(MessageNotFoundException::new);
    }
 }

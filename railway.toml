@@ -1,0 +1,19 @@
+# Railway 배포 설정 파일
+# 이 파일은 Railway의 build/deploy 설정을 리포지토리에서 관리하기 위한 파일입니다.
+# Railway는 배포 시 railway.toml 또는 railway.json 파일을 읽어 설정에 반영합니다.
+#
+# 중요:
+# 이 프로젝트는 Java 17 기준으로 빌드됩니다.
+# Java 버전은 Railway Variables에서 직접 설정해야 합니다.
+#
+# Railway Variables:
+# RAILPACK_JDK_VERSION=17
+
+[build]
+builder = "RAILPACK"
+buildCommand = "chmod +x gradlew && ./gradlew clean build -x check -x test -Pproduction"
+
+[deploy]
+startCommand = "java $JAVA_OPTS -Dserver.port=$PORT -jar $(ls -1 build/libs/*.jar | grep -v plain)"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

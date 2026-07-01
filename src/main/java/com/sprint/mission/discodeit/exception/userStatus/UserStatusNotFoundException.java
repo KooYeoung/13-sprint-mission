@@ -1,4 +1,6 @@
-package com.sprint.mission.discodeit.exception;
+package com.sprint.mission.discodeit.exception.userStatus;
+
+import com.sprint.mission.discodeit.exception.CustomNotFoundException;
 
 public class UserStatusNotFoundException extends CustomNotFoundException {
 

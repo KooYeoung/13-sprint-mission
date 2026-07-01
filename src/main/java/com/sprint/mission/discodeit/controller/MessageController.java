@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.controller;
 
+import com.sprint.mission.discodeit.controller.swagger.MessageApi;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
@@ -13,38 +14,39 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor
 @Slf4j
-public class MessageController {
+public class MessageController implements MessageApi {
+
     private final MessageService messageService;
 
-    @RequestMapping(method = RequestMethod.POST)
-    public ResponseEntity<MessageDto> create(@RequestPart MessageCreateRequest request, @RequestPart(required = false) List<MultipartFile> files){
-        MessageDto save = messageService.save(request.toCommand(), files);
-
+    @PostMapping
+    public ResponseEntity<MessageDto> create(
+            @RequestPart MessageCreateRequest messageCreateRequest,
+            @RequestPart( required = false) List<MultipartFile> attachments
+    ) {
+        MessageDto save = messageService.save(messageCreateRequest.toCommand(), attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
-    @RequestMapping(value = "/{id}",method = RequestMethod.PUT)
-    public ResponseEntity<MessageDto> update(@RequestBody MessageUpdateRequest request, @PathVariable UUID id){
-        MessageDto update = messageService.update(id, request.toCommand());
-        return ResponseEntity.ok().body(update);
+    @GetMapping
+    public ResponseEntity<List<MessageDto>> listByChannelId(@RequestParam UUID channelId) {
+        return ResponseEntity.ok(messageService.findAllByChannelId(channelId));
     }
 
-    @RequestMapping(value = "/{id}",method = RequestMethod.DELETE)
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
-        messageService.delete(id);
+    @PatchMapping("/{messageId}")
+    public ResponseEntity<MessageDto> update(
+            @PathVariable UUID messageId,
+            @RequestBody MessageUpdateRequest request
+    ) {
+        return ResponseEntity.ok(messageService.update(messageId, request.toCommand()));
+    }
 
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<Void> delete(@PathVariable UUID messageId) {
+        messageService.delete(messageId);
         return ResponseEntity.noContent().build();
-    }
-
-    @RequestMapping(value = "/channel/{channelId}",method = RequestMethod.GET)
-    public ResponseEntity<List<MessageDto>> listByChannelId(@PathVariable UUID channelId){
-        List<MessageDto> allByChannelId = messageService.findAllByChannelId(channelId);
-
-        return ResponseEntity.ok().body(allByChannelId);
     }
 }

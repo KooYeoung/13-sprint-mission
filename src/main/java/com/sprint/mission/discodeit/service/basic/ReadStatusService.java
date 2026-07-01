@@ -5,17 +5,17 @@ import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
-import com.sprint.mission.discodeit.exception.ReadStatusBadRequestException;
-import com.sprint.mission.discodeit.exception.ReadStatusNotFoundException;
-import com.sprint.mission.discodeit.exception.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusError;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -49,18 +49,15 @@ public class ReadStatusService {
 
    }
 
-   public ReadStatusDto update(UUID readStatusId,UUID userId, UUID channelId, ReadStatusUpdateCommand command) {
+   public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
 
-      Optional<ReadStatus> optionalReadStatus = readStatusRepository.findById(readStatusId);
-      if(optionalReadStatus.isEmpty()){
-         return save(channelId ,new ReadStatusCreateCommand(userId, command.readAt()));
-      }
+      ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
 
-      ReadStatus currentStatus = optionalReadStatus.get();
-      ReadStatus readStatus = currentStatus.updateInfo(command);
-      readStatus = readStatusRepository.update(readStatus);
+      ReadStatus updatedReadStatus = readStatus.updateInfo(command);
 
-      return ReadStatusDto.from(readStatus);
+      ReadStatus savedReadStatus = readStatusRepository.update(updatedReadStatus);
+
+      return ReadStatusDto.from(savedReadStatus);
    }
 
    public void delete(UUID id) {
@@ -69,7 +66,8 @@ public class ReadStatusService {
    }
 
    private ReadStatus getReadStatusRequireThrow(UUID id) {
-      return readStatusRepository.findById(id).orElseThrow(ReadStatusNotFoundException::new);
+      return readStatusRepository.findById(id)
+              .orElseThrow(ReadStatusNotFoundException::new);
    }
 
    private Channel getChannelRequireThrow(UUID channelId) {
@@ -87,12 +85,12 @@ public class ReadStatusService {
 
       Channel channel = getChannelRequireThrow(channelId);
 
-      if (!channel.isPrivate()) throw new ReadStatusBadRequestException("비공개 채널만 등록 가능합니다.");
+      if (!channel.isPrivate()) throw new ReadStatusBadRequestException(ReadStatusError.IS_PRIVATE_CHANNEL.getMessage());
 
       boolean hasReadStatus = readStatusRepository.findByUserId(userId).stream()
             .anyMatch(r -> r.getChannelId().equals(channelId));
 
-      if (hasReadStatus) throw new ReadStatusBadRequestException("이미 읽음 상태가 존재합니다.");
+      if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());
    }
 
 

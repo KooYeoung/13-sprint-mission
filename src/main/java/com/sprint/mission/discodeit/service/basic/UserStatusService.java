@@ -5,15 +5,14 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.exception.UserNotFoundException;
-import com.sprint.mission.discodeit.exception.UserStatusBadRequestException;
-import com.sprint.mission.discodeit.exception.UserStatusNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.userStatus.UserStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.userStatus.UserStatusNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,20 +66,18 @@ public class UserStatusService {
       return UserStatusDto.from(status);
    }
 
-   public UserStatusDto updateByUserId(UUID userId) {
+   public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
 
       getUserRequireThrow(userId);
       Optional<UserStatus> userStatusResult = userStatusRepository.findByUserId(userId);
 
-      Instant now = Instant.now();
-
       UserStatus status;
       if (userStatusResult.isPresent()) {
          UserStatus userStatus = userStatusResult.get();
-         UserStatus updatedUserStatus = userStatus.updateInfo(new UserStatusUpdateCommand(now));
+         UserStatus updatedUserStatus = userStatus.updateInfo(command);
          status = userStatusRepository.update(updatedUserStatus);
       } else {
-         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand( now));
+         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand(command.updateAt()));
          status = userStatusRepository.save(userStatus);
       }
       return UserStatusDto.from(status);

@@ -2,7 +2,8 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
-import lombok.*;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -37,12 +38,12 @@ public class User extends UpdatableEntity {
               getId(),
               getCreatedAt(),
               Instant.now(),
-              username,
-              command.nickname(),
-              command.realName(),
-              command.password(),
-              command.email(),
-              command.phoneNumber(),
+              keepIfBlank(command.username(), username),
+              keepIfBlank(command.nickname(), nickname),
+              keepIfBlank(command.realName(), realName),
+              keepIfBlank(command.password(), password),
+              keepIfBlank(command.email(), email),
+              keepIfBlank(command.phoneNumber(), phoneNumber),
               profileImageId
       );
    }
@@ -76,4 +77,14 @@ public class User extends UpdatableEntity {
       return this.email.equals(email);
    }
 
+   public boolean hasUsername(String username) {
+      return this.username.equals(username);
+   }
+
+   private String keepIfBlank(String newValue, String oldValue) {
+      if (newValue == null || newValue.isBlank()) {
+         return oldValue;
+      }
+      return newValue;
+   }
 }

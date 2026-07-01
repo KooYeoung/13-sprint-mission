@@ -7,8 +7,9 @@ import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.exception.UserBadRequestException;
-import com.sprint.mission.discodeit.exception.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserBadRequestException;
+import com.sprint.mission.discodeit.exception.user.UserError;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import com.sprint.mission.discodeit.service.UserService;
@@ -39,8 +40,8 @@ public class BasicUserService implements UserService {
       Predicate<User> isExistUsername = user -> user.getUsername().equals(command.username()) ;
       Predicate<User> isExistEmail = user ->  user.getEmail().equals(command.email());
 
-      existThrow(isExistEmail, userList, "이미 존재하는 이메일 입니다.");
-      existThrow(isExistUsername, userList, "이미 존재하는 아이디 입니다.");
+      existThrow(isExistEmail, userList, UserError.EMAIL.getMessage());
+      existThrow(isExistUsername, userList, UserError.USERNAME.getMessage());
 
       UUID profileImageId = null;
       Optional<BinaryContentDto> binaryContentDto = binaryContentService.create(file);
@@ -88,12 +89,7 @@ public class BasicUserService implements UserService {
    public UserDto update(UUID userId,UserUpdateCommand command, MultipartFile file) {
       User user = getUserRequireThrow(userId);
 
-      // 이메일 검증.
-      if(!user.hasEmail(command.email())) {
-         Predicate<User> isExistEmail = u -> u.getEmail().equals(command.email());
-         List<User> userList = userRepository.findAll();
-         existThrow(isExistEmail,userList,"이미 존재하는 이메일 입니다.");
-      }
+      checkUserUpdates(command, user);
 
       UUID oldImageId = user.getProfileImageId();
       UUID newImageId = oldImageId;
@@ -113,6 +109,24 @@ public class BasicUserService implements UserService {
       }
 
       return UserDto.from(updatedUser);
+   }
+
+   private void checkUserUpdates(UserUpdateCommand command, User user) {
+      if(user.hasUsername(command.username()) && user.hasEmail(command.email())){
+         return;
+      }
+      List<User> userList = userRepository.findAll();
+
+      // 이메일 검증.
+      if(!user.hasEmail(command.email())) {
+         Predicate<User> isExistEmail = u -> u.getEmail().equals(command.email());
+         existThrow(isExistEmail, userList,UserError.EMAIL.getMessage());
+      }
+
+      if(!user.hasUsername(command.username())){
+         Predicate<User> isExistUsername = u -> u.getUsername().equals(command.username());
+         existThrow(isExistUsername,userList,UserError.USERNAME.getMessage());
+      }
    }
 
    @Override

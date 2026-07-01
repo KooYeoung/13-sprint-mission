@@ -31,7 +31,7 @@ public class Channel extends UpdatableEntity {
               ,Instant.now()
               , command.channelName()
               , command.channelDescription()
-              ,command.channelType()
+              , getChannelType()
       );
    }
 

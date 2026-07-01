@@ -1,15 +1,18 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePrivateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
 import com.sprint.mission.discodeit.entity.BaseEntity;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.exception.ChannelNotFoundException;
-import com.sprint.mission.discodeit.exception.ChannelUpdateFailException;
-import com.sprint.mission.discodeit.exception.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.channel.ChannelError;
+import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.channel.ChannelUpdateFailException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
@@ -30,6 +33,7 @@ public class BasicChannelService implements ChannelService {
    private final ReadStatusRepository readStatusRepository;
    private final MessageRepository messageRepository;
    private final UserRepository userRepository;
+   private final ReadStatusService readStatusService;
 
 
    @Override
@@ -38,7 +42,12 @@ public class BasicChannelService implements ChannelService {
       Channel channel = new Channel(command);
       channelRepository.save(channel);
 
-      return ChannelDto.from(channel);
+      if(command.isPrivate() && command instanceof ChannelCreatePrivateCommand privateCommand){
+         privateCommand.participantIds()
+                 .forEach(id -> readStatusService.save(channel.getId(), new ReadStatusCreateCommand(id, Instant.now())));
+      }
+
+      return findById(channel.getId());
    }
 
    @Override
@@ -114,7 +123,7 @@ public class BasicChannelService implements ChannelService {
    public ChannelDto update(UUID channelId,  ChannelUpdateCommand command) {
       Channel channel = getChannelRequireThrow(channelId);
 
-      if(channel.isPrivate()) throw new ChannelUpdateFailException("PRIVATE 채널은 수정할 수 없습니다.");
+      if(channel.isPrivate()) throw new ChannelUpdateFailException(ChannelError.PRIVATE_NOT_UPDATE.getMessage());
 
       Channel updatedChannel = channel.updateInfo(command);
 
