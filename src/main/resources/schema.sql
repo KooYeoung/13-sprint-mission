@@ -41,8 +41,10 @@ CREATE TABLE channels
     description varchar(500),
     type        varchar(10) NOT NULL,
 
+    /* 체크 조약 조건 대신 어플리케이션에서 검증 처리
     CONSTRAINT chk_channels_type
         CHECK (type IN ('PUBLIC', 'PRIVATE'))
+     */
 );
 
 CREATE TABLE user_statuses
@@ -102,13 +104,14 @@ CREATE TABLE messages
             ON DELETE SET NULL
 );
 
-CREATE TABLE message_attachments
+CREATE TABLE message_files
 (
+    id            uuid PRIMARY KEY     DEFAULT gen_random_uuid(),
     message_id    uuid NOT NULL,
-    attachment_id uuid NOT NULL,
+    file_id uuid NOT NULL,
 
-    CONSTRAINT pk_message_attachments
-        PRIMARY KEY (message_id, attachment_id),
+    CONSTRAINT uk_message_attachments_message_attachment
+        UNIQUE (message_id, attachment_id),
 
     CONSTRAINT fk_message_attachments_message
         FOREIGN KEY (message_id)
