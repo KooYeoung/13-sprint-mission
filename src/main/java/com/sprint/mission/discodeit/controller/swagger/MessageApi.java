@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.controller.swagger;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
+import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -79,9 +81,10 @@ public interface MessageApi {
                     )
             )
     })
-    ResponseEntity<List<MessageDto>> listByChannelId(
+    ResponseEntity<PageResponse<MessageDto>> listByChannelId(
             @Parameter(description = "조회할 Channel ID", required = true)
-            UUID channelId
+            UUID channelId,
+            Pageable pageable
     );
 
     @Operation(summary = "Message 내용 수정")

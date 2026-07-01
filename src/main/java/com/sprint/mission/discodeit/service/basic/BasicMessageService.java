@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
+import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
@@ -15,6 +16,8 @@ import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -63,12 +66,16 @@ public class BasicMessageService implements MessageService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<MessageDto> findAllByChannelId(UUID channelId) {
+    public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable) {
 
-        return messageRepository.findAllByChannel_Id(channelId)
+        Slice<Message> messagesPage = messageRepository.findAllByChannel_Id(channelId, pageable);
+
+        List<MessageDto> convertedMessages = messagesPage.getContent()
                 .stream()
                 .map(MessageDto::from)
                 .toList();
+
+        return PageResponse.from(messagesPage, convertedMessages);
     }
 
     @Override
