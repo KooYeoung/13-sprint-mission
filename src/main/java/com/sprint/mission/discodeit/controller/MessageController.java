@@ -9,6 +9,8 @@ import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +37,14 @@ public class MessageController implements MessageApi {
     }
 
     @GetMapping
-    public ResponseEntity<PageResponse<MessageDto>> listByChannelId(@RequestParam UUID channelId, Pageable pageable) {
+    public ResponseEntity<PageResponse<MessageDto>> listByChannelId(
+            @RequestParam UUID channelId,
+            @PageableDefault(
+                    size = 50,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable) {
         return ResponseEntity.ok(messageService.findAllByChannelId(channelId, pageable));
     }
 

@@ -14,7 +14,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -84,6 +87,12 @@ public interface MessageApi {
     ResponseEntity<PageResponse<MessageDto>> listByChannelId(
             @Parameter(description = "조회할 Channel ID", required = true)
             UUID channelId,
+            @ParameterObject
+            @PageableDefault(
+                    size = 50,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            )
             Pageable pageable
     );
 
