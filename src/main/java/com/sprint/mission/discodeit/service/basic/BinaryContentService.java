@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
+import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
 import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
@@ -8,6 +9,7 @@ import com.sprint.mission.discodeit.exception.file.FileError;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,10 +49,14 @@ public class BinaryContentService {
     @Transactional(readOnly = true)
     public BinaryContentDto findById(UUID id) {
 
-        BinaryContent binaryContent = binaryContentRepository.findById(id)
-                .orElseThrow(CustomFileNotFoundException::new);
+        BinaryContent binaryContent = getBinaryContentById(id);
 
         return BinaryContentDto.from(binaryContent, getBytes(binaryContent));
+    }
+
+    private @NonNull BinaryContent getBinaryContentById(UUID id) {
+        return binaryContentRepository.findById(id)
+                .orElseThrow(CustomFileNotFoundException::new);
     }
 
 
@@ -88,6 +94,13 @@ public class BinaryContentService {
 
         binaryContentRepository.deleteById(binaryContent.getId());
 
+    }
+
+    public DownloadDto download(UUID binaryContentId){
+        BinaryContentDto binaryContentDto = BinaryContentDto.from(getBinaryContentById(binaryContentId));
+        Resource resource = binaryContentStorage.download(binaryContentDto);
+
+        return DownloadDto.from(binaryContentDto, resource);
     }
 
     @NonNull

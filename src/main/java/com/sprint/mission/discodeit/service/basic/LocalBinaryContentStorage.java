@@ -64,9 +64,9 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     @Override
     public InputStream get(UUID fileId) {
-        Path savePath = resolvePath(fileId);
+        Path savedPath = resolvePath(fileId);
         try {
-            return Files.newInputStream(savePath, StandardOpenOption.READ);
+            return Files.newInputStream(savedPath, StandardOpenOption.READ);
         } catch (NoSuchFileException e) {
             throw new CustomInternalServerException(FileError.NOT_FOUND.getMessage(), e);
         } catch (IOException e) {
@@ -87,7 +87,6 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     @Override
     public Resource download(BinaryContentDto binaryContentDto) {
-
         return new InputStreamResource(get(binaryContentDto.id()));
     }
 }

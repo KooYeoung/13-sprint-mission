@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record BinaryContentDto(
         UUID id,
+        String fileName,
         OffsetDateTime createdAt,
         Long size,
         String contentType,
@@ -16,10 +17,15 @@ public record BinaryContentDto(
     public static BinaryContentDto from(BinaryContent binaryContent, byte[] bytes) {
         return new BinaryContentDto(
                 binaryContent.getId(),
+                binaryContent.getOriginalFileName(),
                 RequestTimeZoneUtils.toOffsetDateTime(binaryContent.getCreatedAt()),
                 binaryContent.getSize(),
                 binaryContent.getContentType(),
                 bytes
         );
+    }
+
+    public static BinaryContentDto from(BinaryContent binaryContent) {
+        return BinaryContentDto.from(binaryContent, null);
     }
 }
