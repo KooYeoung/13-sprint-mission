@@ -3,10 +3,10 @@ package com.sprint.mission.discodeit.dto.response;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
+import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,7 +15,7 @@ public record ChannelDto(
         ChannelType type,
         String name,
         String description,
-        List<UUID> participantIds,
+        List<UserDto> participants,
         OffsetDateTime lastMessageAt
 ) {
     public static ChannelDto from(Channel channel) {
@@ -24,10 +24,11 @@ public record ChannelDto(
                 channel.getType(),
                 channel.getName(),
                 channel.getDescription(),
-                channel.getReadStatusUserIds(),
+                convertReadStatusToUserDtos(channel),
                 null
         );
     }
+
 
     public static ChannelDto from(Channel channel, Instant lastMessageAt) {
         return new ChannelDto(
@@ -35,12 +36,19 @@ public record ChannelDto(
                 channel.getType(),
                 channel.getName(),
                 channel.getDescription(),
-                channel.getReadStatusUserIds(),
+                convertReadStatusToUserDtos(channel),
                 RequestTimeZoneUtils.toOffsetDateTime(lastMessageAt)
         );
     }
 
     public boolean isPrivate() {
         return ChannelType.PRIVATE.equals(type);
+    }
+
+    private static @NonNull List<UserDto> convertReadStatusToUserDtos(Channel channel) {
+        return channel.getReadStatusList()
+                .stream()
+                .map(r -> UserDto.from(r.getUser()))
+                .toList();
     }
 }

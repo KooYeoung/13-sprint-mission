@@ -11,7 +11,7 @@ public record UserDto(
         UUID id,
         String username,
         String email,
-        @With UUID profileId,
+        @With BinaryContentDto profile,
         @With boolean online,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
@@ -27,7 +27,7 @@ public record UserDto(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getProfileId(),
+                BinaryContentDto.from(user.getProfile()),
                 online,
                 RequestTimeZoneUtils.toOffsetDateTime(user.getCreatedAt()),
                 RequestTimeZoneUtils.toOffsetDateTime(user.getUpdatedAt())

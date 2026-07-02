@@ -51,7 +51,7 @@ public class BinaryContentService {
 
         BinaryContent binaryContent = getBinaryContentById(id);
 
-        return BinaryContentDto.from(binaryContent, getBytes(binaryContent));
+        return BinaryContentDto.from(binaryContent);
     }
 
     private @NonNull BinaryContent getBinaryContentById(UUID id) {
@@ -66,7 +66,7 @@ public class BinaryContentService {
         return binaryContentRepository
                 .findAllByIdIn(ids)
                 .stream()
-                .map(b -> BinaryContentDto.from(b, getBytes(b)))
+                .map(BinaryContentDto::from)
                 .toList();
     }
 

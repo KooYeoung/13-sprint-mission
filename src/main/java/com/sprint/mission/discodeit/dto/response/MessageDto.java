@@ -2,10 +2,11 @@ package com.sprint.mission.discodeit.dto.response;
 
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
+import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
+import org.jspecify.annotations.NonNull;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,8 +16,8 @@ public record MessageDto(
         OffsetDateTime updatedAt,
         String content,
         UUID channelId,
-        UUID authorId,
-        List<UUID> attachmentIds
+        UserDto author,
+        List<BinaryContentDto> attachments
 ) {
     public static MessageDto from(Message message) {
         return new MessageDto(
@@ -24,12 +25,9 @@ public record MessageDto(
                 RequestTimeZoneUtils.toOffsetDateTime(message.getCreatedAt()),
                 RequestTimeZoneUtils.toOffsetDateTime(message.getUpdatedAt()),
                 message.getContent(),
-                message.getChannel().getId(),
-                message.getAuthor().getId(),
-                message.getMessageFiles()
-                        .stream()
-                        .map(m -> m.getBinaryContent().getId())
-                        .toList()
+                message.getChannelId(),
+                UserDto.from(message.getAuthor()),
+                convertToBinaryContentList(message.getMessageFiles())
         );
     }
 
@@ -39,11 +37,15 @@ public record MessageDto(
                 RequestTimeZoneUtils.toOffsetDateTime(message.getCreatedAt()),
                 RequestTimeZoneUtils.toOffsetDateTime(message.getUpdatedAt()),
                 message.getContent(),
-                message.getChannel().getId(),
-                message.getAuthor().getId(),
-                messageFiles.stream()
-                        .map(m -> m.getBinaryContent().getId())
-                        .toList()
+                message.getChannelId(),
+                UserDto.from(message.getAuthor()),
+                convertToBinaryContentList(messageFiles)
         );
+    }
+
+    private static @NonNull List<BinaryContentDto> convertToBinaryContentList(List<MessageFile> messageFiles) {
+        return messageFiles.stream()
+                .map(m -> BinaryContentDto.from(m.getBinaryContent()))
+                .toList();
     }
 }

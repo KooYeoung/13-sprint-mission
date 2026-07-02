@@ -89,9 +89,6 @@ public class ReadStatusService {
 
         Channel channel = getChannelRequireThrow(channelId);
 
-        if (!channel.isPrivate())
-            throw new ReadStatusBadRequestException(ReadStatusError.IS_PRIVATE_CHANNEL.getMessage());
-
         boolean hasReadStatus = readStatusRepository.existsByChannel_IdAndUser_Id(channelId, userId);
 
         if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());

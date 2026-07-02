@@ -11,11 +11,15 @@ import java.util.List;
 import java.util.UUID;
 
 public interface MessageService {
-   MessageDto save(MessageCreateCommand command, List<MultipartFile> files);
-   MessageDto findById(UUID messageId);
-   List<MessageDto>  findAll();
-   PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable);
-   MessageDto update(UUID messageId, MessageUpdateCommand command);
-   void delete(UUID messageId);
-   void deleteAllByChannelId(UUID channelId);
+    MessageDto save(MessageCreateCommand command, List<MultipartFile> files);
+
+    MessageDto findById(UUID messageId);
+
+    PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable);
+
+    MessageDto update(UUID messageId, MessageUpdateCommand command);
+
+    void delete(UUID messageId);
+
+    void deleteAllByChannelId(UUID channelId);
 }

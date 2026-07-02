@@ -56,16 +56,6 @@ public class BasicMessageService implements MessageService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<MessageDto> findAll() {
-
-        return messageRepository.findAll()
-                .stream()
-                .map(MessageDto::from)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    @Override
     public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable) {
 
         Slice<Message> messagesPage = messageRepository.findAllByChannel_Id(channelId, pageable);
