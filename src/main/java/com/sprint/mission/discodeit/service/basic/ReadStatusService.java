@@ -124,7 +124,7 @@ public class ReadStatusService {
     }
 
     public void deleteByChannelId(UUID channelId) {
-        if(!readStatusRepository.exxistsByChannel_Id(channelId)) return;
+        if(!readStatusRepository.existsByChannel_Id(channelId)) return;
 
         readStatusRepository.deleteByChannel_Id(channelId);
     }

@@ -49,5 +49,5 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
     @EntityGraph(attributePaths = {"user", "user.profile", "channel"})
     List<ReadStatus> findByChannel_IdIn(List<UUID> channelIds);
 
-    boolean exxistsByChannel_Id(UUID channelId);
+    boolean existsByChannel_Id(UUID channelId);
 }
