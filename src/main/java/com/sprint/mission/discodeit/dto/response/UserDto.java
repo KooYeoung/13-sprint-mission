@@ -18,17 +18,13 @@ public record UserDto(
 ) {
 
     public static UserDto from(User user) {
-        boolean online = false;
-        if (user.getUserStatus() != null) {
-            online = user.getUserStatus().isOnline();
-        }
 
         return new UserDto(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
                 BinaryContentDto.from(user.getProfile()),
-                online,
+                user.isOnline(),
                 RequestTimeZoneUtils.toOffsetDateTime(user.getCreatedAt()),
                 RequestTimeZoneUtils.toOffsetDateTime(user.getUpdatedAt())
         );

@@ -51,4 +51,5 @@ public record ChannelDto(
                 .map(r -> UserDto.from(r.getUser()))
                 .toList();
     }
+
 }

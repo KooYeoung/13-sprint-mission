@@ -8,7 +8,6 @@ import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 
 @Getter
@@ -51,10 +50,5 @@ public class Channel extends UpdatableEntity {
         return ChannelType.PUBLIC.equals(type);
     }
 
-    public List<UUID> getReadStatusUserIds() {
-        return readStatusList.stream()
-                .map(ReadStatus::getUserId)
-                .toList();
-    }
 
 }

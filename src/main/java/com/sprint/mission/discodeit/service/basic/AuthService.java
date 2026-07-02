@@ -5,9 +5,7 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.exception.user.LoginFailException;
-import com.sprint.mission.discodeit.exception.user.UserError;
-import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,17 +14,17 @@ import java.time.Instant;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-    private final UserRepository userRepository;
     private final UserStatusService userStatusService;
+    private final UserReader userReader;
+    private final UserMapper userMapper;
 
     public UserDto login(UserLoginCommand command) {
-        User user = userRepository.findByUsernameAndPassword(command.username(), command.password())
-                .orElseThrow(() -> new LoginFailException(UserError.LOGIN.getMessage()));
+        User user = userReader.getUserByCredentials(command.username(), command.password());
 
         Instant now = Instant.now();
 
         UserStatusDto userStatusDto = userStatusService.updateByUserId(user.getId(), new UserStatusUpdateCommand(now));
 
-        return UserDto.from(user).withOnline(userStatusDto.online());
+        return userMapper.toDto(user, userStatusDto.isOnline());
     }
 }

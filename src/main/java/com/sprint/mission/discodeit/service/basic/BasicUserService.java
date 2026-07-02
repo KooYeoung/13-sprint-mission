@@ -43,7 +43,7 @@ public class BasicUserService implements UserService {
 
         UserStatusDto userStatusDto = userStatusService.create(savedUser, new UserStatusCreateCommand(Instant.now()));
 
-        return UserDto.from(savedUser).withOnline(userStatusDto.online());
+        return UserDto.from(savedUser).withOnline(userStatusDto.isOnline());
     }
 
     @Transactional(readOnly = true)
