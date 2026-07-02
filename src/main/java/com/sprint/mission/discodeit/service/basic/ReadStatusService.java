@@ -11,6 +11,7 @@ import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestExc
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusError;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
+import com.sprint.mission.discodeit.mapper.ReadStatusMapper;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +32,7 @@ public class ReadStatusService {
     private final ReadStatusRepository readStatusRepository;
     private final UserRepository userRepository;
     private final ChannelRepository channelRepository;
+    private final ReadStatusMapper readStatusMapper;
 
     public ReadStatusDto save(UUID channelId, ReadStatusCreateCommand command) {
         User user = getUserRequireThrow(command.userId());
@@ -97,4 +100,32 @@ public class ReadStatusService {
     }
 
 
+    public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
+
+        if (userIds == null) throw new UserNotFoundException();
+
+        List<UUID> distinctUserIds = userIds.stream().distinct().toList();
+        if(distinctUserIds.isEmpty()) throw new UserNotFoundException();
+
+        int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), userIds, readAt);
+
+        if(insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
+
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReadStatus> findAllByChannelId(UUID channelId) {
+        return readStatusRepository.findByChannel_Id(channelId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReadStatus> findAllByChannelIds(List<UUID> channelIds) {
+        return readStatusRepository.findByChannel_IdIn(channelIds);
+    }
+
+    public void deleteByChannelId(UUID channelId) {
+        if(!readStatusRepository.exxistsByChannel_Id(channelId)) return;
+
+        readStatusRepository.deleteByChannel_Id(channelId);
+    }
 }

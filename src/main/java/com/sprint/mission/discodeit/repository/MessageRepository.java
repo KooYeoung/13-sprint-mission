@@ -26,6 +26,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     Optional<Message> findTop1ByChannel_IdOrderByCreatedAtDesc(UUID channelId);
 
+    @EntityGraph(attributePaths = { "channel"})
     @Query("""
                 select m
                 from Message m 
