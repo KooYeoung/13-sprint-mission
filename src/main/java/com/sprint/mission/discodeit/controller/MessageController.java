@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,8 +45,13 @@ public class MessageController implements MessageApi {
                     sort = "createdAt",
                     direction = Sort.Direction.DESC
             )
-            Pageable pageable) {
-        return ResponseEntity.ok(messageService.findAllByChannelId(channelId, pageable));
+            Pageable pageable,
+            @RequestParam(required = false) Instant cursor
+    ) {
+
+        log.info("cursor : {}", cursor);
+
+        return ResponseEntity.ok(messageService.findAllByChannelId(channelId, pageable, cursor));
     }
 
     @PatchMapping("/{messageId}")

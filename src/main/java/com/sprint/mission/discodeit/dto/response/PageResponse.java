@@ -4,14 +4,9 @@ import java.util.List;
 
 public record PageResponse<T>(
         List<T> content,
-        int number,
+        Object nextCursor,
         int size,
-        boolean hasNext,
-        Long totalElements
+        boolean hasNext
 ) {
-
-    public PageResponse(List<T> content, int number, int size, boolean hasNext) {
-        this(content, number, size, hasNext, null);
-    }
 
 }
