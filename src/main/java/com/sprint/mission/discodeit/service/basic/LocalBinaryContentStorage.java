@@ -28,9 +28,11 @@ import java.util.UUID;
 public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     private final Path root;
+    private final FileTransactionManager transactionManager;
 
-    public LocalBinaryContentStorage(@Value("${discodeit.storage.local.root-path}") String rootPath) {
+    public LocalBinaryContentStorage(@Value("${discodeit.storage.local.root-path}") String rootPath, FileTransactionManager transactionManager) {
         this.root = Paths.get(rootPath);
+        this.transactionManager = transactionManager;
     }
 
     @PostConstruct
@@ -51,6 +53,8 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
                     bytes,
                     StandardOpenOption.CREATE_NEW
             );
+
+            transactionManager.deleteOnRollback(savePath);
 
             return fileId;
 
@@ -78,11 +82,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     @Override
     public void delete(UUID fileId) {
         Path savedPath = resolvePath(fileId);
-        try {
-            Files.deleteIfExists(savedPath);
-        } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.DELETE.getMessage(), e);
-        }
+        transactionManager.deleteAfterCommit(savedPath);
 
     }
 
