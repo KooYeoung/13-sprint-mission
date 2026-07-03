@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,7 +39,6 @@ public class BasicChannelService implements ChannelService {
     private final ChannelMapper channelMapper;
     private final UserReader userReader;
     private final MessageReader messageReader;
-
 
     @Override
     public ChannelDto save(ChannelCreateCommand command) {
@@ -88,7 +86,7 @@ public class BasicChannelService implements ChannelService {
                 .stream()
                 .map(cs -> channelMapper.toDto(
                                 cs,
-                                channelIdToReadStatusMap.getOrDefault(cs.id(), new ArrayList<>())
+                                channelIdToReadStatusMap.getOrDefault(cs.id(), List.of())
                         )
                 )
                 .toList();

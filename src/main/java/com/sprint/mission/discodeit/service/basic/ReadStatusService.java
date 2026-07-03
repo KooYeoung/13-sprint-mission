@@ -30,9 +30,22 @@ import java.util.UUID;
 @Transactional
 public class ReadStatusService {
     private final ReadStatusRepository readStatusRepository;
-    private final UserRepository userRepository;
-    private final ChannelRepository channelRepository;
     private final ReadStatusMapper readStatusMapper;
+    private final ChannelReader channelReader;
+    private final UserReader userReader;
+
+    public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
+
+        if (userIds == null) throw new UserNotFoundException();
+
+        List<UUID> distinctUserIds = userIds.stream().distinct().toList();
+        if (distinctUserIds.isEmpty()) throw new UserNotFoundException();
+
+        int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), distinctUserIds, readAt);
+
+        if (insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
+
+    }
 
     public ReadStatusDto save(UUID channelId, ReadStatusCreateCommand command) {
         User user = getUserRequireThrow(command.userId());
@@ -40,13 +53,31 @@ public class ReadStatusService {
 
         ReadStatus save = readStatusRepository.save(new ReadStatus(channel, user, command));
 
-        return ReadStatusDto.from(save);
+        return readStatusMapper.toDto(save);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReadStatus> findAllByChannelId(UUID channelId) {
+        return readStatusRepository.findByChannel_Id(channelId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReadStatus> findAllByChannelIds(List<UUID> channelIds) {
+        if (channelIds.isEmpty()) return List.of();
+
+        return readStatusRepository.findByChannel_IdIn(channelIds);
+    }
+
+    public void deleteByChannelId(UUID channelId) {
+        if (!readStatusRepository.existsByChannel_Id(channelId)) return;
+
+        readStatusRepository.deleteByChannel_Id(channelId);
     }
 
     @Transactional(readOnly = true)
     public ReadStatusDto findById(UUID id) {
         ReadStatus readStatus = getReadStatusRequireThrow(id);
-        return ReadStatusDto.from(readStatus);
+        return readStatusMapper.toDto(readStatus);
     }
 
     @Transactional(readOnly = true)
@@ -54,9 +85,8 @@ public class ReadStatusService {
 
         return readStatusRepository.findByUser_Id(userId)
                 .stream()
-                .map(ReadStatusDto::from)
+                .map(readStatusMapper::toDto)
                 .toList();
-
     }
 
     public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
@@ -65,7 +95,7 @@ public class ReadStatusService {
 
         readStatus.updateInfo(command);
 
-        return ReadStatusDto.from(readStatusRepository.save(readStatus));
+        return readStatusMapper.toDto(readStatusRepository.save(readStatus));
     }
 
     public void delete(UUID id) {
@@ -79,13 +109,11 @@ public class ReadStatusService {
     }
 
     private Channel getChannelRequireThrow(UUID channelId) {
-        return channelRepository.findById(channelId)
-                .orElseThrow(ChannelNotFoundException::new);
+        return channelReader.getChannel(channelId);
     }
 
     private User getUserRequireThrow(UUID userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        return userReader.getUser(userId);
     }
 
     private Channel validateChannelAndReadStatus(UUID userId, UUID channelId) {
@@ -97,35 +125,5 @@ public class ReadStatusService {
         if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());
 
         return channel;
-    }
-
-
-    public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
-
-        if (userIds == null) throw new UserNotFoundException();
-
-        List<UUID> distinctUserIds = userIds.stream().distinct().toList();
-        if(distinctUserIds.isEmpty()) throw new UserNotFoundException();
-
-        int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), userIds, readAt);
-
-        if(insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
-
-    }
-
-    @Transactional(readOnly = true)
-    public List<ReadStatus> findAllByChannelId(UUID channelId) {
-        return readStatusRepository.findByChannel_Id(channelId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ReadStatus> findAllByChannelIds(List<UUID> channelIds) {
-        return readStatusRepository.findByChannel_IdIn(channelIds);
-    }
-
-    public void deleteByChannelId(UUID channelId) {
-        if(!readStatusRepository.existsByChannel_Id(channelId)) return;
-
-        readStatusRepository.deleteByChannel_Id(channelId);
     }
 }

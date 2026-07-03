@@ -9,10 +9,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
 
+    @EntityGraph(attributePaths = {"user", "channel"})
     List<ReadStatus> findByUser_Id(UUID userId);
 
     void deleteByChannel_Id(UUID channelId);
@@ -50,4 +52,8 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
     List<ReadStatus> findByChannel_IdIn(List<UUID> channelIds);
 
     boolean existsByChannel_Id(UUID channelId);
+
+    @EntityGraph(attributePaths = {"user", "channel"})
+    @Override
+    Optional<ReadStatus> findById(UUID id);
 }
