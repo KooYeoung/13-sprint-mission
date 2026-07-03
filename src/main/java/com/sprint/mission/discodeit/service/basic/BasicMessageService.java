@@ -122,6 +122,14 @@ public class BasicMessageService implements MessageService {
         messageRepository.deleteAllByChannel_Id(channelId);
     }
 
+    @Override
+    public void detachByAuthorId(UUID userId) {
+        if(!messageRepository.existsByAuthor_Id(userId)) return;
+
+        messageRepository.detachAuthorByAuthorId(userId);
+
+    }
+
     private Channel getChannelRequireThrow(UUID channelId) {
         return channelReader.getChannel(channelId);
     }

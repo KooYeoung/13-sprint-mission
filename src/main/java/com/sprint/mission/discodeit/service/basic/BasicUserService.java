@@ -12,6 +12,7 @@ import com.sprint.mission.discodeit.exception.user.UserError;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,8 @@ public class BasicUserService implements UserService {
     private final UserRepository userRepository;
     private final BinaryContentService binaryContentService;
     private final UserStatusService userStatusService;
+    private final ReadStatusService readStatusService;
+    private final MessageService messageService;
     private final UserMapper userMapper;
 
     @Override
@@ -89,7 +92,10 @@ public class BasicUserService implements UserService {
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
-        // userStatus, readStatus 삭제 처리 필요.
+
+        userStatusService.delete(user.getStatusId(), userId);
+        readStatusService.deleteByUserId(userId);
+        messageService.detachByAuthorId(userId);
 
         userRepository.deleteById(user.getId());
 

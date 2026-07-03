@@ -24,4 +24,6 @@ public interface MessageService {
 
     void deleteAllByChannelId(UUID channelId);
 
+    void detachByAuthorId(UUID userId);
+
 }

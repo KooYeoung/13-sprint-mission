@@ -123,4 +123,10 @@ public class ReadStatusService {
 
         return channel;
     }
+
+    public void deleteByUserId(UUID userId) {
+        if(!readStatusRepository.existsByUser_Id(userId)) return;
+
+        readStatusRepository.deleteByUser_Id(userId);
+    }
 }

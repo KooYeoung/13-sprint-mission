@@ -79,4 +79,9 @@ public class User extends UpdatableEntity {
         if (userStatus == null) return false;
         return userStatus.isOnline();
     }
+
+    public UUID getStatusId() {
+        if (userStatus == null) return null;
+        return userStatus.getId();
+    }
 }

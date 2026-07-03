@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -35,4 +36,17 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     void deleteAllByChannel_Id(UUID channelId);
 
     boolean existsByChannel_Id(UUID channelId);
+
+    @Modifying(flushAutomatically = true,clearAutomatically = true)
+    @Query("""
+        update Message m
+        set
+            m.author = null 
+        where
+            m.author.id = :authorId
+               
+    """)
+    void detachAuthorByAuthorId(@Param("authorId") UUID authorId);
+
+    boolean existsByAuthor_Id(UUID authorId);
 }
