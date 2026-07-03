@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.user.UserBadRequestException;
 import com.sprint.mission.discodeit.exception.user.UserError;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
+import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class BasicUserService implements UserService {
     private final UserRepository userRepository;
     private final BinaryContentService binaryContentService;
     private final UserStatusService userStatusService;
+    private final UserMapper userMapper;
 
     @Override
     public UserDto create(UserCreateCommand command, MultipartFile file) {
@@ -43,7 +45,7 @@ public class BasicUserService implements UserService {
 
         UserStatusDto userStatusDto = userStatusService.create(savedUser, new UserStatusCreateCommand(Instant.now()));
 
-        return UserDto.from(savedUser).withOnline(userStatusDto.isOnline());
+        return userMapper.toDto(savedUser, userStatusDto.isOnline());
     }
 
     @Transactional(readOnly = true)
@@ -51,7 +53,7 @@ public class BasicUserService implements UserService {
     public UserDto findById(UUID userId) {
         User user = getUserRequireThrow(userId);
 
-        return UserDto.from(user);
+        return userMapper.toDto(user);
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +62,7 @@ public class BasicUserService implements UserService {
 
         return userRepository.findAll()
                 .stream()
-                .map(UserDto::from)
+                .map(userMapper::toDto)
                 .toList();
     }
 
@@ -81,7 +83,7 @@ public class BasicUserService implements UserService {
             binaryContentService.delete(oldImage);
         }
 
-        return UserDto.from(updatedUser);
+        return userMapper.toDto(updatedUser);
     }
 
     @Override
