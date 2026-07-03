@@ -16,9 +16,9 @@ public final class RequestTimeZoneUtils {
     private static final String TIME_ZONE_HEADER = "Time-Zone";
     private static final ZoneId DEFAULT_ZONE_ID = ZoneId.of("Asia/Seoul");
 
-    public static OffsetDateTime toOffsetDateTime(Instant instant){
-        if(instant == null){
-            return  null;
+    public static OffsetDateTime toOffsetDateTime(Instant instant) {
+        if (instant == null) {
+            return null;
         }
 
         return instant
@@ -30,7 +30,7 @@ public final class RequestTimeZoneUtils {
         ServletRequestAttributes attributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
 
-        if(attributes == null){
+        if (attributes == null) {
             return DEFAULT_ZONE_ID;
         }
 
@@ -42,13 +42,13 @@ public final class RequestTimeZoneUtils {
     }
 
     private static ZoneId pareZoneId(String timeZoneHeader) {
-        if(timeZoneHeader == null || timeZoneHeader.isBlank()){
+        if (timeZoneHeader == null || timeZoneHeader.isBlank()) {
             return DEFAULT_ZONE_ID;
         }
 
         try {
             return ZoneId.of(timeZoneHeader);
-        }catch (DateTimeException e){
+        } catch (DateTimeException e) {
             return DEFAULT_ZONE_ID;
         }
 

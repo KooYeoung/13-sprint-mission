@@ -2,7 +2,6 @@ package com.sprint.mission.discodeit.mapper;
 
 import com.sprint.mission.discodeit.dto.repository.ChannelSummary;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
-import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
@@ -40,7 +39,7 @@ public class ChannelMapper {
     }
 
     public ChannelDto toDto(Channel channel) {
-        return toDto(channel ,new ArrayList<>());
+        return toDto(channel, new ArrayList<>());
     }
 
     public ChannelDto toDto(ChannelSummary channelSummary, List<ReadStatus> readStatuses) {
