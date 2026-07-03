@@ -7,7 +7,5 @@ public record DownloadDto(
         Resource resource
 ) {
 
-    public static DownloadDto from(BinaryContentDto binaryContent, Resource resource) {
-        return new DownloadDto(binaryContent, resource);
-    }
+
 }

@@ -6,6 +6,7 @@ import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
 import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.exception.file.FileError;
+import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class BinaryContentService {
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
+    private final BinaryContentMapper binaryContentMapper;
 
     public Optional<BinaryContent> create(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -50,12 +52,7 @@ public class BinaryContentService {
 
         BinaryContent binaryContent = getBinaryContentById(id);
 
-        return BinaryContentDto.from(binaryContent);
-    }
-
-    private @NonNull BinaryContent getBinaryContentById(UUID id) {
-        return binaryContentRepository.findById(id)
-                .orElseThrow(CustomFileNotFoundException::new);
+        return binaryContentMapper.toDto(binaryContent);
     }
 
 
@@ -65,7 +62,7 @@ public class BinaryContentService {
         return binaryContentRepository
                 .findAllByIdIn(ids)
                 .stream()
-                .map(BinaryContentDto::from)
+                .map(binaryContentMapper::toDto)
                 .toList();
     }
 
@@ -106,10 +103,10 @@ public class BinaryContentService {
     }
 
     public DownloadDto download(UUID binaryContentId) {
-        BinaryContentDto binaryContentDto = BinaryContentDto.from(getBinaryContentById(binaryContentId));
-        Resource resource = binaryContentStorage.download(binaryContentDto);
+        BinaryContent binaryContent = getBinaryContentById(binaryContentId);
+        Resource resource = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
 
-        return DownloadDto.from(binaryContentDto, resource);
+        return binaryContentMapper.toDto(binaryContent, resource);
     }
 
     private byte[] getBytes(MultipartFile file) {
@@ -118,5 +115,10 @@ public class BinaryContentService {
         } catch (IOException e) {
             throw new CustomInternalServerException(FileError.READ.getMessage(), e);
         }
+    }
+
+    private @NonNull BinaryContent getBinaryContentById(UUID id) {
+        return binaryContentRepository.findById(id)
+                .orElseThrow(CustomFileNotFoundException::new);
     }
 }
