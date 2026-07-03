@@ -5,9 +5,9 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusBadRequestException;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusNotFoundException;
+import com.sprint.mission.discodeit.mapper.UserStatusMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,8 @@ import java.util.UUID;
 @Transactional
 public class UserStatusService {
     private final UserStatusRepository userStatusRepository;
-    private final UserRepository userRepository;
+    private final UserReader userReader;
+    private final UserStatusMapper userStatusMapper;
 
     public UserStatusDto create(UUID userId, UserStatusCreateCommand command) {
 
@@ -31,48 +32,43 @@ public class UserStatusService {
 
         User user = getUserRequireThrow(userId);
 
-        return createUserStatus(command, user);
+        return userStatusMapper.toDto(userStatusRepository.save(new UserStatus(user, command)));
     }
 
     public UserStatusDto create(User user, UserStatusCreateCommand command) {
 
-        if (userStatusRepository.existsByUser_Id(user.getId())) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
+        if (userStatusRepository.existsByUser_Id(user.getId()))
+            throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
 
-        return createUserStatus(command, user);
+        return userStatusMapper.toDto(userStatusRepository.save(new UserStatus(user, command)));
     }
 
     @Transactional(readOnly = true)
     public UserStatusDto findById(UUID userStatusId, UUID userId) {
         UserStatus userStatus = getUserStatusRequireThrow(userStatusId, userId);
 
-        return UserStatusDto.from(userStatus);
+        return userStatusMapper.toDto(userStatus);
     }
 
     public UserStatusDto update(UUID userStatusId, UUID userId, UserStatusUpdateCommand command) {
         Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUser_Id(userStatusId, userId);
-        if (statusOptional.isPresent()) {
-            UserStatus currentStatus = statusOptional.get();
-            currentStatus.updateInfo(command);
-            return UserStatusDto.from(userStatusRepository.save(currentStatus));
-        }
 
-        return create(userId, new UserStatusCreateCommand(command.updateAt()));
+        UserStatus status = createOrUpdateUserStatus(userId, command, statusOptional);
+
+        return userStatusMapper.toDto(userStatusRepository.save(status));
     }
+
 
     public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
         Optional<UserStatus> userStatusResult = userStatusRepository.findByUser_Id(userId);
 
-        if (userStatusResult.isPresent()) {
-            UserStatus userStatus = userStatusResult.get();
-            userStatus.updateInfo(command);
-            return UserStatusDto.from(userStatusRepository.save(userStatus));
-        }
+        UserStatus status = createOrUpdateUserStatus(userId, command, userStatusResult);
 
-        return create(userId, new UserStatusCreateCommand(command.updateAt()));
+        return userStatusMapper.toDto(userStatusRepository.save(status));
     }
 
     public void delete(UUID userStatusId, UUID userId) {
-        if(!userStatusRepository.existsByIdAndUser_Id(userStatusId, userId)) throw new UserStatusNotFoundException();
+        if (!userStatusRepository.existsByIdAndUser_Id(userStatusId, userId)) throw new UserStatusNotFoundException();
         userStatusRepository.deleteById(userStatusId);
     }
 
@@ -82,11 +78,20 @@ public class UserStatusService {
     }
 
     private User getUserRequireThrow(UUID userId) {
-        return userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        return userReader.getUser(userId);
     }
 
-    private @NonNull UserStatusDto createUserStatus(UserStatusCreateCommand command, User user) {
-        return UserStatusDto.from(userStatusRepository.save(new UserStatus(user, command)));
+    private @NonNull UserStatus createOrUpdateUserStatus(UUID userId, UserStatusUpdateCommand command, Optional<UserStatus> statusOptional) {
+        if (statusOptional.isPresent()) {
+            UserStatus currentStatus = statusOptional.get();
+            currentStatus.updateInfo(command);
+            return currentStatus;
+        }
+
+        return new UserStatus(
+                getUserRequireThrow(userId),
+                new UserStatusCreateCommand(command.updateAt())
+        );
     }
 
 }
