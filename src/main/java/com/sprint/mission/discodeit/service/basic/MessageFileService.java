@@ -3,9 +3,11 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
+import com.sprint.mission.discodeit.exception.CustomInternalServerException;
 import com.sprint.mission.discodeit.repository.MessageFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,39 +25,66 @@ public class MessageFileService {
     private final MessageFileRepository messageFileRepository;
     private final BinaryContentService binaryContentService;
 
-    public List<MessageFile> save(Message message, List<MultipartFile> files){
+    public List<MessageFile> save(Message message, List<MultipartFile> files) {
 
-        List<MessageFile> messageFiles = new ArrayList<>();
-        if (files != null && !files.isEmpty()) {
-            for (MultipartFile file : files) {
-                Optional<BinaryContent> binaryContent = binaryContentService.create(file);
-                if (binaryContent.isEmpty()) {
-                    continue;
-                }
-                BinaryContent messageFile = binaryContent.get();
-                messageFiles.add(new MessageFile(message, messageFile));
-            }
+        if (files == null || files.isEmpty()) return List.of();
+
+        List<UUID> fileIds = new ArrayList<>();
+
+        for (MultipartFile file : files) {
+            Optional<BinaryContent> binaryContent = binaryContentService.create(file);
+            binaryContent.ifPresent(b -> fileIds.add(b.getId()));
         }
 
-        // 벌크 처리.. 필요
-        return messageFileRepository.saveAll(messageFiles);
+        if (fileIds.isEmpty()) return List.of();
+
+        int insertedCount = messageFileRepository.bulkInsert(fileIds, message.getId());
+
+        if (insertedCount != fileIds.size()) throw new CustomInternalServerException("메시지 파일 저장에 실패했습니다.");
+
+        return messageFileRepository.findAllByMessage_Id(message.getId());
     }
 
-    public void deleteByMessageId(UUID messageId){
-        if(!messageFileRepository.existsByMessage_Id(messageId)) return;
+    public void deleteByMessageId(UUID messageId) {
+        if (!messageFileRepository.existsByMessage_Id(messageId)) return;
 
-        messageFileRepository.findAllByMessage_Id(messageId).forEach(messageFile -> {
-            binaryContentService.delete(messageFile.getBinaryContent());
-        });
+        List<MessageFile> messageFiles = messageFileRepository.findAllByMessage_Id(messageId);
+
+        List<BinaryContent> binaryContents = convertToBinaryContents(messageFiles);
+
+        binaryContentService.deleteAll(binaryContents);
 
         messageFileRepository.deleteByMessage_Id(messageId);
     }
 
-    public void deleteAll(List<MessageFile> messageFiles){
-        messageFiles.forEach(messageFile -> {
-            binaryContentService.delete(messageFile.getBinaryContent());
-        });
+    public void deleteAllByChannelId(UUID channelId) {
+        if (!messageFileRepository.existsByMessage_Channel_Id(channelId)) return;
 
-        messageFileRepository.deleteAll(messageFiles);
+        List<MessageFile> messageFiles = messageFileRepository.findAllByChannelId(channelId);
+
+        List<BinaryContent> binaryContents = convertToBinaryContents(messageFiles);
+
+        binaryContentService.deleteAll(binaryContents);
+
+        List<UUID> messageFileIds = messageFiles.stream().map(MessageFile::getId).toList();
+
+        messageFileRepository.deleteAllByIdIn(messageFileIds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageFile> findAllByMessageId(UUID messageId) {
+        return messageFileRepository.findAllByMessage_Id(messageId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageFile> findAllByMessageIds(List<UUID> messageIds) {
+        return messageFileRepository.findAllByMessage_IdIn(messageIds);
+    }
+
+    private @NonNull List<BinaryContent> convertToBinaryContents(List<MessageFile> messageFiles) {
+        return messageFiles
+                .stream()
+                .map(MessageFile::getBinaryContent)
+                .toList();
     }
 }

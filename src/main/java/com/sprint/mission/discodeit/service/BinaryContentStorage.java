@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import org.springframework.core.io.Resource;
 
 import java.io.InputStream;
+import java.util.List;
 import java.util.UUID;
 
 public interface BinaryContentStorage {
@@ -14,4 +15,7 @@ public interface BinaryContentStorage {
     void delete(UUID fileId);
 
     Resource download(BinaryContentDto binaryContentDto);
+
+    void deleteAll(List<UUID> binaryContentIds);
+
 }

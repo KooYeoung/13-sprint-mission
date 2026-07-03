@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -88,5 +89,10 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     @Override
     public Resource download(BinaryContentDto binaryContentDto) {
         return new InputStreamResource(get(binaryContentDto.id()));
+    }
+
+    @Override
+    public void deleteAll(List<UUID> binaryContentIds) {
+        binaryContentIds.forEach(this::delete);
     }
 }

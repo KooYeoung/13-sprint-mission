@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 public class BinaryContentMapper {
 
     public BinaryContentDto toDto(BinaryContent binaryContent) {
+        if (binaryContent == null) return null;
+
         return new BinaryContentDto(
                 binaryContent.getId(),
                 binaryContent.getOriginalFileName(),

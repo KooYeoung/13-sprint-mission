@@ -19,7 +19,7 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
 
     boolean existsByChannel_IdAndUser_Id(UUID channelId, UUID userId);
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             insert into read_statuses(
                             id,

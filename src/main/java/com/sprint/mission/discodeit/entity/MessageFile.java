@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.util.UUID;
+
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,8 +27,16 @@ public class MessageFile extends BaseEntity {
     @JoinColumn(name = "file_id", nullable = false)
     private BinaryContent binaryContent;
 
-    public MessageFile(Message message, BinaryContent binaryContent) {
-        this.message = message;
-        this.binaryContent = binaryContent;
+    public UUID getMessageId() {
+        if (message == null) return null;
+
+        return message.getId();
     }
+
+    public UUID getFileId() {
+        if (binaryContent == null) return null;
+
+        return binaryContent.getId();
+    }
+
 }

@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.NoSuchFileException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,23 +95,21 @@ public class BinaryContentService {
 
     }
 
-    public DownloadDto download(UUID binaryContentId){
+    public void deleteAll(List<BinaryContent> binaryContents) {
+        if (binaryContents == null || binaryContents.isEmpty()) return;
+
+        List<UUID> binaryContentIds = binaryContents.stream().map(BinaryContent::getId).toList();
+
+        binaryContentStorage.deleteAll(binaryContentIds);
+
+        binaryContentRepository.deleteAllByIdIn(binaryContentIds);
+    }
+
+    public DownloadDto download(UUID binaryContentId) {
         BinaryContentDto binaryContentDto = BinaryContentDto.from(getBinaryContentById(binaryContentId));
         Resource resource = binaryContentStorage.download(binaryContentDto);
 
         return DownloadDto.from(binaryContentDto, resource);
-    }
-
-    @NonNull
-    private byte[] getBytes(BinaryContent binaryContent) {
-        try {
-            return binaryContentStorage.get(binaryContent.getId())
-                    .readAllBytes();
-        } catch (NoSuchFileException e) {
-            throw new CustomFileNotFoundException();
-        } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
-        }
     }
 
     private byte[] getBytes(MultipartFile file) {

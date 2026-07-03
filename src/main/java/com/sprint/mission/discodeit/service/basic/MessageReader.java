@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,11 +15,8 @@ import java.util.UUID;
 public class MessageReader {
     private final MessageRepository messageRepository;
 
-    public Optional<Message> getLatestMessageByChannelId(UUID channelId){
+    public Optional<Message> getLatestMessageByChannelId(UUID channelId) {
         return messageRepository.findTop1ByChannel_IdOrderByCreatedAtDesc(channelId);
     }
 
-    public List<Message> getLatestMessagesByChannelIds(List<UUID> channelIds){
-        return messageRepository.findLatestMessagesByChannelIds(channelIds);
-    }
 }
