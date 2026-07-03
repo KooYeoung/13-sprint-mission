@@ -9,8 +9,8 @@ public record UserDto(
         UUID id,
         String username,
         String email,
-        @With BinaryContentDto profile,
-        @With boolean online,
+        BinaryContentDto profile,
+        boolean online,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

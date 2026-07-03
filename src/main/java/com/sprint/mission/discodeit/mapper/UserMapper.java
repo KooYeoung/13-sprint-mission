@@ -18,7 +18,7 @@ public interface UserMapper {
     @Mapping(source = "online", target = "online")
     @Mapping(source = "user.createdAt", target = "createdAt", qualifiedByName = "toOffsetDateTime")
     @Mapping(source = "user.updatedAt", target = "updatedAt", qualifiedByName = "toOffsetDateTime")
-    UserDto toDto(User user, boolean isOnline);
+    UserDto toDto(User user, boolean online);
 
     default UserDto toDto(User user) {
         if (user == null) return null;
