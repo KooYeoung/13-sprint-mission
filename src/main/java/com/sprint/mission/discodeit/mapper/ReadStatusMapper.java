@@ -2,20 +2,17 @@ package com.sprint.mission.discodeit.mapper;
 
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class ReadStatusMapper {
+@Mapper(
+        config = MapStructConfig.class,
+        uses = {DateTimeMapper.class}
+)
+public interface ReadStatusMapper {
 
-    public ReadStatusDto toDto(ReadStatus readStatus) {
-        return new ReadStatusDto(
-                readStatus.getId(),
-                RequestTimeZoneUtils.toOffsetDateTime(readStatus.getCreatedAt()),
-                RequestTimeZoneUtils.toOffsetDateTime(readStatus.getUpdatedAt()),
-                readStatus.getUserId(),
-                readStatus.getChannelId(),
-                RequestTimeZoneUtils.toOffsetDateTime(readStatus.getLastReadAt())
-        );
-    }
+    @Mapping(source = "createdAt", target = "createdAt", qualifiedByName = "toOffsetDateTime")
+    @Mapping(source = "updatedAt", target = "updatedAt", qualifiedByName = "toOffsetDateTime")
+    @Mapping(source = "lastReadAt", target = "lastReadAt", qualifiedByName = "toOffsetDateTime")
+    ReadStatusDto toDto(ReadStatus readStatus);
 }

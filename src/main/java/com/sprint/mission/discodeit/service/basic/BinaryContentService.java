@@ -106,7 +106,7 @@ public class BinaryContentService {
         BinaryContent binaryContent = getBinaryContentById(binaryContentId);
         Resource resource = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
 
-        return binaryContentMapper.toDto(binaryContent, resource);
+        return binaryContentMapper.toDownloadDto(binaryContent, resource);
     }
 
     private byte[] getBytes(MultipartFile file) {

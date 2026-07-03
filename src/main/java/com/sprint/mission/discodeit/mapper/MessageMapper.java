@@ -1,44 +1,34 @@
 package com.sprint.mission.discodeit.mapper;
 
-import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
-import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
-import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import java.util.List;
 
-@Component
-@RequiredArgsConstructor
-public class MessageMapper {
-    private final UserMapper userMapper;
-    private final BinaryContentMapper binaryContentMapper;
+@Mapper(
+        config = MapStructConfig.class,
+        uses = {UserMapper.class, MessageAttachmentMapper.class, DateTimeMapper.class}
+)
+public interface MessageMapper {
 
-    public MessageDto toDto(Message message) {
+    @Mapping(source = "message.id", target = "id")
+    @Mapping(source = "message.createdAt", target = "createdAt", qualifiedByName = "toOffsetDateTime")
+    @Mapping(source = "message.updatedAt", target = "updatedAt", qualifiedByName = "toOffsetDateTime")
+    @Mapping(source = "message.content", target = "content")
+    @Mapping(source = "message.channelId", target = "channelId")
+    @Mapping(source = "message.author", target = "author")
+    @Mapping(source = "messageFiles", target = "attachments", qualifiedByName = "toAttachments")
+    MessageDto toDto(Message message, List<MessageFile> messageFiles);
+
+    default MessageDto toDto(Message message) {
         return toDto(
                 message,
                 message.getMessageFiles()
         );
     }
 
-    public MessageDto toDto(Message message, List<MessageFile> messageFiles) {
-        return new MessageDto(
-                message.getId(),
-                RequestTimeZoneUtils.toOffsetDateTime(message.getCreatedAt()),
-                RequestTimeZoneUtils.toOffsetDateTime(message.getUpdatedAt()),
-                message.getContent(),
-                message.getChannelId(),
-                userMapper.toDto(message.getAuthor()),
-                convertToBinaryContentList(messageFiles)
-        );
-    }
 
-    private @NonNull List<BinaryContentDto> convertToBinaryContentList(List<MessageFile> messageFiles) {
-        return messageFiles.stream()
-                .map(m -> binaryContentMapper.toDto(m.getBinaryContent()))
-                .toList();
-    }
 }

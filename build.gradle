@@ -33,6 +33,13 @@ dependencies {
 
 	// local/test 환경에서 사용하고, prod 환경에서는 decorator.datasource.enabled=false 로 비활성화 권장
 	implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
+
+	//mapStruct
+	implementation 'org.mapstruct:mapstruct:1.6.3'
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+	// Lombok을 같이 쓰고 있다면 필요
+	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 }
 
 tasks.named('test') {

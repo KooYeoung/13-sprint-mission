@@ -2,30 +2,28 @@ package com.sprint.mission.discodeit.mapper;
 
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-@RequiredArgsConstructor
-public class UserMapper {
+@Mapper(
+        config = MapStructConfig.class,
+        uses = {BinaryContentMapper.class, DateTimeMapper.class}
+)
+public interface UserMapper {
 
-    private final BinaryContentMapper binaryContentMapper;
+    @Mapping(source = "user.id", target = "id")
+    @Mapping(source = "user.username", target = "username")
+    @Mapping(source = "user.email", target = "email")
+    @Mapping(source = "user.profile", target = "profile")
+    @Mapping(source = "online", target = "online")
+    @Mapping(source = "user.createdAt", target = "createdAt", qualifiedByName = "toOffsetDateTime")
+    @Mapping(source = "user.updatedAt", target = "updatedAt", qualifiedByName = "toOffsetDateTime")
+    UserDto toDto(User user, boolean isOnline);
 
-    public UserDto toDto(User user) {
+    default UserDto toDto(User user) {
+        if (user == null) return null;
+
         return toDto(user, user.isOnline());
-    }
-
-    public UserDto toDto(User user, boolean isOnline) {
-        return new UserDto(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail(),
-                binaryContentMapper.toDto(user.getProfile()),
-                isOnline,
-                RequestTimeZoneUtils.toOffsetDateTime(user.getCreatedAt()),
-                RequestTimeZoneUtils.toOffsetDateTime(user.getUpdatedAt())
-        );
     }
 
 

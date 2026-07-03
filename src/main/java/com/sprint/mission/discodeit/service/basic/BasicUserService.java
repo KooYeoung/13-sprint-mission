@@ -89,6 +89,7 @@ public class BasicUserService implements UserService {
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
+        // userStatus, readStatus 삭제 처리 필요.
 
         userRepository.deleteById(user.getId());
 
