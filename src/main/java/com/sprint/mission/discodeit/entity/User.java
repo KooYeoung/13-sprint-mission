@@ -8,6 +8,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.UUID;
 
@@ -63,10 +64,7 @@ public class User extends UpdatableEntity {
     }
 
     private String keepIfBlank(String newValue, String oldValue) {
-        if (newValue == null || newValue.isBlank()) {
-            return oldValue;
-        }
-        return newValue;
+        return StringUtils.defaultIfBlank(newValue, oldValue);
     }
 
     public UUID getProfileId() {
