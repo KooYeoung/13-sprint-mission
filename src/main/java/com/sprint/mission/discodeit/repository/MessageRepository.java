@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface MessageRepository extends JpaRepository<Message, UUID> {
+public interface MessageRepository extends JpaRepository<Message, UUID> , MessageRepositoryCustom{
 
     @Override
     @EntityGraph(attributePaths = {"author", "channel", "author.userStatus", "author.profile"})

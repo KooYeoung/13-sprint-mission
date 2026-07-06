@@ -61,8 +61,7 @@ public class BasicMessageService implements MessageService {
     @Override
     public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable, Instant cursor) {
 
-        Slice<Message> messageSlice;
-        messageSlice = getMessageSlice(channelId, pageable, cursor);
+        Slice<Message> messageSlice = getMessageSliceDsl(channelId, pageable, cursor);
 
         List<Message> content = messageSlice.getContent();
 
@@ -86,12 +85,20 @@ public class BasicMessageService implements MessageService {
         return messageDtoPageResponseMapper.fromSlice(dtoSlice, nextCursor);
     }
 
+    // jpql
     private Slice<Message> getMessageSlice(UUID channelId, Pageable pageable, Instant cursor) {
         if(cursor != null){
            return messageRepository.findAllByChannelIdWithCursor(channelId, pageable, cursor);
         }
         return messageRepository.findAllByChannel_Id(channelId, pageable);
     }
+
+    //dsl
+    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, Instant cursor) {
+
+        return messageRepository.findAllByChannelId(channelId, pageable, cursor);
+    }
+
 
     @Override
     public MessageDto update(UUID messageId, MessageUpdateCommand command) {
