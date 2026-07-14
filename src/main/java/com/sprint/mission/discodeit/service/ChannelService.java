@@ -8,10 +8,13 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ChannelService {
-   ChannelDto save(ChannelCreateCommand command);
-   ChannelDto findById(UUID channelId);
-   List<ChannelDto> findAllByUserId(UUID userId);
-   List<ChannelDto> findAll();
-   ChannelDto update(UUID channelId, ChannelUpdateCommand command);
-   void delete(UUID channelId);
+    ChannelDto save(ChannelCreateCommand command);
+
+    ChannelDto findById(UUID channelId);
+
+    List<ChannelDto> findAllByUserId(UUID userId);
+
+    ChannelDto update(UUID channelId, ChannelUpdateCommand command);
+
+    void delete(UUID channelId);
 }

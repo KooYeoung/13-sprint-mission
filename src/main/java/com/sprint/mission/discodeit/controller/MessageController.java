@@ -4,16 +4,22 @@ import com.sprint.mission.discodeit.controller.swagger.MessageApi;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
+import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor
@@ -25,15 +31,27 @@ public class MessageController implements MessageApi {
     @PostMapping
     public ResponseEntity<MessageDto> create(
             @RequestPart MessageCreateRequest messageCreateRequest,
-            @RequestPart( required = false) List<MultipartFile> attachments
+            @RequestPart(required = false) List<MultipartFile> attachments
     ) {
         MessageDto save = messageService.save(messageCreateRequest.toCommand(), attachments);
         return ResponseEntity.status(HttpStatus.CREATED).body(save);
     }
 
     @GetMapping
-    public ResponseEntity<List<MessageDto>> listByChannelId(@RequestParam UUID channelId) {
-        return ResponseEntity.ok(messageService.findAllByChannelId(channelId));
+    public ResponseEntity<PageResponse<MessageDto>> listByChannelId(
+            @RequestParam UUID channelId,
+            @PageableDefault(
+                    size = 50,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            )
+            Pageable pageable,
+            @RequestParam(required = false) Instant cursor
+    ) {
+
+        log.info("cursor : {}", cursor);
+
+        return ResponseEntity.ok(messageService.findAllByChannelId(channelId, pageable, cursor));
     }
 
     @PatchMapping("/{messageId}")

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: codeit-postgres
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: codeit
+      POSTGRES_USER: codeit
+      POSTGRES_PASSWORD: codeit1234
+      TZ: Asia/Seoul
+    volumes:
+      - codeit-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  codeit-postgres-data:

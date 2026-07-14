@@ -2,56 +2,48 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
+import com.sprint.mission.discodeit.entity.base.UpdatableEntity;
+import jakarta.persistence.*;
+import lombok.*;
 
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Getter
-@ToString
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "messages")
+@ToString(exclude = {"messageFiles", "author", "channel"}, callSuper = true)
 public class Message extends UpdatableEntity {
 
-   private final String content;
-   private final UUID userId;
-   private final UUID channelId;
-   private final List<UUID> fileIds;
+    private String content;
 
-   @Builder
-   public Message(MessageCreateCommand command, List<UUID> fileIds) {
-      super(Instant.now());
-      this.content = command.content();
-      this.userId = command.userId();
-      this.channelId = command.channelId();
-      this.fileIds = fileIds;
-   }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id")
+    private User author;
 
-   private Message(UUID id
-         , Instant createdAt
-         , Instant updatedAt
-         , String content
-         , UUID userId
-         , UUID channelId
-         , List<UUID> fileIds) {
-      super(id, createdAt, updatedAt);
-      this.content = content;
-      this.userId = userId;
-      this.channelId = channelId;
-      this.fileIds = fileIds;
-   }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "channel_id", nullable = false)
+    private Channel channel;
 
-   public Message updateInfo(MessageUpdateCommand command){
-      return new Message(
-            getId(),
-            getCreatedAt(),
-            Instant.now(),
-            command.content(),
-            userId,
-            channelId,
-            fileIds
-      );
-   }
+    @OneToMany(mappedBy = "message")
+    private List<MessageFile> messageFiles = new ArrayList<>();
+
+    @Builder
+    public Message(User author, Channel channel, MessageCreateCommand command) {
+        this.content = command.content();
+        this.author = author;
+        this.channel = channel;
+    }
+
+    public void updateInfo(MessageUpdateCommand command) {
+        this.content = command.content();
+    }
+
+    public UUID getChannelId() {
+        if (channel == null) return null;
+        return channel.getId();
+    }
 
 }

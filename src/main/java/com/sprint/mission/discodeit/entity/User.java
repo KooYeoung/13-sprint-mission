@@ -2,89 +2,84 @@ package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
+import com.sprint.mission.discodeit.entity.base.UpdatableEntity;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Getter
-@ToString(exclude = "password",callSuper = true)
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "users")
+@ToString(exclude = {"password", "userStatus", "profile"}, callSuper = true)
 public class User extends UpdatableEntity {
 
-   private final String username;
-   private final String nickname;
-   private final String realName;
-   private final String password;
-   private final String email;
-   private final String phoneNumber;
-   private final UUID profileImageId;
+    @Column(unique = true, nullable = false, length = 50)
+    private String username;
 
-   public User(UserCreateCommand command, UUID profileImageId) {
-      super(Instant.now());
-      this.username = command.username();
-      this.nickname = command.nickname();
-      this.realName = command.realName();
-      this.password = command.password();
-      this.email = command.email();
-      this.phoneNumber = command.phoneNumber();
-      this.profileImageId = profileImageId;
-   }
+    @Column(nullable = false, length = 60)
+    private String password;
 
-   public User updateInfo(
-          UserUpdateCommand command, UUID profileImageId
-   ) {
-      return new User(
-              getId(),
-              getCreatedAt(),
-              Instant.now(),
-              keepIfBlank(command.username(), username),
-              keepIfBlank(command.nickname(), nickname),
-              keepIfBlank(command.realName(), realName),
-              keepIfBlank(command.password(), password),
-              keepIfBlank(command.email(), email),
-              keepIfBlank(command.phoneNumber(), phoneNumber),
-              profileImageId
-      );
-   }
-   private User(
-         UUID id,
-         Instant createdAt,
-         Instant updatedAt,
-         String username,
-         String nickname,
-         String realName,
-         String password,
-         String email,
-         String phoneNumber,
-         UUID profileImageId
-   ) {
-      super(id, createdAt, updatedAt);
-      this.username = username;
-      this.nickname = nickname;
-      this.realName = realName;
-      this.password = password;
-      this.email = email;
-      this.phoneNumber = phoneNumber;
-      this.profileImageId = profileImageId;
-   }
+    @Column(unique = true, nullable = false, length = 100)
+    private String email;
 
-   public boolean isProfileImageExist(){
-      return profileImageId != null;
-   }
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profile_id")
+    private BinaryContent profile;
 
-   public boolean hasEmail(String email){
-      return this.email.equals(email);
-   }
+    @OneToOne(fetch = FetchType.LAZY, mappedBy = "user", cascade = CascadeType.REMOVE)
+    private UserStatus userStatus;
 
-   public boolean hasUsername(String username) {
-      return this.username.equals(username);
-   }
+    public User(UserCreateCommand command, BinaryContent profile) {
+        this.username = command.username();
+        this.password = command.password();
+        this.email = command.email();
+        this.profile = profile;
+    }
 
-   private String keepIfBlank(String newValue, String oldValue) {
-      if (newValue == null || newValue.isBlank()) {
-         return oldValue;
-      }
-      return newValue;
-   }
+    public void updateInfo(
+            UserUpdateCommand command, BinaryContent profile
+    ) {
+        this.username = keepIfBlank(command.username(), username);
+        this.password = keepIfBlank(command.password(), password);
+        this.email = keepIfBlank(command.email(), email);
+        this.profile = profile;
+    }
+
+    public boolean isProfileImageExist() {
+        return profile != null;
+    }
+
+    public boolean hasEmail(String email) {
+        return this.email.equals(email);
+    }
+
+    public boolean hasUsername(String username) {
+        return this.username.equals(username);
+    }
+
+    private String keepIfBlank(String newValue, String oldValue) {
+        return StringUtils.defaultIfBlank(newValue, oldValue);
+    }
+
+    public UUID getProfileId() {
+        if (profile == null) return null;
+
+        return profile.getId();
+    }
+
+    public boolean isOnline() {
+        if (userStatus == null) return false;
+        return userStatus.isOnline();
+    }
+
+    public UUID getStatusId() {
+        if (userStatus == null) return null;
+        return userStatus.getId();
+    }
 }

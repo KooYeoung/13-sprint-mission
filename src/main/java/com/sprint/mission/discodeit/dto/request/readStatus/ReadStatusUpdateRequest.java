@@ -7,7 +7,7 @@ import java.time.Instant;
 public record ReadStatusUpdateRequest(
         Instant newLastReadAt
 ) {
-      public ReadStatusUpdateCommand toCommand() {
-            return new ReadStatusUpdateCommand(newLastReadAt);
-      }
+    public ReadStatusUpdateCommand toCommand() {
+        return new ReadStatusUpdateCommand(newLastReadAt);
+    }
 }

@@ -5,96 +5,92 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusBadRequestException;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusNotFoundException;
-import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.mapper.UserStatusMapper;
 import com.sprint.mission.discodeit.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class UserStatusService {
-   private final UserStatusRepository userStatusRepository;
-   private final UserRepository userRepository;
+    private final UserStatusRepository userStatusRepository;
+    private final UserReader userReader;
+    private final UserStatusMapper userStatusMapper;
 
-   public UserStatusDto create(UUID userId, UserStatusCreateCommand command) {
+    public UserStatusDto create(UUID userId, UserStatusCreateCommand command) {
 
-      getUserRequireThrow(userId);
-      boolean userStatusExists = userStatusRepository.findAll().stream()
-            .anyMatch(u -> u.getUserId().equals(userId));
+        if (userStatusRepository.existsByUser_Id(userId)) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
 
-      if (userStatusExists) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
+        User user = getUserRequireThrow(userId);
 
-      UserStatus userStatus = new UserStatus(userId, command);
-      userStatusRepository.save(userStatus);
+        return userStatusMapper.toDto(userStatusRepository.save(new UserStatus(user, command)));
+    }
 
-      return UserStatusDto.from(userStatus);
-   }
+    public UserStatusDto create(User user, UserStatusCreateCommand command) {
 
-   public UserStatusDto findById(UUID userStatusId, UUID userId) {
-      UserStatus userStatus = getUserStatusRequireThrow(userStatusId,userId);
+        if (userStatusRepository.existsByUser_Id(user.getId()))
+            throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
 
-      return UserStatusDto.from(userStatus);
-   }
+        return userStatusMapper.toDto(userStatusRepository.save(new UserStatus(user, command)));
+    }
 
-   public List<UserStatusDto> findAll() {
+    @Transactional(readOnly = true)
+    public UserStatusDto findById(UUID userStatusId, UUID userId) {
+        UserStatus userStatus = getUserStatusRequireThrow(userStatusId, userId);
 
-      return userStatusRepository.findAll()
-            .stream()
-            .map(UserStatusDto::from)
-            .toList();
+        return userStatusMapper.toDto(userStatus);
+    }
 
-   }
+    public UserStatusDto update(UUID userStatusId, UUID userId, UserStatusUpdateCommand command) {
+        Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUser_Id(userStatusId, userId);
 
-   public UserStatusDto update(UUID userStatusId ,UUID userId, UserStatusUpdateCommand command){
-      Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUserId(userStatusId, userId);
-      UserStatus status;
-      if (statusOptional.isPresent()) {
-         UserStatus currentStatus = statusOptional.get();
-         UserStatus updatedUserStatus = currentStatus.updateInfo(command);
-         status = userStatusRepository.update(updatedUserStatus);
-      } else {
-         return create(userId, new UserStatusCreateCommand(command.updateAt()));
-      }
+        UserStatus status = createOrUpdateUserStatus(userId, command, statusOptional);
 
-      return UserStatusDto.from(status);
-   }
+        return userStatusMapper.toDto(userStatusRepository.save(status));
+    }
 
-   public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
 
-      getUserRequireThrow(userId);
-      Optional<UserStatus> userStatusResult = userStatusRepository.findByUserId(userId);
+    public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
+        Optional<UserStatus> userStatusResult = userStatusRepository.findByUser_Id(userId);
 
-      UserStatus status;
-      if (userStatusResult.isPresent()) {
-         UserStatus userStatus = userStatusResult.get();
-         UserStatus updatedUserStatus = userStatus.updateInfo(command);
-         status = userStatusRepository.update(updatedUserStatus);
-      } else {
-         UserStatus userStatus = new UserStatus(userId, new UserStatusCreateCommand(command.updateAt()));
-         status = userStatusRepository.save(userStatus);
-      }
-      return UserStatusDto.from(status);
-   }
+        UserStatus status = createOrUpdateUserStatus(userId, command, userStatusResult);
 
-   public void delete(UUID userStatusId, UUID userId) {
-      getUserStatusRequireThrow(userStatusId, userId);
-      userStatusRepository.delete(userStatusId);
+        return userStatusMapper.toDto(userStatusRepository.save(status));
+    }
 
-   }
+    public void delete(UUID userStatusId, UUID userId) {
+        if (!userStatusRepository.existsByIdAndUser_Id(userStatusId, userId)) throw new UserStatusNotFoundException();
+        userStatusRepository.deleteById(userStatusId);
+    }
 
-   private UserStatus getUserStatusRequireThrow(UUID userStatusId, UUID userId) {
-      return userStatusRepository.findByIdAndUserId(userStatusId, userId).orElseThrow(UserStatusNotFoundException::new);
-   }
+    private UserStatus getUserStatusRequireThrow(UUID userStatusId, UUID userId) {
+        return userStatusRepository.findByIdAndUser_Id(userStatusId, userId)
+                .orElseThrow(UserStatusNotFoundException::new);
+    }
 
-   private User getUserRequireThrow(UUID userId) {
-      return userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-   }
+    private User getUserRequireThrow(UUID userId) {
+        return userReader.getUser(userId);
+    }
+
+    private @NonNull UserStatus createOrUpdateUserStatus(UUID userId, UserStatusUpdateCommand command, Optional<UserStatus> statusOptional) {
+        if (statusOptional.isPresent()) {
+            UserStatus currentStatus = statusOptional.get();
+            currentStatus.updateInfo(command);
+            return currentStatus;
+        }
+
+        return new UserStatus(
+                getUserRequireThrow(userId),
+                new UserStatusCreateCommand(command.updateAt())
+        );
+    }
 
 }

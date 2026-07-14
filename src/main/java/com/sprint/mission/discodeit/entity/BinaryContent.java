@@ -1,27 +1,35 @@
 package com.sprint.mission.discodeit.entity;
 
+import com.sprint.mission.discodeit.entity.base.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-import java.time.Instant;
-
 @Getter
-@ToString
-public class BinaryContent extends BaseEntity{
-   private final String fileName;
-   private final String originalFileName;
-   private final String contentType;
-   private final Long size;
-   private final String path;
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "binary_contents")
+@ToString(callSuper = true)
+public class BinaryContent extends BaseEntity {
 
-   public BinaryContent(String originalFileName, String fileName, String contentType, Long size, String path) {
-      super(Instant.now());
-      this.fileName = fileName;
-      this.originalFileName = originalFileName;
-      this.contentType = contentType;
-      this.size = size;
-      this.path = path;
-   }
+    @Column(name = "original_file_name", nullable = false, length = 255)
+    private String originalFileName;
+
+    @Column(name = "content_type", nullable = false, length = 100)
+    private String contentType;
+
+    @Column(nullable = false)
+    private Long size;
+
+    public BinaryContent(String originalFileName, String contentType, Long size) {
+        this.originalFileName = originalFileName;
+        this.contentType = contentType;
+        this.size = size;
+    }
 
 
 }

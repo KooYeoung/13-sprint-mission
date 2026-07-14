@@ -50,3 +50,6 @@ bin/
 
 ## etc
 analysis/
+
+## 업로드 폴더
+uploads/
