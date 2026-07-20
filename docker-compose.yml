@@ -2,15 +2,30 @@ services:
   postgres:
     image: postgres:16
     container_name: codeit-postgres
+    restart: unless-stopped
+
     ports:
       - "5434:5432"
+
     environment:
-      POSTGRES_DB: codeit
-      POSTGRES_USER: codeit
-      POSTGRES_PASSWORD: codeit1234
+      POSTGRES_DB: discodeit
+      POSTGRES_USER: discodeit_user
+      POSTGRES_PASSWORD: discodeit1234
       TZ: Asia/Seoul
+
     volumes:
       - codeit-postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U discodeit_user -d discodeit"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
 volumes:
   codeit-postgres-data:

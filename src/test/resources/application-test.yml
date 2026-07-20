@@ -1,0 +1,59 @@
+server:
+  # 테스트 실행 시 사용 가능한 임의 포트 할당
+  port: 0
+
+spring:
+  docker:
+    compose:
+      # 테스트에서는 PostgreSQL Docker Compose를 실행하지 않음
+      enabled: false
+
+  datasource:
+    # PostgreSQL 호환 모드의 H2 인메모리 DB 사용
+    url: jdbc:h2:mem:discodeit;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      # 테스트 시작 시 스키마 생성, 종료 시 삭제
+      ddl-auto: create-drop
+
+    open-in-view: false
+
+    properties:
+      hibernate:
+        # 테스트 SQL 가독성과 배치 조회 설정
+        format_sql: true
+        default_batch_fetch_size: 100
+
+  flyway:
+    # 테스트 스키마는 Hibernate가 생성하므로 Flyway 비활성화
+    enabled: false
+
+  servlet:
+    multipart:
+      # 파일 업로드 테스트 크기 제한
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+decorator:
+  datasource:
+    # 테스트에서는 P6Spy 비활성화
+    enabled: false
+
+logging:
+  level:
+    # 테스트 및 SQL 디버깅 로그
+    root: info
+    com.sprint.mission.discodeit: debug
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+discodeit:
+  storage:
+    # 테스트 파일은 build 하위의 별도 경로에 저장
+    type: local
+    local:
+      root-path: C:/codeit-13th-develop/13-sprint-mission/build/test-uploads

@@ -1,0 +1,47 @@
+server:
+  # 환경변수가 없으면 8080 포트 사용
+  port: ${SERVER_PORT:8080}
+
+spring:
+  docker:
+    compose:
+      # 운영 환경에서는 Docker Compose 자동 실행 비활성화
+      enabled: false
+
+  datasource:
+    # 운영 DB 정보는 환경변수로 주입
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 운영 DB 스키마를 수정하지 않고 일치 여부만 검증
+      ddl-auto: validate
+
+  flyway:
+    # 운영 환경 DB 마이그레이션 활성화
+    enabled: true
+
+decorator:
+  datasource:
+    # 운영 환경에서는 P6Spy 비활성화
+    enabled: false
+
+logging:
+  level:
+    # 운영 환경은 프로젝트 로그를 INFO 이상으로 출력
+    root: info
+    com.sprint.mission.discodeit: info
+
+    # SQL 및 바인딩 값 상세 로그 비활성화
+    org.hibernate.SQL: warn
+    org.hibernate.orm.jdbc.bind: warn
+
+discodeit:
+  storage:
+    # 파일 저장 방식과 경로를 환경변수로 설정
+    type: ${STORAGE_TYPE:local}
+    local:
+      root-path: ${STORAGE_PATH:/app/uploads}
