@@ -1,9 +1,13 @@
 package com.sprint.mission.discodeit.exception.message;
 
-import com.sprint.mission.discodeit.exception.CustomNotFoundException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
+import com.sprint.mission.discodeit.exception.MessageException;
 
-public class MessageNotFoundException extends CustomNotFoundException {
-    public MessageNotFoundException() {
-        super("존재하지 않는 메시지 입니다.");
+import java.util.Map;
+import java.util.UUID;
+
+public class MessageNotFoundException extends MessageException {
+    public MessageNotFoundException(UUID messageId) {
+        super(ErrorCode.MESSAGE_NOT_FOUND, Map.of("messageId", messageId));
     }
 }

@@ -8,8 +8,8 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.exception.user.UserBadRequestException;
-import com.sprint.mission.discodeit.exception.user.UserError;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -41,8 +41,8 @@ public class BasicUserService implements UserService {
     @Override
     public UserDto create(UserCreateCommand command, MultipartFile file) {
 
-        existThrow(userRepository.existsByEmail(command.email()), UserError.EMAIL.getMessage());
-        existThrow(userRepository.existsByUsername(command.username()), UserError.USERNAME.getMessage());
+        existThrow(userRepository.existsByEmail(command.email()), ErrorCode.USER_EMAIL_DUPLICATED);
+        existThrow(userRepository.existsByUsername(command.username()), ErrorCode.USER_USERNAME_DUPLICATED);
 
         BinaryContent profile = binaryContentService.create(file).orElse(null);
 
@@ -109,13 +109,13 @@ public class BasicUserService implements UserService {
 
     }
 
-    private void existThrow(boolean exist, String message) {
-        if (exist) throw new UserBadRequestException(message);
+    private void existThrow(boolean exist, ErrorCode errorCode) {
+        if (exist) throw new UserBadRequestException(errorCode);
     }
 
     private User getUserRequireThrow(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+                .orElseThrow(()-> new UserNotFoundException(userId));
     }
 
     private void checkUserUpdates(UserUpdateCommand command, User user) {
@@ -124,11 +124,11 @@ public class BasicUserService implements UserService {
         }
         // 이메일 검증.
         if (!user.hasEmail(command.email())) {
-            existThrow(userRepository.existsByEmail(command.email()), UserError.EMAIL.getMessage());
+            existThrow(userRepository.existsByEmail(command.email()), ErrorCode.USER_EMAIL_DUPLICATED);
         }
 
         if (!user.hasUsername(command.username())) {
-            existThrow(userRepository.existsByUsername(command.username()), UserError.USERNAME.getMessage());
+            existThrow(userRepository.existsByUsername(command.username()), ErrorCode.USER_USERNAME_DUPLICATED);
         }
     }
 

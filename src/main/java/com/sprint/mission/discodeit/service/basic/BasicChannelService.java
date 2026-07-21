@@ -10,7 +10,6 @@ import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.exception.channel.ChannelError;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
 import com.sprint.mission.discodeit.exception.channel.ChannelUpdateFailException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
@@ -65,7 +64,7 @@ public class BasicChannelService implements ChannelService {
     public ChannelDto findById(UUID channelId) {
 
         ChannelSummary channelSummary = channelRepository.findByDetail(channelId)
-                .orElseThrow(ChannelNotFoundException::new);
+                .orElseThrow(()-> new ChannelNotFoundException(channelId));
 
         return channelMapper.toDto(channelSummary, readStatusService.findAllByChannelId(channelId));
     }
@@ -73,7 +72,7 @@ public class BasicChannelService implements ChannelService {
     @Transactional(readOnly = true)
     @Override
     public List<ChannelDto> findAllByUserId(UUID userId) {
-        if (!userReader.isUserExist(userId)) throw new UserNotFoundException();
+        if (!userReader.isUserExist(userId)) throw new UserNotFoundException(userId);
 
         List<ChannelSummary> channelSummaries = channelRepository.findVisibleChannels(userId, ChannelType.PUBLIC);
 
@@ -99,7 +98,7 @@ public class BasicChannelService implements ChannelService {
     public ChannelDto update(UUID channelId, ChannelUpdateCommand command) {
         Channel channel = getChannelRequireThrow(channelId);
 
-        if (channel.isPrivate()) throw new ChannelUpdateFailException(ChannelError.PRIVATE_NOT_UPDATE.getMessage());
+        if (channel.isPrivate()) throw new ChannelUpdateFailException(channelId);
 
         channel.updateInfo(command);
 
@@ -114,7 +113,7 @@ public class BasicChannelService implements ChannelService {
     @Override
     public void delete(UUID channelId) {
 
-        if (!channelRepository.existsById(channelId)) throw new ChannelNotFoundException();
+        if (!channelRepository.existsById(channelId)) throw new ChannelNotFoundException(channelId);
 
         readStatusService.deleteByChannelId(channelId);
 
@@ -126,7 +125,7 @@ public class BasicChannelService implements ChannelService {
 
     private Channel getChannelRequireThrow(UUID channelId) {
         return channelRepository.findById(channelId)
-                .orElseThrow(ChannelNotFoundException::new);
+                .orElseThrow(()-> new ChannelNotFoundException(channelId));
     }
 
     private @Nullable Instant getLastMessageAt(UUID channelId) {

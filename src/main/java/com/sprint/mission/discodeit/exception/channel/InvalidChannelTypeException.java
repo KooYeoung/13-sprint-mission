@@ -1,9 +1,11 @@
 package com.sprint.mission.discodeit.exception.channel;
 
-import com.sprint.mission.discodeit.exception.CustomBadRequestException;
+import com.sprint.mission.discodeit.exception.ChannelException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 
-public class InvalidChannelTypeException extends CustomBadRequestException {
-    public InvalidChannelTypeException(String message) {
-        super(message);
+public class InvalidChannelTypeException extends ChannelException {
+    public InvalidChannelTypeException(ErrorCode errorCode) {
+        super(errorCode);
     }
+
 }

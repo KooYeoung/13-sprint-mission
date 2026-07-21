@@ -14,25 +14,23 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(CustomBadRequestException.class)
-    public ResponseEntity<ApiErrorResponse> badRequest(RuntimeException e) {
-        log.warn(e.getMessage());
+    @ExceptionHandler(DiscodeitException.class)
+    public ResponseEntity<ApiErrorResponse> handleDiscodeitException(DiscodeitException e) {
+        HttpStatus status = e.getErrorCode().getStatus();
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.of(e.getMessage()));
-    }
+        if (status.is5xxServerError()) {
+            log.error("application error: {}", e.getMessage(), e);
+        } else {
+            log.warn(e.getMessage());
+        }
 
-    @ExceptionHandler(CustomNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> notFound(RuntimeException e) {
-        log.warn(e.getMessage());
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiErrorResponse.of(e.getMessage()));
+        return ResponseEntity.status(status)
+                .body(ApiErrorResponse.of(e));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        Map<String, String> fieldsMap = new HashMap<>();
+        Map<String, Object> fieldsMap = new HashMap<>();
 
         e.getBindingResult()
                 .getFieldErrors()
@@ -40,24 +38,33 @@ public class GlobalExceptionHandler {
 
         log.warn("validation errors={}", fieldsMap);
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiErrorResponse.of("요청 본문에 일부 필드가 유효하지 않습니다.", fieldsMap));
-    }
+        ErrorCode errorCode = ErrorCode.INVALID_REQUEST;
 
-    @ExceptionHandler(CustomInternalServerException.class)
-    public ResponseEntity<ApiErrorResponse> internalServerError(CustomInternalServerException e) {
-        log.error("internal server error: {}", e.getMessage(), e);
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiErrorResponse.of(e.getMessage()));
+                .status(errorCode.getStatus())
+                .body(ApiErrorResponse.of(
+                        errorCode.getStatus().value(),
+                        e.getClass().getSimpleName(),
+                        errorCode.getCode(),
+                        errorCode.getMessage(),
+                        fieldsMap
+                ));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> exception(Exception e) {
         log.error("Unhandled exception", e);
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiErrorResponse.of("알 수 없는 오류가 발생했습니다."));
+        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiErrorResponse.of(
+                        errorCode.getStatus().value(),
+                        e.getClass().getSimpleName(),
+                        errorCode.getCode(),
+                        errorCode.getMessage(),
+                        Map.of()
+                ));
     }
 
 }

@@ -6,8 +6,8 @@ import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestException;
-import com.sprint.mission.discodeit.exception.readStatus.ReadStatusError;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.ReadStatusMapper;
@@ -96,7 +96,7 @@ public class ReadStatusService {
     }
 
     public void delete(UUID id) {
-        if (!readStatusRepository.existsById(id)) throw new ReadStatusNotFoundException();
+        if (!readStatusRepository.existsById(id)) throw new ReadStatusNotFoundException(id);
         readStatusRepository.deleteById(id);
     }
 
@@ -108,7 +108,7 @@ public class ReadStatusService {
 
     private ReadStatus getReadStatusRequireThrow(UUID id) {
         return readStatusRepository.findById(id)
-                .orElseThrow(ReadStatusNotFoundException::new);
+                .orElseThrow(()-> new ReadStatusNotFoundException(id));
     }
 
     private Channel getChannelRequireThrow(UUID channelId) {
@@ -125,7 +125,9 @@ public class ReadStatusService {
 
         boolean hasReadStatus = readStatusRepository.existsByChannel_IdAndUser_Id(channelId, userId);
 
-        if (hasReadStatus) throw new ReadStatusBadRequestException(ReadStatusError.HAS_READ.getMessage());
+        if (hasReadStatus) {
+            throw new ReadStatusBadRequestException(ErrorCode.READ_STATUS_ALREADY_EXISTS, channelId, userId);
+        }
 
         return channel;
     }

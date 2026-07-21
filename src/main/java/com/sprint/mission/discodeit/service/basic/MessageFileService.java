@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.repository.MessageFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ public class MessageFileService {
 
         int insertedCount = messageFileRepository.bulkInsert(fileIds, message.getId());
 
-        if (insertedCount != fileIds.size()) throw new CustomInternalServerException("메시지 파일 저장에 실패했습니다.");
+        if (insertedCount != fileIds.size()) throw new CustomInternalServerException(ErrorCode.MESSAGE_FILE_SAVE_FAILED);
 
         return messageFileRepository.findAllByMessage_Id(message.getId());
     }

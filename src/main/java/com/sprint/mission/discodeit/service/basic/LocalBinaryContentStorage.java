@@ -2,7 +2,8 @@ package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.file.FileError;
+import com.sprint.mission.discodeit.exception.ErrorCode;
+import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.DIRECTORY.getMessage(), e);
+            throw new CustomInternalServerException(ErrorCode.FILE_DIRECTORY_CREATE_FAILED, e);
         }
     }
 
@@ -59,7 +60,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
             return fileId;
 
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.SAVE.getMessage(), e);
+            throw new CustomInternalServerException(ErrorCode.FILE_SAVE_FAILED, e);
         }
     }
 
@@ -73,9 +74,10 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             return Files.newInputStream(savedPath, StandardOpenOption.READ);
         } catch (NoSuchFileException e) {
-            throw new CustomInternalServerException(FileError.NOT_FOUND.getMessage(), e);
+            log.warn("파일이 존재하지 않습니다. fileId={}", fileId);
+            throw new CustomFileNotFoundException(fileId, e);
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+            throw new CustomInternalServerException(ErrorCode.FILE_READ_FAILED, e);
         }
     }
 

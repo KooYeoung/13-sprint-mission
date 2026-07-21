@@ -101,7 +101,7 @@ public class BasicMessageService implements MessageService {
     @LogAction(value = "메시지 삭제", idName = "messageId", idParamIndex = 0)
     @Override
     public void delete(UUID messageId) {
-        if (!messageRepository.existsById(messageId)) throw new MessageNotFoundException();
+        if (!messageRepository.existsById(messageId)) throw new MessageNotFoundException(messageId);
 
         messageFileService.deleteByMessageId(messageId);
 
@@ -136,7 +136,7 @@ public class BasicMessageService implements MessageService {
 
     private Message getMessageRequireThrow(UUID messageId) {
         return messageRepository.findById(messageId)
-                .orElseThrow(MessageNotFoundException::new);
+                .orElseThrow(()-> new MessageNotFoundException(messageId));
     }
 
     private @NonNull Map<UUID, List<MessageFile>> getMessageFilesGroupedByMessageId(List<UUID> messageIds) {

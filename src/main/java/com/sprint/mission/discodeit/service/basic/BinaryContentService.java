@@ -4,9 +4,9 @@ import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.exception.CustomInternalServerException;
 import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
-import com.sprint.mission.discodeit.exception.file.FileError;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
@@ -75,6 +75,7 @@ public class BinaryContentService {
         Optional<BinaryContent> existingContent = binaryContentRepository.findById(id);
 
         if (existingContent.isEmpty()) {
+            log.warn("파일이 존재하지 않습니다. binaryContentId={}", id);
             return;
         }
 
@@ -118,12 +119,12 @@ public class BinaryContentService {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+            throw new CustomInternalServerException(ErrorCode.FILE_READ_FAILED, e);
         }
     }
 
     private @NonNull BinaryContent getBinaryContentById(UUID id) {
         return binaryContentRepository.findById(id)
-                .orElseThrow(CustomFileNotFoundException::new);
+                .orElseThrow(() ->new CustomFileNotFoundException(id));
     }
 }

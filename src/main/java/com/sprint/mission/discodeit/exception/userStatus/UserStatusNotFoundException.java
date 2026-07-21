@@ -1,10 +1,14 @@
 package com.sprint.mission.discodeit.exception.userStatus;
 
-import com.sprint.mission.discodeit.exception.CustomNotFoundException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
+import com.sprint.mission.discodeit.exception.UserStatusException;
 
-public class UserStatusNotFoundException extends CustomNotFoundException {
+import java.util.Map;
+import java.util.UUID;
 
-    public UserStatusNotFoundException() {
-        super("유저 상태가 존재하지 않습니다.");
+public class UserStatusNotFoundException extends UserStatusException {
+
+    public UserStatusNotFoundException(UUID userStatusId) {
+        super(ErrorCode.USER_STATUS_NOT_FOUND, Map.of("userStatusId", userStatusId));
     }
 }

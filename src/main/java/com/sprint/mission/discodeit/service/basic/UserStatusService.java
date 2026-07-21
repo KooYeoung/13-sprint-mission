@@ -5,6 +5,7 @@ import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusUpdateComma
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusBadRequestException;
 import com.sprint.mission.discodeit.exception.userStatus.UserStatusNotFoundException;
 import com.sprint.mission.discodeit.mapper.UserStatusMapper;
@@ -27,7 +28,9 @@ public class UserStatusService {
 
     public UserStatusDto create(UUID userId, UserStatusCreateCommand command) {
 
-        if (userStatusRepository.existsByUser_Id(userId)) throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
+        if (userStatusRepository.existsByUser_Id(userId)) {
+            throw new UserStatusBadRequestException(ErrorCode.USER_STATUS_ALREADY_EXISTS, userId);
+        }
 
         User user = getUserRequireThrow(userId);
 
@@ -36,8 +39,9 @@ public class UserStatusService {
 
     public UserStatusDto create(User user, UserStatusCreateCommand command) {
 
-        if (userStatusRepository.existsByUser_Id(user.getId()))
-            throw new UserStatusBadRequestException("이미 유저 상태가 존재합니다.");
+        if (userStatusRepository.existsByUser_Id(user.getId())) {
+            throw new UserStatusBadRequestException(ErrorCode.USER_STATUS_ALREADY_EXISTS, user.getId());
+        }
 
         return userStatusMapper.toDto(userStatusRepository.save(new UserStatus(user, command)));
     }
@@ -66,13 +70,13 @@ public class UserStatusService {
     }
 
     public void delete(UUID userStatusId, UUID userId) {
-        if (!userStatusRepository.existsByIdAndUser_Id(userStatusId, userId)) throw new UserStatusNotFoundException();
+        if (!userStatusRepository.existsByIdAndUser_Id(userStatusId, userId)) return;
         userStatusRepository.deleteById(userStatusId);
     }
 
     private UserStatus getUserStatusRequireThrow(UUID userStatusId, UUID userId) {
         return userStatusRepository.findByIdAndUser_Id(userStatusId, userId)
-                .orElseThrow(UserStatusNotFoundException::new);
+                .orElseThrow(() -> new UserStatusNotFoundException(userStatusId));
     }
 
     private User getUserRequireThrow(UUID userId) {
