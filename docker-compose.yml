@@ -1,7 +1,9 @@
+name: discodeit
+
 services:
   postgres:
     image: postgres:16
-    container_name: codeit-postgres
+    container_name: discodeit-postgres
     restart: unless-stopped
 
     ports:
@@ -14,7 +16,7 @@ services:
       TZ: Asia/Seoul
 
     volumes:
-      - codeit-postgres-data:/var/lib/postgresql/data
+      - discodeit-postgres-data:/var/lib/postgresql/data
 
     healthcheck:
       test:
@@ -28,4 +30,4 @@ services:
       start_period: 10s
 
 volumes:
-  codeit-postgres-data:
+  discodeit-postgres-data:
