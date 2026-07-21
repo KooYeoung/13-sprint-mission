@@ -28,11 +28,12 @@ public class FileTransactionManager {
             @Override
             public void afterCompletion(int status) {
                 if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-                    deleteQuietly(path);
+                    deleteAfterRollback(path);
                 }
             }
         });
 
+        log.debug("트랜잭션 롤백 시 파일 삭제를 예약했습니다. path={}", path);
     }
 
     /**
@@ -63,5 +64,19 @@ public class FileTransactionManager {
             log.error("파일 삭제 중 오류가 발생했습니다. path={}", path, e);
         }
 
+    }
+
+    private void deleteAfterRollback(Path path) {
+        try {
+            boolean deleted = Files.deleteIfExists(path);
+            if (deleted) {
+                log.info("트랜잭션 롤백으로 파일을 삭제했습니다. path={}", path);
+                return;
+            }
+
+            log.warn("트랜잭션 롤백 파일 삭제 대상이 존재하지 않습니다. path={}", path);
+        } catch (IOException e) {
+            log.error("트랜잭션 롤백 후 파일 삭제에 실패했습니다. path={}", path, e);
+        }
     }
 }

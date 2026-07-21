@@ -8,4 +8,8 @@ import java.lang.annotation.*;
 public @interface LogAction {
 
     String value();
+
+    String idName() default "";
+
+    int idParamIndex() default -1;
 }

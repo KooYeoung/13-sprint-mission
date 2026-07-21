@@ -19,7 +19,7 @@ public class BusinessActionLoggingAspect {
         log.info("{} 시작", logAction.value());
         try {
             Object result = joinPoint.proceed();
-            logResult(logAction, result);
+            logResult(logAction, joinPoint,result);
             return result;
         } catch (Exception e) {
             log.error("{} 실패", logAction.value(), e);
@@ -27,10 +27,23 @@ public class BusinessActionLoggingAspect {
         }
     }
 
-    private void logResult(LogAction logAction, Object result) {
+    private void logResult(LogAction logAction, ProceedingJoinPoint joinPoint,Object result) {
         if (result instanceof LoggableResult loggableResult) {
             log.info("{} 완료. {}", logAction.value(), loggableResult.logFields());
             return;
+        }
+
+        if (!logAction.idName().isBlank() && logAction.idParamIndex() >= 0) {
+            Object[] args = joinPoint.getArgs();
+
+            if (args.length > logAction.idParamIndex()) {
+                log.info("{} 완료. {}={}",
+                        logAction.value(),
+                        logAction.idName(),
+                        args[logAction.idParamIndex()]
+                );
+                return;
+            }
         }
 
         log.info("{} 완료", logAction.value());

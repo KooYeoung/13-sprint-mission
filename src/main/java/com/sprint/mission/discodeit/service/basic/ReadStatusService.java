@@ -100,6 +100,12 @@ public class ReadStatusService {
         readStatusRepository.deleteById(id);
     }
 
+    public void deleteByUserId(UUID userId) {
+        if(!readStatusRepository.existsByUser_Id(userId)) return;
+
+        readStatusRepository.deleteByUser_Id(userId);
+    }
+
     private ReadStatus getReadStatusRequireThrow(UUID id) {
         return readStatusRepository.findById(id)
                 .orElseThrow(ReadStatusNotFoundException::new);
@@ -124,9 +130,5 @@ public class ReadStatusService {
         return channel;
     }
 
-    public void deleteByUserId(UUID userId) {
-        if(!readStatusRepository.existsByUser_Id(userId)) return;
 
-        readStatusRepository.deleteByUser_Id(userId);
-    }
 }

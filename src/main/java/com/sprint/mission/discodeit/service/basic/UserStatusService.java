@@ -57,7 +57,6 @@ public class UserStatusService {
         return userStatusMapper.toDto(userStatusRepository.save(status));
     }
 
-
     public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
         Optional<UserStatus> userStatusResult = userStatusRepository.findByUser_Id(userId);
 

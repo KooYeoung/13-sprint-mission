@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePrivateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
@@ -40,6 +41,7 @@ public class BasicChannelService implements ChannelService {
     private final UserReader userReader;
     private final MessageReader messageReader;
 
+    @LogAction(value = "채널 생성")
     @Override
     public ChannelDto save(ChannelCreateCommand command) {
 
@@ -92,6 +94,7 @@ public class BasicChannelService implements ChannelService {
                 .toList();
     }
 
+    @LogAction(value = "채널 수정")
     @Override
     public ChannelDto update(UUID channelId, ChannelUpdateCommand command) {
         Channel channel = getChannelRequireThrow(channelId);
@@ -107,6 +110,7 @@ public class BasicChannelService implements ChannelService {
         );
     }
 
+    @LogAction(value = "채널 삭제", idName = "channelId", idParamIndex = 0)
     @Override
     public void delete(UUID channelId) {
 

@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
@@ -38,6 +39,7 @@ public class BasicMessageService implements MessageService {
     private final MessageMapper messageMapper;
     private final PageResponseMapper<MessageDto> messageDtoPageResponseMapper;
 
+    @LogAction(value = "메시지 생성")
     @Override
     public MessageDto save(MessageCreateCommand command, List<MultipartFile> files) {
         Channel channel = getChannelRequireThrow(command.channelId());
@@ -85,21 +87,7 @@ public class BasicMessageService implements MessageService {
         return messageDtoPageResponseMapper.fromSlice(dtoSlice, nextCursor);
     }
 
-    // jpql
-    private Slice<Message> getMessageSlice(UUID channelId, Pageable pageable, Instant cursor) {
-        if(cursor != null){
-           return messageRepository.findAllByChannelIdWithCursor(channelId, pageable, cursor);
-        }
-        return messageRepository.findAllByChannel_Id(channelId, pageable);
-    }
-
-    //dsl
-    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, Instant cursor) {
-
-        return messageRepository.findAllByChannelId(channelId, pageable, cursor);
-    }
-
-
+    @LogAction(value = "메시지 수정")
     @Override
     public MessageDto update(UUID messageId, MessageUpdateCommand command) {
 
@@ -110,6 +98,7 @@ public class BasicMessageService implements MessageService {
         return messageMapper.toDto(messageRepository.save(message), messageFileService.findAllByMessageId(messageId));
     }
 
+    @LogAction(value = "메시지 삭제", idName = "messageId", idParamIndex = 0)
     @Override
     public void delete(UUID messageId) {
         if (!messageRepository.existsById(messageId)) throw new MessageNotFoundException();
@@ -163,4 +152,19 @@ public class BasicMessageService implements MessageService {
                 .map(Message::getId)
                 .toList();
     }
+
+    // jpql
+    private Slice<Message> getMessageSlice(UUID channelId, Pageable pageable, Instant cursor) {
+        if(cursor != null){
+            return messageRepository.findAllByChannelIdWithCursor(channelId, pageable, cursor);
+        }
+        return messageRepository.findAllByChannel_Id(channelId, pageable);
+    }
+
+    //dsl
+    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, Instant cursor) {
+
+        return messageRepository.findAllByChannelId(channelId, pageable, cursor);
+    }
+
 }

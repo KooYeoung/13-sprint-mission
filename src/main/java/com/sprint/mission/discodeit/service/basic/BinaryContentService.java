@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
@@ -10,6 +11,7 @@ import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ import java.util.UUID;
 @Service
 @Transactional
 @RequiredArgsConstructor
+@Slf4j
 public class BinaryContentService {
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
@@ -44,6 +47,7 @@ public class BinaryContentService {
 
         binaryContentStorage.put(binaryContent.getId(), getBytes(file));
 
+        log.info("파일 업로드 완료. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);
     }
 
@@ -102,6 +106,7 @@ public class BinaryContentService {
         binaryContentRepository.deleteAllByIdIn(binaryContentIds);
     }
 
+    @LogAction(value = "파일 다운로드")
     public DownloadDto download(UUID binaryContentId) {
         BinaryContent binaryContent = getBinaryContentById(binaryContentId);
         Resource resource = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
