@@ -1,7 +1,6 @@
 package com.sprint.mission.discodeit.exception.user;
 
 import com.sprint.mission.discodeit.exception.ErrorCode;
-import com.sprint.mission.discodeit.exception.UserException;
 
 import java.util.Map;
 import java.util.UUID;

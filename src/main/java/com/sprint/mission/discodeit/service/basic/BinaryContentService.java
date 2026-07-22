@@ -4,9 +4,8 @@ import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.ErrorCode;
-import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
@@ -119,12 +118,12 @@ public class BinaryContentService {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new CustomInternalServerException(ErrorCode.FILE_READ_FAILED, e);
+            throw new FileReadFailedException(file.getOriginalFilename(), e);
         }
     }
 
     private @NonNull BinaryContent getBinaryContentById(UUID id) {
         return binaryContentRepository.findById(id)
-                .orElseThrow(() ->new CustomFileNotFoundException(id));
+                .orElseThrow(() -> new FileNotFoundException(id));
     }
 }

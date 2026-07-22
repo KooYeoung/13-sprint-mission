@@ -6,8 +6,7 @@ import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.exception.ErrorCode;
-import com.sprint.mission.discodeit.exception.readStatus.ReadStatusBadRequestException;
+import com.sprint.mission.discodeit.exception.readStatus.ReadStatusAlreadyExistsException;
 import com.sprint.mission.discodeit.exception.readStatus.ReadStatusNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.ReadStatusMapper;
@@ -32,7 +31,6 @@ public class ReadStatusService {
     private final UserReader userReader;
 
     public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
-
         if (userIds == null) throw new UserNotFoundException();
 
         List<UUID> distinctUserIds = userIds.stream().distinct().toList();
@@ -41,7 +39,6 @@ public class ReadStatusService {
         int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), distinctUserIds, readAt);
 
         if (insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
-
     }
 
     public ReadStatusDto save(UUID channelId, ReadStatusCreateCommand command) {
@@ -79,7 +76,6 @@ public class ReadStatusService {
 
     @Transactional(readOnly = true)
     public List<ReadStatusDto> findAllByUserId(UUID userId) {
-
         return readStatusRepository.findByUser_Id(userId)
                 .stream()
                 .map(readStatusMapper::toDto)
@@ -87,7 +83,6 @@ public class ReadStatusService {
     }
 
     public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
-
         ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
 
         readStatus.updateInfo(command);
@@ -101,14 +96,14 @@ public class ReadStatusService {
     }
 
     public void deleteByUserId(UUID userId) {
-        if(!readStatusRepository.existsByUser_Id(userId)) return;
+        if (!readStatusRepository.existsByUser_Id(userId)) return;
 
         readStatusRepository.deleteByUser_Id(userId);
     }
 
     private ReadStatus getReadStatusRequireThrow(UUID id) {
         return readStatusRepository.findById(id)
-                .orElseThrow(()-> new ReadStatusNotFoundException(id));
+                .orElseThrow(() -> new ReadStatusNotFoundException(id));
     }
 
     private Channel getChannelRequireThrow(UUID channelId) {
@@ -120,17 +115,14 @@ public class ReadStatusService {
     }
 
     private Channel validateChannelAndReadStatus(UUID userId, UUID channelId) {
-
         Channel channel = getChannelRequireThrow(channelId);
 
         boolean hasReadStatus = readStatusRepository.existsByChannel_IdAndUser_Id(channelId, userId);
-
         if (hasReadStatus) {
-            throw new ReadStatusBadRequestException(ErrorCode.READ_STATUS_ALREADY_EXISTS, channelId, userId);
+            throw new ReadStatusAlreadyExistsException(channelId, userId);
         }
 
         return channel;
     }
-
 
 }

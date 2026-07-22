@@ -8,9 +8,9 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.exception.ErrorCode;
-import com.sprint.mission.discodeit.exception.user.UserBadRequestException;
+import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
+import com.sprint.mission.discodeit.exception.user.UserUsernameDuplicatedException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.MessageService;
@@ -37,12 +37,10 @@ public class BasicUserService implements UserService {
     private final MessageService messageService;
     private final UserMapper userMapper;
 
-    @LogAction(value = "사용자 생성")
+    @LogAction(value = "?ъ슜???앹꽦")
     @Override
     public UserDto create(UserCreateCommand command, MultipartFile file) {
-
-        existThrow(userRepository.existsByEmail(command.email()), ErrorCode.USER_EMAIL_DUPLICATED);
-        existThrow(userRepository.existsByUsername(command.username()), ErrorCode.USER_USERNAME_DUPLICATED);
+        validateCreatableUser(command);
 
         BinaryContent profile = binaryContentService.create(file).orElse(null);
 
@@ -64,14 +62,13 @@ public class BasicUserService implements UserService {
     @Transactional(readOnly = true)
     @Override
     public List<UserDto> findAll() {
-
         return userRepository.findAll()
                 .stream()
                 .map(userMapper::toDto)
                 .toList();
     }
 
-    @LogAction(value = "사용자 수정")
+    @LogAction(value = "?ъ슜???섏젙")
     @Override
     public UserDto update(UUID userId, UserUpdateCommand command, MultipartFile file) {
         User user = getUserRequireThrow(userId);
@@ -92,7 +89,7 @@ public class BasicUserService implements UserService {
         return userMapper.toDto(updatedUser);
     }
 
-    @LogAction(value = "사용자 삭제", idName = "userId", idParamIndex = 0)
+    @LogAction(value = "?ъ슜????젣", idName = "userId", idParamIndex = 0)
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
@@ -106,29 +103,33 @@ public class BasicUserService implements UserService {
         if (user.isProfileImageExist()) {
             binaryContentService.delete(user.getProfile());
         }
-
     }
 
-    private void existThrow(boolean exist, ErrorCode errorCode) {
-        if (exist) throw new UserBadRequestException(errorCode);
+    private void validateCreatableUser(UserCreateCommand command) {
+        if (userRepository.existsByEmail(command.email())) {
+            throw new UserEmailDuplicatedException(command.email());
+        }
+        if (userRepository.existsByUsername(command.username())) {
+            throw new UserUsernameDuplicatedException(command.username());
+        }
     }
 
     private User getUserRequireThrow(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(()-> new UserNotFoundException(userId));
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 
     private void checkUserUpdates(UserUpdateCommand command, User user) {
         if (user.hasUsername(command.username()) && user.hasEmail(command.email())) {
             return;
         }
-        // 이메일 검증.
-        if (!user.hasEmail(command.email())) {
-            existThrow(userRepository.existsByEmail(command.email()), ErrorCode.USER_EMAIL_DUPLICATED);
+
+        if (!user.hasEmail(command.email()) && userRepository.existsByEmail(command.email())) {
+            throw new UserEmailDuplicatedException(command.email());
         }
 
-        if (!user.hasUsername(command.username())) {
-            existThrow(userRepository.existsByUsername(command.username()), ErrorCode.USER_USERNAME_DUPLICATED);
+        if (!user.hasUsername(command.username()) && userRepository.existsByUsername(command.username())) {
+            throw new UserUsernameDuplicatedException(command.username());
         }
     }
 

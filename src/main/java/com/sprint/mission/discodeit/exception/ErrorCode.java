@@ -21,7 +21,6 @@ public enum ErrorCode {
 
     READ_STATUS_NOT_FOUND("READ_STATUS_NOT_FOUND", HttpStatus.NOT_FOUND, "읽음 상태를 찾을 수 없습니다."),
     READ_STATUS_ALREADY_EXISTS("READ_STATUS_ALREADY_EXISTS", HttpStatus.CONFLICT, "이미 읽음 상태가 존재합니다."),
-    READ_STATUS_PRIVATE_CHANNEL_REQUIRED("READ_STATUS_PRIVATE_CHANNEL_REQUIRED", HttpStatus.BAD_REQUEST, "PRIVATE 채널에만 읽음 상태를 등록할 수 있습니다."),
 
     FILE_SAVE_FAILED("FILE_SAVE_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다."),
     FILE_READ_FAILED("FILE_READ_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽는 중 오류가 발생했습니다."),

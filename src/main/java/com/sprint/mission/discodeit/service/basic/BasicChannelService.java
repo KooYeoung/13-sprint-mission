@@ -11,7 +11,7 @@ import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
-import com.sprint.mission.discodeit.exception.channel.ChannelUpdateFailException;
+import com.sprint.mission.discodeit.exception.channel.PrivateChannelUpdateNotAllowedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.ChannelMapper;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
@@ -98,7 +98,7 @@ public class BasicChannelService implements ChannelService {
     public ChannelDto update(UUID channelId, ChannelUpdateCommand command) {
         Channel channel = getChannelRequireThrow(channelId);
 
-        if (channel.isPrivate()) throw new ChannelUpdateFailException(channelId);
+        if (channel.isPrivate()) throw new PrivateChannelUpdateNotAllowedException(channelId);
 
         channel.updateInfo(command);
 

@@ -1,7 +1,7 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.exception.user.LoginFailException;
+import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +27,6 @@ public class UserReader {
 
     public User getUserByCredentials(String username, String password) {
         return userRepository.findByUsernameAndPassword(username, password)
-                .orElseThrow(LoginFailException::new);
+                .orElseThrow(UserLoginFailedException::new);
     }
 }

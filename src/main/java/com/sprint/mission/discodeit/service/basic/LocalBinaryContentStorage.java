@@ -1,9 +1,10 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
-import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.ErrorCode;
-import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileDirectoryCreateFailedException;
+import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
+import com.sprint.mission.discodeit.exception.storage.FileSaveFailedException;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +42,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
-            throw new CustomInternalServerException(ErrorCode.FILE_DIRECTORY_CREATE_FAILED, e);
+            throw new FileDirectoryCreateFailedException(root, e);
         }
     }
 
@@ -60,7 +61,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
             return fileId;
 
         } catch (IOException e) {
-            throw new CustomInternalServerException(ErrorCode.FILE_SAVE_FAILED, e);
+            throw new FileSaveFailedException(savePath, e);
         }
     }
 
@@ -75,9 +76,9 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
             return Files.newInputStream(savedPath, StandardOpenOption.READ);
         } catch (NoSuchFileException e) {
             log.warn("파일이 존재하지 않습니다. fileId={}", fileId);
-            throw new CustomFileNotFoundException(fileId, e);
+            throw new FileNotFoundException(fileId, e);
         } catch (IOException e) {
-            throw new CustomInternalServerException(ErrorCode.FILE_READ_FAILED, e);
+            throw new FileReadFailedException(fileId, e);
         }
     }
 
