@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -66,7 +67,7 @@ public interface MessageApi {
     })
     ResponseEntity<MessageDto> create(
             @Parameter(hidden = true)
-            @RequestPart("messageCreateRequest") MessageCreateRequest messageCreateRequest,
+            @Valid @RequestPart("messageCreateRequest") MessageCreateRequest messageCreateRequest,
 
             @Parameter(hidden = true)
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
@@ -115,7 +116,7 @@ public interface MessageApi {
             @Parameter(description = "수정할 Message ID", required = true)
             UUID messageId,
 
-            @RequestBody MessageUpdateRequest request
+            @Valid @RequestBody MessageUpdateRequest request
     );
 
     @Operation(summary = "Message 삭제")

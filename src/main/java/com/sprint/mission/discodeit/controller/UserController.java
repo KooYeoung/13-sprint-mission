@@ -8,6 +8,7 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.service.UserService;
 import com.sprint.mission.discodeit.service.basic.UserStatusService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,7 @@ public class UserController implements UserApi {
 
     @PostMapping
     public ResponseEntity<UserDto> create(
-            @RequestPart UserCreateRequest userCreateRequest,
+            @Valid @RequestPart UserCreateRequest userCreateRequest,
             @RequestPart(required = false) MultipartFile profile
     ) {
         UserDto userDto = userService.create(userCreateRequest.toCommand(), profile);
@@ -44,7 +45,7 @@ public class UserController implements UserApi {
     @PatchMapping("/{userId}")
     public ResponseEntity<UserDto> update(
             @PathVariable UUID userId,
-            @RequestPart UserUpdateRequest userUpdateRequest,
+            @Valid @RequestPart UserUpdateRequest userUpdateRequest,
             @RequestPart(required = false) MultipartFile profile
     ) {
         return ResponseEntity.ok(userService.update(userId, userUpdateRequest.toCommand(), profile));
@@ -58,7 +59,7 @@ public class UserController implements UserApi {
 
     @PatchMapping("/{userId}/userStatus")
     public ResponseEntity<UserStatusDto> statusUpdate(@PathVariable UUID userId,
-                                                      @RequestBody UserStatusUpdateRequest request) {
+                                                      @Valid @RequestBody UserStatusUpdateRequest request) {
         return ResponseEntity.ok(userStatusService.updateByUserId(userId, request.toCommand()));
     }
 }
