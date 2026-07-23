@@ -5,7 +5,7 @@ import com.sprint.mission.discodeit.exception.ErrorCode;
 import java.util.Map;
 
 public class ChannelTypeInvalidException extends ChannelException {
-    public ChannelTypeInvalidException(String type) {
-        super(ErrorCode.CHANNEL_TYPE_INVALID, Map.of("type", String.valueOf(type)));
+    public ChannelTypeInvalidException(String type, Throwable cause) {
+        super(ErrorCode.CHANNEL_TYPE_INVALID, Map.of("type", String.valueOf(type)), cause);
     }
 }

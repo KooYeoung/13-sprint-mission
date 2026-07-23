@@ -19,7 +19,7 @@ public enum ChannelType {
         try {
             return ChannelType.valueOf(normalizedType);
         } catch (IllegalArgumentException e) {
-            throw new ChannelTypeInvalidException(type);
+            throw new ChannelTypeInvalidException(type, e);
         }
 
     }

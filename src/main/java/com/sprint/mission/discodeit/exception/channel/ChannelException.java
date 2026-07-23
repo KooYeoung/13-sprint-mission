@@ -15,4 +15,7 @@ public abstract class ChannelException extends DiscodeitException {
         super(errorCode, details);
     }
 
+    protected ChannelException(ErrorCode errorCode, Map<String, Object> details, Throwable cause) {
+        super(errorCode, details, cause);
+    }
 }
