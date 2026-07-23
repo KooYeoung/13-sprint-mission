@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 @Slf4j
-@Order(Ordered.LOWEST_PRECEDENCE)
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class ServiceDebugLoggingAspect {
 
     @Pointcut("execution(* com.sprint.mission.discodeit.service..*.*(..))")
@@ -37,17 +37,16 @@ public class ServiceDebugLoggingAspect {
 
             log.debug("{} 완료 elapsedMs={}", method, elapsedMs);
             return result;
-        } catch (Exception e) {
+        } catch (Throwable throwable) {
             long elapsedMs = System.currentTimeMillis() - start;
             log.debug("{} 실패 elapsedMs={}, exception={}",
                     method,
                     elapsedMs,
-                    e.getClass().getSimpleName()
+                    throwable.getClass().getSimpleName()
             );
-            throw e;
+            throw throwable;
         }
     }
-
 
 
 }
