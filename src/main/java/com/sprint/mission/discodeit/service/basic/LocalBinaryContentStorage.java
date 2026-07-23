@@ -32,7 +32,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     private final Path root;
     private final FileTransactionManager transactionManager;
 
-    public LocalBinaryContentStorage(@Value("${discodeit.storage.local.root-path}") String rootPath, FileTransactionManager transactionManager) {
+    public LocalBinaryContentStorage(@Value("${discodeit.storage.path}") String rootPath, FileTransactionManager transactionManager) {
         this.root = Paths.get(rootPath);
         this.transactionManager = transactionManager;
     }

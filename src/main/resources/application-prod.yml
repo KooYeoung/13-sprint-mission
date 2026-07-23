@@ -43,5 +43,4 @@ discodeit:
   storage:
     # 파일 저장 방식과 경로를 환경변수로 설정
     type: ${STORAGE_TYPE:local}
-    local:
-      root-path: ${STORAGE_PATH:/app/uploads}
+    path: ${STORAGE_PATH:/app/uploads}
