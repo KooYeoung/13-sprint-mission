@@ -9,6 +9,7 @@ public class FileDeleteFailedException extends StorageException {
         super(
                 ErrorCode.FILE_DELETE_FAILED,
                 Map.of(),
+                null,
                 cause
         );
     }
