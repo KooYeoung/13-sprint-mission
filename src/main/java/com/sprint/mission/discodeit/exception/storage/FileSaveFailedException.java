@@ -7,6 +7,11 @@ import java.util.Map;
 
 public class FileSaveFailedException extends StorageException {
     public FileSaveFailedException(Path path, Throwable cause) {
-        super(ErrorCode.FILE_SAVE_FAILED, Map.of("path", path.toString()), cause);
+        super(
+                ErrorCode.FILE_SAVE_FAILED,
+                Map.of(),
+                path,
+                cause
+        );
     }
 }

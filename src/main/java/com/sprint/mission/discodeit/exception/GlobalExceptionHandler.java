@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.exception;
 
+import com.sprint.mission.discodeit.exception.storage.StorageException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,9 +21,13 @@ public class GlobalExceptionHandler {
         HttpStatus status = e.getErrorCode().getStatus();
 
         if (status.is5xxServerError()) {
-            log.error("application error: {}", e.getMessage(), e);
+            logServerError(e);
         } else {
-            log.warn(e.getMessage());
+            log.warn(
+                    "client error. code={}, message={}",
+                    e.getErrorCode(),
+                    e.getMessage()
+            );
         }
 
         return ResponseEntity.status(status)
@@ -65,6 +71,32 @@ public class GlobalExceptionHandler {
                         errorCode.getMessage(),
                         Map.of()
                 ));
+    }
+
+    private void logServerError(DiscodeitException e) {
+        if (e instanceof StorageException storageException) {
+            log.error(
+                    "storage error. code={}, path={}",
+                    e.getErrorCode(),
+                    getLogPath(storageException),
+                    e
+            );
+            return;
+        }
+
+        log.error(
+                "application error. code={}, message={}",
+                e.getErrorCode(),
+                e.getMessage(),
+                e
+        );
+    }
+
+    private Path getLogPath(StorageException storageException) {
+        if (storageException.getPath() == null) {
+            return null;
+        }
+        return storageException.getPath().getFileName();
     }
 
 }

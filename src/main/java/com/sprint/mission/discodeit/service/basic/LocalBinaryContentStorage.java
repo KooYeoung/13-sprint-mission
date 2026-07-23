@@ -75,10 +75,9 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             return Files.newInputStream(savedPath, StandardOpenOption.READ);
         } catch (NoSuchFileException e) {
-            log.warn("파일이 존재하지 않습니다. fileId={}", fileId);
             throw new FileNotFoundException(fileId, e);
         } catch (IOException e) {
-            throw new FileReadFailedException(fileId, e);
+            throw new FileReadFailedException(fileId, savedPath, e);
         }
     }
 
@@ -86,7 +85,6 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     public void delete(UUID fileId) {
         Path savedPath = resolvePath(fileId);
         transactionManager.deleteAfterCommit(savedPath);
-
     }
 
     @Override
