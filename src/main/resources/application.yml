@@ -49,9 +49,9 @@ management:
         # 외부에 노출할 Actuator 엔드포인트
         include:
           - health
-          - info
-          - metrics
-          - loggers
+  endpoint:
+    health:
+      show-details: never
 
   info:
     env:
