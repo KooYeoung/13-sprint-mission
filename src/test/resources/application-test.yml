@@ -55,5 +55,4 @@ discodeit:
   storage:
     # 테스트 파일은 build 하위의 별도 경로에 저장
     type: local
-    local:
-      root-path: C:/codeit-13th-develop/13-sprint-mission/build/test-uploads
+    path: ./build/test-uploads
