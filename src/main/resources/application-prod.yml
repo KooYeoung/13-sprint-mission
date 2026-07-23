@@ -42,5 +42,5 @@ logging:
 discodeit:
   storage:
     # 파일 저장 방식과 경로를 환경변수로 설정
-    type: ${STORAGE_TYPE:local}
-    path: ${STORAGE_PATH:/app/uploads}
+    type: ${STORAGE_TYPE}
+    path: ${STORAGE_PATH}
