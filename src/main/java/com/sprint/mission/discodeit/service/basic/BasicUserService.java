@@ -37,7 +37,7 @@ public class BasicUserService implements UserService {
     private final MessageService messageService;
     private final UserMapper userMapper;
 
-    @LogAction(value = "?ъ슜???앹꽦")
+    @LogAction(value = "사용자 생성")
     @Override
     public UserDto create(UserCreateCommand command, MultipartFile file) {
         validateCreatableUser(command);
@@ -68,7 +68,7 @@ public class BasicUserService implements UserService {
                 .toList();
     }
 
-    @LogAction(value = "?ъ슜???섏젙")
+    @LogAction(value = "사용자 수정")
     @Override
     public UserDto update(UUID userId, UserUpdateCommand command, MultipartFile file) {
         User user = getUserRequireThrow(userId);
@@ -89,7 +89,7 @@ public class BasicUserService implements UserService {
         return userMapper.toDto(updatedUser);
     }
 
-    @LogAction(value = "?ъ슜????젣", idName = "userId", idParamIndex = 0)
+    @LogAction(value = "사용자 삭제", idName = "userId", idParamIndex = 0)
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
