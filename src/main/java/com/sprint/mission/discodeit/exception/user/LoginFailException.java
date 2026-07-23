@@ -1,9 +1,0 @@
-package com.sprint.mission.discodeit.exception.user;
-
-import com.sprint.mission.discodeit.exception.ErrorCode;
-
-public class LoginFailException extends UserException {
-    public LoginFailException() {
-        super(ErrorCode.USER_LOGIN_FAILED);
-    }
-}
