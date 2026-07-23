@@ -50,5 +50,5 @@ discodeit:
   storage:
     # 개발 파일을 로컬 디렉터리에 저장
     type: local
-    path: C:/codeit-13th-develop/13-sprint-mission/uploads
+    path: ${STORAGE_PATH:./uploads}
 
