@@ -153,15 +153,6 @@ public class BasicMessageService implements MessageService {
                 .toList();
     }
 
-    // jpql
-    private Slice<Message> getMessageSlice(UUID channelId, Pageable pageable, Instant cursor) {
-        if(cursor != null){
-            return messageRepository.findAllByChannelIdWithCursor(channelId, pageable, cursor);
-        }
-        return messageRepository.findAllByChannel_Id(channelId, pageable);
-    }
-
-    //dsl
     private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, Instant cursor) {
 
         return messageRepository.findAllByChannelId(channelId, pageable, cursor);
