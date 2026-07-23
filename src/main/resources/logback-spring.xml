@@ -103,21 +103,13 @@
 
     </springProfile>
 
-    <!-- 개발 환경: 콘솔과 파일에 함께 출력 -->
-    <springProfile name="dev">
-        <root level="${ROOT_LOG_LEVEL}">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="FILE"/>
-        </root>
-    </springProfile>
-
-    <!-- 운영 환경: 콘솔과 파일에 함께 출력 -->
-    <springProfile name="prod">
-        <root level="${ROOT_LOG_LEVEL}">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="FILE"/>
-        </root>
-    </springProfile>
+    +    <!-- 개발/운영 환경: 콘솔과 파일에 함께 출력 -->
+    +    <springProfile name="dev | prod">
+    +        <root level="${ROOT_LOG_LEVEL}">
+    +            <appender-ref ref="CONSOLE"/>
+    +            <appender-ref ref="FILE"/>
+    +        </root>
+    +    </springProfile>
 
     <!-- 테스트 환경: 콘솔에만 출력 -->
     <springProfile name="test">
