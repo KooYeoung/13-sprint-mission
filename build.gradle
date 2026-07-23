@@ -17,6 +17,22 @@ repositories {
 	mavenCentral()
 }
 
+def springBootVersion =
+		org.springframework.boot.gradle.plugin.SpringBootPlugin
+				.BOM_COORDINATES
+				.tokenize(':')
+				.last()
+
+springBoot {
+	buildInfo {
+		properties {
+			additional = [
+					springBootVersion: springBootVersion
+			]
+		}
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'

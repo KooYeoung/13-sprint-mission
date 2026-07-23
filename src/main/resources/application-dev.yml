@@ -51,4 +51,3 @@ discodeit:
     # 개발 파일을 로컬 디렉터리에 저장
     type: local
     path: ${STORAGE_PATH:./uploads}
-

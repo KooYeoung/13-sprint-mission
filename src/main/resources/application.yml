@@ -64,12 +64,6 @@ info:
     name: Discodeit
     version: 1.7.0
 
-  java:
-    version: 17
-
-  spring-boot:
-    version: 3.5.14
-
   datasource:
     url: ${spring.datasource.url}
     driver-class-name: ${spring.datasource.driver-class-name}
