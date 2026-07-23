@@ -69,3 +69,18 @@ info:
 
   spring-boot:
     version: 3.5.14
+
+  datasource:
+    url: ${spring.datasource.url}
+    driver-class-name: ${spring.datasource.driver-class-name}
+
+  jpa:
+    ddl-auto: ${spring.jpa.hibernate.ddl-auto}
+
+  storage:
+    type: ${discodeit.storage.type}
+    path: ${discodeit.storage.path}
+
+  multipart:
+    max-file-size: ${spring.servlet.multipart.max-file-size}
+    max-request-size: ${spring.servlet.multipart.max-request-size}
