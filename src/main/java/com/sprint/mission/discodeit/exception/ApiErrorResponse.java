@@ -4,7 +4,9 @@ import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public record ApiErrorResponse(
         int status,
@@ -38,8 +40,27 @@ public record ApiErrorResponse(
                 exceptionType,
                 code,
                 message,
-                details == null ? Map.of() : Map.copyOf(details),
+                copyDetails(details),
                 RequestTimeZoneUtils.toOffsetDateTime(Instant.now())
         );
+    }
+
+    private static Map<String, Object> copyDetails(Map<String, Object> details) {
+        if (details == null || details.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Object> normalized = new LinkedHashMap<>();
+
+        details.forEach((key, value) -> {
+            if (key != null) {
+                normalized.put(
+                        key,
+                        Objects.requireNonNullElse(value, "상세 정보가 없습니다.")
+                );
+            }
+        });
+
+        return Map.copyOf(normalized);
     }
 }
