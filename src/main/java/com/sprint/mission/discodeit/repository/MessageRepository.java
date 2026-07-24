@@ -22,7 +22,7 @@ public interface MessageRepository extends JpaRepository<Message, UUID> , Messag
 
     boolean existsByChannel_Id(UUID channelId);
 
-    @Modifying(flushAutomatically = true,clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("""
         update Message m
         set

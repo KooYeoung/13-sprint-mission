@@ -11,8 +11,6 @@ import com.sprint.mission.discodeit.entity.UserStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.SessionFactory;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -274,47 +272,27 @@ class UserRepositoryTest {
     void findById_returnsEmpty_whenUserDoesNotExist() {
         // given
         // findById(...)가 "존재하지 않는 id"에 대해 Optional.empty를 반환하는지 검증한다.
-        // 단순히 랜덤 UUID를 조회해도 empty는 확인할 수 있지만,
-        // 여기서는 한 번 실제로 저장된 id를 삭제한 뒤 같은 id로 다시 조회해서
-        // "DB에 더 이상 row가 없는 사용자 id"라는 상황을 명확히 만든다.
+        // 테스트 DB가 완전히 비어 있어서 우연히 empty가 되는 상황과 구분하기 위해
+        // 실제 User row를 하나 저장한 뒤, 그 id와 다른 UUID를 조회 대상으로 사용한다.
         User savedUser = userRepository.saveAndFlush(new User(userCreateCommand(), null));
         UUID savedUserId = savedUser.getId();
+        UUID missingUserId = UUID.randomUUID();
 
         assertThat(savedUserId).isNotNull();
+        assertThat(missingUserId).isNotEqualTo(savedUserId);
 
-        // 1차 캐시에 저장 직후의 User가 남아 있으면 이후 조회 검증이 DB 상태와 분리될 수 있다.
-        // 따라서 삭제 전에 영속성 컨텍스트를 비워, 삭제와 재조회가 실제 DB를 기준으로 수행되게 한다.
+        // 저장 직후의 User가 1차 캐시에 남아 있어도 missingUserId 조회 결과에는 직접 영향이 없지만,
+        // repository 조회 테스트에서는 실제 DB 조회 경로를 명확히 하기 위해 영속성 컨텍스트를 비운다.
         em.clear();
 
-        // 테스트 데이터 저장 과정에서 발생한 insert SQL은 이 테스트의 관심사가 아니다.
-        // 여기서 Hibernate Statistics를 초기화해서 deleteDirectlyById(...)와 findById(...)가 만든 SQL statement만 센다.
-        Statistics statistics = resetHibernateStatistics();
-
-        // UserRepository.deleteDirectlyById(...)는 Spring Data JPA 기본 deleteById(...)와 구분되는
-        // @Modifying JPQL 벌크 삭제 메서드다.
-        // 기본 deleteById는 삭제 대상 엔티티를 먼저 조회한 뒤 삭제할 수 있어 불필요한 select SQL이 발생한다.
-        // 따라서 삭제 직후 statement 수가 1이면, 선행 select 없이 delete SQL만 실행됐다는 회귀 방지 검증이 된다.
-        int deletedCount = userRepository.deleteDirectlyById(savedUserId);
-        assertThat(deletedCount).isEqualTo(1);
-        assertThat(statistics.getPrepareStatementCount())
-                .as("deleteDirectlyById는 선행 select 없이 delete SQL 1번만 실행해야 한다")
-                .isEqualTo(1L);
-
         // when
-        // 삭제된 사용자 id로 다시 단건 조회한다.
-        Optional<User> foundUser = userRepository.findById(savedUserId);
+        // DB에 존재하지 않는 사용자 id로 단건 조회한다.
+        Optional<User> foundUser = userRepository.findById(missingUserId);
 
         // then
-        // users 테이블에 해당 id의 row가 더 이상 없으므로 Optional.empty가 반환되어야 한다.
+        // users 테이블에 해당 id의 row가 없으므로 Optional.empty가 반환되어야 한다.
         assertThat(foundUser).isEmpty();
-
-        // deleteDirectlyById(...)에서 1번, findById(...)에서 1번 SQL statement가 실행되어 총 2번이어야 한다.
-        // 이 검증은 직접 삭제 메서드가 다시 기본 구현처럼 select 후 delete로 바뀌는 회귀를 잡아준다.
-        assertThat(statistics.getPrepareStatementCount())
-                .as("deleteDirectlyById 1번 + findById 1번으로 총 2개의 SQL statement만 실행되어야 한다")
-                .isEqualTo(2L);
     }
-
     @Test
     @DisplayName("사용자 인증 조회 성공 - 사용자명과 비밀번호가 일치하면 UserStatus와 프로필을 함께 조회")
     void findByUsernameAndPassword_fetchesUserStatusAndProfile_whenCredentialsMatch() {
@@ -425,13 +403,6 @@ class UserRepositoryTest {
         return new UserStatusCreateCommand(Instant.now());
     }
 
-    private Statistics resetHibernateStatistics() {
-        SessionFactory sessionFactory = em.getEntityManagerFactory().unwrap(SessionFactory.class);
-        Statistics statistics = sessionFactory.getStatistics();
-        statistics.setStatisticsEnabled(true);
-        statistics.clear();
-        return statistics;
-    }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();

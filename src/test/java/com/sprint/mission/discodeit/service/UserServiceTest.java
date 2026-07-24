@@ -935,7 +935,7 @@ class UserServiceTest {
             inOrder.verify(userStatusService).delete(user.getStatusId(), userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
-            inOrder.verify(userRepository).deleteDirectlyById(userId);
+            inOrder.verify(userRepository).deleteById(userId);
 
             // 프로필 이미지가 없는 사용자이므로 파일 삭제는 실행되지 않아야 한다.
             verify(binaryContentService, never()).delete(any(BinaryContent.class));
@@ -953,7 +953,7 @@ class UserServiceTest {
             UUID userId = UUID.randomUUID();
 
             // BasicUserService.delete(...)는 가장 먼저 삭제 대상 User를 조회한다.
-            // Optional.empty()이면 연결 데이터 정리나 deleteDirectlyById(...)로 넘어가지 않고 예외가 발생해야 한다.
+            // Optional.empty()이면 연결 데이터 정리나 deleteById(...)로 넘어가지 않고 예외가 발생해야 한다.
             given(userRepository.findById(userId)).willReturn(Optional.empty());
 
             // when & then
@@ -996,7 +996,7 @@ class UserServiceTest {
             inOrder.verify(userStatusService).delete(user.getStatusId(), userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
-            inOrder.verify(userRepository).deleteDirectlyById(userId);
+            inOrder.verify(userRepository).deleteById(userId);
             inOrder.verify(binaryContentService).delete(profile);
 
             // delete()는 DTO를 반환하지 않으므로 mapper를 사용하지 않는다.
