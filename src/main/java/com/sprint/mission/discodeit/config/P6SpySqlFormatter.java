@@ -22,12 +22,12 @@ public class P6SpySqlFormatter implements MessageFormattingStrategy {
 
     @Override
     public String formatMessage(int connectionId, String now, long elapsed, String category, String prepared, String sql, String url) {
-        if (sql == null || sql.isBlank()) {
+        if (prepared == null || prepared.isBlank()) {
             return "";
         }
 
-        String formattedSql = formatSql(category, sql).strip();
-
+        // P6Spy의 sql 인자는 바인딩 값이 치환된 실행 SQL일 수 있으므로 로그에 사용하지 않는다.
+        String formattedSql = formatSql(category, prepared).strip();
         return String.format(
                 "%s [%s] | %d ms | connection=%d %s %s",
                 LINE_SEPARATOR,

@@ -40,7 +40,7 @@ spring:
 
 decorator:
   datasource:
-    # 테스트에서는 P6Spy 비활성화
+    # 테스트에서 P6Spy SQL 로그 활성화
     enabled: true
 
     p6spy:
