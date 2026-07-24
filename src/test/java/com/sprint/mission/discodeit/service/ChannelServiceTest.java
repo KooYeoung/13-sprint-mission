@@ -75,19 +75,19 @@ class ChannelServiceTest {
         @DisplayName("공개 채널 생성 성공")
         void save_returnsPublicChannelDto_whenPublicCommandIsValid() {
             // given
-            // 이 테스트는 공개 채널 생성 요청이 들어왔을 때 save()가 해야 하는 일을 검증한다.
-            // 1. 요청 command 값으로 Channel 엔티티를 만든다.
-            // 2. 생성된 Channel을 channelRepository.save(...)에 넘겨 저장한다.
-            // 3. 공개 채널은 참여자 읽음 상태(ReadStatus)를 만들지 않는다.
-            // 4. 저장된 Channel을 ChannelDto로 변환한 뒤 그대로 반환한다.
+            // 공개 채널 생성 요청 command와 저장 후 부여될 channelId를 준비한다.
+            // command는 단순 값 객체이므로 실제 객체를 사용하고,
+            // 서비스가 command 값으로 실제 Channel 엔티티를 만드는지 ArgumentCaptor로 검증한다.
             UUID channelId = UUID.randomUUID();
             ChannelCreatePublicCommand publicCreateCommand = createPublicCreateCommand();
+
+            // mapper가 반환할 최종 DTO는 실제 record 객체로 준비한다.
+            // 실제 Channel -> ChannelDto 필드 매핑은 ChannelMapper 테스트 책임이므로,
+            // 여기서는 mapper 반환값이 서비스 반환값으로 이어지는지만 확인한다.
             ChannelDto publicChannelDto = createPublicChannelDto(channelId, publicCreateCommand);
 
-            // channelRepository는 mock 객체라서 실제 DB에 저장하지 않는다.
-            // 아무 설정이 없으면 save(...) 호출 결과가 null이 될 수 있으므로,
-            // 테스트에서는 save(...)에 들어온 Channel을 그대로 반환하도록 만든다.
-            // 추가로 실제 JPA 저장처럼 id가 생긴 상황을 흉내 내기 위해 setId(...)도 해준다.
+            // channelRepository는 mock이라 실제 DB 저장이나 id 생성을 하지 않는다.
+            // 서비스는 저장된 Channel을 mapper에 전달하므로, save(...)에 들어온 Channel에 id를 넣고 그대로 반환한다.
             given(channelRepository.save(any(Channel.class)))
                     .willAnswer(invocation -> {
                         Channel channel = invocation.getArgument(0);
@@ -95,116 +95,105 @@ class ChannelServiceTest {
                         return channel;
                     });
 
-            // BasicChannelService는 DTO를 직접 만들지 않고 channelMapper.toDto(...)에 맡긴다.
-            // 따라서 mapper가 반환할 값을 미리 정해두고, 서비스가 그 값을 그대로 돌려주는지 확인한다.
             given(channelMapper.toDto(any(Channel.class))).willReturn(publicChannelDto);
 
             // when
-            // 테스트 대상 메서드를 실제로 호출한다.
+            // 공개 채널 생성 로직을 실행한다.
             ChannelDto result = channelService.save(publicCreateCommand);
 
             // then
-            // 서비스의 최종 반환값이 mapper가 만들어준 DTO와 같은지 확인한다.
+            // 서비스는 mapper가 만든 DTO를 그대로 반환해야 한다.
             assertThat(result).isEqualTo(publicChannelDto);
 
-            // ArgumentCaptor는 mock 메서드에 전달된 실제 인자를 꺼내 볼 때 사용한다.
-            // 여기서는 repository.save(...)에 어떤 Channel이 저장 요청으로 들어갔는지 확인한다.
+            // repository.save(...)에 전달된 실제 Channel을 캡처해서 command 값이 반영됐는지 확인한다.
             ArgumentCaptor<Channel> captor = ArgumentCaptor.forClass(Channel.class);
             verify(channelRepository).save(captor.capture());
 
-            Channel channel = captor.getValue();
-            assertThat(channel.getId()).isEqualTo(channelId);
-            assertThat(channel.getType()).isEqualTo(ChannelType.PUBLIC);
-            assertThat(channel.getName()).isEqualTo(publicCreateCommand.channelName());
-            assertThat(channel.getDescription()).isEqualTo(publicCreateCommand.channelDescription());
+            Channel savedChannel = captor.getValue();
+            assertThat(savedChannel.getId()).isEqualTo(channelId);
+            assertThat(savedChannel.getType()).isEqualTo(ChannelType.PUBLIC);
+            assertThat(savedChannel.getName()).isEqualTo(publicCreateCommand.channelName());
+            assertThat(savedChannel.getDescription()).isEqualTo(publicCreateCommand.channelDescription());
 
-            // 공개 채널은 참여자 목록이 없으므로 ReadStatus를 생성하거나 조회하면 안 된다.
-            // never()는 "이 mock 메서드가 한 번도 호출되지 않아야 한다"는 의미다.
-            verify(readStatusService, never()).saveAll(any(Channel.class), any(), any(Instant.class));
-            verify(readStatusService, never()).findAllByChannelId(any(UUID.class));
+            // 공개 채널은 참여자 목록이 없으므로 ReadStatus 생성/조회가 필요 없다.
+            // 또한 사용자 존재 확인, 최신 메시지 조회, 메시지 삭제 같은 다른 서비스 책임도 수행하지 않는다.
+            verifyNoInteractions(readStatusService, userReader, messageReader, messageService);
 
-            // 공개 채널은 참여자 정보가 필요 없으므로,
-            // 비공개 채널에서 사용하는 toDto(channel, readStatuses) 오버로드가 호출되면 안 된다.
+            // 공개 채널 DTO 변환은 단일 Channel 인자 mapper를 사용해야 한다.
+            // 비공개 채널용 toDto(channel, readStatuses) 오버로드가 호출되면 분기 처리가 잘못된 것이다.
+            verify(channelMapper).toDto(savedChannel);
             verify(channelMapper, never()).toDto(any(Channel.class), any());
 
-            // 최종적으로 저장된 Channel이 DTO 변환 대상으로 사용됐는지 확인한다.
-            verify(channelMapper).toDto(channel);
+            verifyNoMoreInteractions(channelRepository, channelMapper);
         }
 
         @Test
         @DisplayName("비공개 채널 생성 성공 - 참여자 읽음 상태 생성")
         void save_returnsPrivateChannelDto_whenPrivateCommandIsValid() {
             // given
-            // 이 테스트는 비공개 채널 생성 요청이 들어왔을 때 save()가 해야 하는 일을 검증한다.
-            // 비공개 채널은 공개 채널과 달리 참여자 목록이 필요하고,
-            // 서비스는 채널 저장 후 참여자별 ReadStatus를 만들어야 한다.
+            // 비공개 채널 생성 요청과 참여자 id 목록을 준비한다.
+            // 비공개 채널은 저장 직후 참여자별 ReadStatus를 생성해야 하므로 participantIds 전달 여부가 핵심이다.
             UUID channelId = UUID.randomUUID();
-            List<UUID> participantIds = List.of(UUID.randomUUID());
-
-            // ChannelCreatePrivateCommand에는 채널 이름/설명이 없고 participantIds와 타입만 들어간다.
-            // ChannelCreatePrivateCommand.channelName(), channelDescription()은 빈 문자열을 반환한다.
+            List<UUID> participantIds = List.of(UUID.randomUUID(), UUID.randomUUID());
             ChannelCreatePrivateCommand privateCommand = new ChannelCreatePrivateCommand(participantIds, ChannelType.PRIVATE);
 
-            // 서비스의 최종 반환값으로 사용할 DTO를 미리 준비한다.
-            // 실제 DTO 변환은 mapper 책임이므로, 단위 테스트에서는 mapper가 이 값을 반환한다고 가정한다.
+            // mapper가 반환할 최종 DTO는 실제 record 객체로 준비한다.
             ChannelDto privateChannelDto = createPrivateChannelDto(channelId);
 
-            // 이 테스트에서는 ReadStatus 내부 값 자체를 검증하지 않는다.
-            // "조회된 ReadStatus 목록이 mapper에 그대로 전달되는지"만 중요하므로 mock 객체 하나면 충분하다.
+            // ReadStatus는 이 테스트에서 내부 상태를 검증하지 않고 mapper로 전달만 한다.
+            // 따라서 실제 엔티티를 어렵게 구성하지 않고 mock 객체로 충분하다.
             ReadStatus readStatus = mock(ReadStatus.class);
             List<ReadStatus> readStatuses = List.of(readStatus);
 
-            // channelRepository는 mock이라 실제 DB 저장과 UUID 자동 생성을 해주지 않는다.
-            // 그런데 BasicChannelService.save()는 저장 후 savedChannel.getId()로 ReadStatus를 조회한다.
-            // 따라서 테스트에서도 실제 저장된 엔티티처럼 id가 생긴 상황을 setId(...)로 만들어준다.
-            given(channelRepository.save(any(Channel.class))).willAnswer(inv -> {
-                Channel channel = inv.getArgument(0);
+            // mock repository는 실제 id 생성을 하지 않으므로 저장된 Channel에 channelId를 넣어 반환한다.
+            // BasicChannelService.save(...)는 savedChannel.getId()로 ReadStatus를 다시 조회한다.
+            given(channelRepository.save(any(Channel.class))).willAnswer(invocation -> {
+                Channel channel = invocation.getArgument(0);
                 setId(channel, channelId);
                 return channel;
             });
 
-            // 서비스는 비공개 채널의 ReadStatus를 생성한 뒤,
-            // savedChannel.getId()로 ReadStatus 목록을 다시 조회한다.
             given(readStatusService.findAllByChannelId(channelId)).willReturn(readStatuses);
-
-            // 비공개 채널은 참여자 정보가 필요하므로 toDto(channel) 단일 인자 메서드가 아니라
-            // toDto(channel, readStatuses) 오버로드를 사용해야 한다.
-            // eq(readStatuses)는 정확히 이 readStatuses 목록이 전달될 때만 stub이 동작하게 한다.
             given(channelMapper.toDto(any(Channel.class), eq(readStatuses))).willReturn(privateChannelDto);
 
             // when
-            // 테스트 대상 메서드를 실제로 호출한다.
+            // 비공개 채널 생성 로직을 실행한다.
             ChannelDto result = channelService.save(privateCommand);
 
             // then
-            // 서비스가 mapper가 만든 DTO를 그대로 반환하는지 확인한다.
+            // 서비스는 mapper가 만든 DTO를 그대로 반환해야 한다.
             assertThat(result).isEqualTo(privateChannelDto);
 
-            // ArgumentCaptor로 repository.save(...)에 전달된 Channel을 꺼내서,
-            // command 값이 Channel 엔티티에 올바르게 반영됐는지 확인한다.
-            ArgumentCaptor<Channel> captor = ArgumentCaptor.forClass(Channel.class);
-            verify(channelRepository).save(captor.capture());
+            // 비공개 채널 생성 성공 흐름은 순서가 의미 있다.
+            // 1. Channel 저장
+            // 2. 저장된 Channel과 participantIds로 ReadStatus 생성
+            // 3. 저장된 channelId로 ReadStatus 목록 재조회
+            // 4. Channel과 ReadStatus 목록을 함께 DTO 변환
+            InOrder inOrder = inOrder(channelRepository, readStatusService, channelMapper);
 
-            Channel privateChannel = captor.getValue();
-            assertThat(privateChannel.getId()).isEqualTo(channelId);
-            assertThat(privateChannel.getType()).isEqualTo(ChannelType.PRIVATE);
-            assertThat(privateChannel.getName()).isEmpty();
-            assertThat(privateChannel.getDescription()).isEmpty();
+            ArgumentCaptor<Channel> channelCaptor = ArgumentCaptor.forClass(Channel.class);
+            inOrder.verify(channelRepository).save(channelCaptor.capture());
 
-            // saveAll(...)의 두 번째 인자는 ReadStatus id가 아니라 command에 들어 있던 participantIds다.
-            // 세 번째 인자는 서비스 안에서 Instant.now()로 만들어지므로 정확한 값을 비교하기 어렵다.
-            // 그래서 "Instant 타입 값이 전달됐다"는 의미로 any(Instant.class)를 사용한다.
-            verify(readStatusService).saveAll(eq(privateChannel), eq(participantIds), any(Instant.class));
+            Channel savedChannel = channelCaptor.getValue();
+            assertThat(savedChannel.getId()).isEqualTo(channelId);
+            assertThat(savedChannel.getType()).isEqualTo(ChannelType.PRIVATE);
+            assertThat(savedChannel.getName()).isEmpty();
+            assertThat(savedChannel.getDescription()).isEmpty();
 
-            // 저장된 채널 id로 ReadStatus 목록을 다시 조회했는지 확인한다.
-            verify(readStatusService).findAllByChannelId(channelId);
+            // saveAll(...)의 세 번째 인자는 서비스 내부 Instant.now()이므로 정확한 값 대신 타입과 null 아님을 검증한다.
+            ArgumentCaptor<Instant> instantCaptor = ArgumentCaptor.forClass(Instant.class);
+            inOrder.verify(readStatusService).saveAll(eq(savedChannel), eq(participantIds), instantCaptor.capture());
+            assertThat(instantCaptor.getValue()).isNotNull();
 
-            // 조회한 ReadStatus 목록을 포함해서 DTO 변환을 요청했는지 확인한다.
-            verify(channelMapper).toDto(privateChannel, readStatuses);
+            inOrder.verify(readStatusService).findAllByChannelId(channelId);
+            inOrder.verify(channelMapper).toDto(savedChannel, readStatuses);
 
-            // 공개 채널 생성에서 사용하는 단일 인자 toDto(channel)가 호출되지 않았음을 확인한다.
-            // 이 검증으로 "비공개 채널 분기를 탔다"는 점을 더 명확하게 보장할 수 있다.
+            // 비공개 채널은 참여자 정보를 포함해야 하므로 단일 인자 mapper를 사용하면 안 된다.
             verify(channelMapper, never()).toDto(any(Channel.class));
+
+            // 채널 생성은 사용자 존재 확인, 최신 메시지 조회, 메시지 삭제와 무관하다.
+            verifyNoInteractions(userReader, messageReader, messageService);
+            verifyNoMoreInteractions(channelRepository, readStatusService, channelMapper);
         }
     }
 
