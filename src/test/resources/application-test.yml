@@ -41,15 +41,25 @@ spring:
 decorator:
   datasource:
     # 테스트에서는 P6Spy 비활성화
-    enabled: false
+    enabled: true
+
+    p6spy:
+      enable-logging: true
+      logging: slf4j
+
+      # 사용자 정의 P6SpySqlFormatter가 SQL 포맷을 담당한다.
+      exclude-categories: info,debug,result,resultset,batch,commit,rollback
 
 logging:
   level:
     # 테스트 및 SQL 디버깅 로그
     root: info
     com.sprint.mission.discodeit: debug
-    org.hibernate.SQL: debug
-    org.hibernate.orm.jdbc.bind: trace
+    p6spy: info
+
+    # 중복 SQL 로그 방지
+    org.hibernate.SQL: off
+    org.hibernate.orm.jdbc.bind: off
 
 discodeit:
   storage:

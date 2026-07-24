@@ -3,6 +3,9 @@ package com.sprint.mission.discodeit.repository;
 import com.sprint.mission.discodeit.entity.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +24,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @EntityGraph(attributePaths = {"userStatus", "profile"})
     Optional<User> findByUsernameAndPassword(String username, String password);
+
+    @Override
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from User u where u.id = :id")
+    void deleteById(@Param("id") UUID id);
+
 }

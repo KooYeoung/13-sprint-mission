@@ -1,0 +1,70 @@
+package com.sprint.mission.discodeit.config;
+
+import com.p6spy.engine.logging.Category;
+import com.p6spy.engine.spy.P6SpyOptions;
+import com.p6spy.engine.spy.appender.MessageFormattingStrategy;
+import jakarta.annotation.PostConstruct;
+import org.hibernate.engine.jdbc.internal.FormatStyle;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Locale;
+
+@Configuration
+public class P6SpySqlFormatter implements MessageFormattingStrategy {
+
+    private static final String LINE_SEPARATOR = System.lineSeparator();
+
+    @PostConstruct
+    public void setLogMessageFormat() {
+        P6SpyOptions.getActiveInstance()
+                .setLogMessageFormat(P6SpySqlFormatter.class.getName());
+    }
+
+    @Override
+    public String formatMessage(int connectionId, String now, long elapsed, String category, String prepared, String sql, String url) {
+        if (sql == null || sql.isBlank()) {
+            return "";
+        }
+
+        String formattedSql = formatSql(category, sql).strip();
+
+        return String.format(
+                "%s [%s] | %d ms | connection=%d %s %s",
+                LINE_SEPARATOR,
+                category,
+                elapsed,
+                connectionId,
+                LINE_SEPARATOR,
+                formattedSql
+        );
+    }
+
+    private String formatSql(String category, String sql) {
+        if (!Category.STATEMENT.getName().equals(category)) {
+            return sql;
+        }
+
+        String normalizedSql = sql
+                .strip()
+                .toLowerCase(Locale.ROOT);
+
+        if (isDdl(normalizedSql)) {
+            return FormatStyle.DDL
+                    .getFormatter()
+                    .format(sql);
+        }
+
+        return FormatStyle.BASIC
+                .getFormatter()
+                .format(sql);
+    }
+
+    private boolean isDdl(String sql) {
+        return sql.startsWith("create")
+                || sql.startsWith("alter")
+                || sql.startsWith("drop")
+                || sql.startsWith("truncate")
+                || sql.startsWith("comment");
+    }
+
+}
