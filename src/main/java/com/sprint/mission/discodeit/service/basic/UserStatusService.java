@@ -53,7 +53,7 @@ public class UserStatusService {
     }
 
     public UserStatusDto update(UUID userStatusId, UUID userId, UserStatusUpdateCommand command) {
-        Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUser_Id(userStatusId, userId);
+        Optional<UserStatus> statusOptional = userStatusRepository.findByIdAndUserId(userStatusId, userId);
 
         UserStatus status = createOrUpdateUserStatus(userId, command, statusOptional);
 
@@ -74,7 +74,7 @@ public class UserStatusService {
     }
 
     private UserStatus getUserStatusRequireThrow(UUID userStatusId, UUID userId) {
-        return userStatusRepository.findByIdAndUser_Id(userStatusId, userId)
+        return userStatusRepository.findByIdAndUserId(userStatusId, userId)
                 .orElseThrow(() -> new UserStatusNotFoundException(userStatusId));
     }
 

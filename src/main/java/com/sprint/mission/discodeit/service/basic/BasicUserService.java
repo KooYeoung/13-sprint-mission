@@ -98,7 +98,7 @@ public class BasicUserService implements UserService {
         readStatusService.deleteByUserId(userId);
         messageService.detachByAuthorId(userId);
 
-        userRepository.deleteById(user.getId());
+        userRepository.deleteDirectlyById(user.getId());
 
         if (user.isProfileImageExist()) {
             binaryContentService.delete(user.getProfile());

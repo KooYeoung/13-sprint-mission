@@ -287,16 +287,17 @@ class UserRepositoryTest {
         em.clear();
 
         // 테스트 데이터 저장 과정에서 발생한 insert SQL은 이 테스트의 관심사가 아니다.
-        // 여기서 Hibernate Statistics를 초기화해서 deleteById(...)와 findById(...)가 만든 SQL statement만 센다.
+        // 여기서 Hibernate Statistics를 초기화해서 deleteDirectlyById(...)와 findById(...)가 만든 SQL statement만 센다.
         Statistics statistics = resetHibernateStatistics();
 
-        // UserRepository.deleteById(...)는 Spring Data JPA 기본 삭제 메서드 대신
-        // @Modifying JPQL delete 쿼리로 재정의되어 있다.
+        // UserRepository.deleteDirectlyById(...)는 Spring Data JPA 기본 deleteById(...)와 구분되는
+        // @Modifying JPQL 벌크 삭제 메서드다.
         // 기본 deleteById는 삭제 대상 엔티티를 먼저 조회한 뒤 삭제할 수 있어 불필요한 select SQL이 발생한다.
         // 따라서 삭제 직후 statement 수가 1이면, 선행 select 없이 delete SQL만 실행됐다는 회귀 방지 검증이 된다.
-        userRepository.deleteById(savedUserId);
+        int deletedCount = userRepository.deleteDirectlyById(savedUserId);
+        assertThat(deletedCount).isEqualTo(1);
         assertThat(statistics.getPrepareStatementCount())
-                .as("deleteById는 선행 select 없이 delete SQL 1번만 실행해야 한다")
+                .as("deleteDirectlyById는 선행 select 없이 delete SQL 1번만 실행해야 한다")
                 .isEqualTo(1L);
 
         // when
@@ -307,10 +308,10 @@ class UserRepositoryTest {
         // users 테이블에 해당 id의 row가 더 이상 없으므로 Optional.empty가 반환되어야 한다.
         assertThat(foundUser).isEmpty();
 
-        // deleteById(...)에서 1번, findById(...)에서 1번 SQL statement가 실행되어 총 2번이어야 한다.
-        // 이 검증은 deleteById(...)가 다시 기본 구현처럼 select 후 delete로 바뀌는 회귀를 잡아준다.
+        // deleteDirectlyById(...)에서 1번, findById(...)에서 1번 SQL statement가 실행되어 총 2번이어야 한다.
+        // 이 검증은 직접 삭제 메서드가 다시 기본 구현처럼 select 후 delete로 바뀌는 회귀를 잡아준다.
         assertThat(statistics.getPrepareStatementCount())
-                .as("deleteById 1번 + findById 1번으로 총 2개의 SQL statement만 실행되어야 한다")
+                .as("deleteDirectlyById 1번 + findById 1번으로 총 2개의 SQL statement만 실행되어야 한다")
                 .isEqualTo(2L);
     }
 

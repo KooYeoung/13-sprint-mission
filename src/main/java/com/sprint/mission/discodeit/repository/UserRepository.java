@@ -25,9 +25,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @EntityGraph(attributePaths = {"userStatus", "profile"})
     Optional<User> findByUsernameAndPassword(String username, String password);
 
-    @Override
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from User u where u.id = :id")
-    void deleteById(@Param("id") UUID id);
+    int deleteDirectlyById(@Param("id") UUID id);
 
 }
