@@ -24,7 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
+@DataJpaTest(showSql = false)
 @Import(value = {QuerydslTestConfig.class, JpaAuditingTestConfig.class, P6SpySqlFormatter.class})
 @DisplayName("UserRepository 슬라이스 테스트")
 @Slf4j
@@ -293,6 +293,7 @@ class UserRepositoryTest {
         // users 테이블에 해당 id의 row가 없으므로 Optional.empty가 반환되어야 한다.
         assertThat(foundUser).isEmpty();
     }
+
     @Test
     @DisplayName("사용자 인증 조회 성공 - 사용자명과 비밀번호가 일치하면 UserStatus와 프로필을 함께 조회")
     void findByUsernameAndPassword_fetchesUserStatusAndProfile_whenCredentialsMatch() {

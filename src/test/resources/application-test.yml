@@ -16,6 +16,7 @@ spring:
     driver-class-name: org.h2.Driver
 
   jpa:
+    show-sql: false
     hibernate:
       # 테스트 시작 시 스키마 생성, 종료 시 삭제
       ddl-auto: create-drop
@@ -24,6 +25,7 @@ spring:
 
     properties:
       hibernate:
+        show_sql: false
         # 테스트 SQL 가독성과 배치 조회 설정
         format_sql: true
         default_batch_fetch_size: 100
