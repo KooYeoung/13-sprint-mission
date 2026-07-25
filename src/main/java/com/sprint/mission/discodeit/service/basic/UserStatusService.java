@@ -61,7 +61,7 @@ public class UserStatusService {
     }
 
     public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateCommand command) {
-        Optional<UserStatus> userStatusResult = userStatusRepository.findByUser_Id(userId);
+        Optional<UserStatus> userStatusResult = userStatusRepository.findByUserId(userId);
 
         UserStatus status = createOrUpdateUserStatus(userId, command, userStatusResult);
 

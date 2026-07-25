@@ -16,7 +16,8 @@ public interface UserStatusRepository extends JpaRepository<UserStatus, UUID> {
     Optional<UserStatus> findByIdAndUserId(@Param("userStatusId") UUID userStatusId,@Param("userId") UUID userId);
 
     @EntityGraph(attributePaths = {"user"})
-    Optional<UserStatus> findByUser_Id(UUID userId);
+    @Query("SELECT us FROM UserStatus us WHERE us.user.id = :userId")
+    Optional<UserStatus> findByUserId(UUID userId);
 
     boolean existsByUser_Id(UUID userId);
 
