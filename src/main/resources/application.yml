@@ -14,6 +14,9 @@ spring:
       hibernate:
         # 지연 로딩 시 배치 조회를 적용해 N+1 문제 완화
         default_batch_fetch_size: 100
+        # 동일한 형태의 DML을 JDBC batch로 묶어 전송
+        jdbc:
+          batch_size: 50
 
   flyway:
     # 애플리케이션 실행 시 DB 마이그레이션 적용
@@ -41,6 +44,8 @@ logging:
   level:
     # 기본 로그 레벨
     root: info
+    # 기본 환경에서는 Hibernate batch 내부 동작을 상세 출력하지 않음
+    org.hibernate.orm.jdbc.batch: info
 
 management:
   endpoints:

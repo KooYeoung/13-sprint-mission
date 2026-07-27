@@ -61,8 +61,9 @@ logging:
     com.sprint.mission.discodeit: debug
     p6spy: info
 
-    # 중복 SQL 로그 방지
-    org.hibernate.SQL: off
+    # Hibernate JDBC batch에서 P6Spy가 SQL 템플릿을 제공하지 않는 경우에도 DML을 확인할 수 있도록 SQL 로그 활성화
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: off
 
 discodeit:

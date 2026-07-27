@@ -23,11 +23,27 @@ public class P6SpySqlFormatter implements MessageFormattingStrategy {
     @Override
     public String formatMessage(int connectionId, String now, long elapsed, String category, String prepared, String sql, String url) {
         if (prepared == null || prepared.isBlank()) {
+            if (sql != null && !sql.isBlank()) {
+                return formatLogMessage(category, elapsed, connectionId, formatSql(category, sql).strip());
+            }
+
+            if (Category.BATCH.getName().equals(category)) {
+                return formatLogMessage(
+                        category,
+                        elapsed,
+                        connectionId,
+                        "JDBC batch executed, but P6Spy did not provide a safe SQL template."
+                );
+            }
             return "";
         }
 
         // P6Spy의 sql 인자는 바인딩 값이 치환된 실행 SQL일 수 있으므로 로그에 사용하지 않는다.
         String formattedSql = formatSql(category, prepared).strip();
+        return formatLogMessage(category, elapsed, connectionId, formattedSql);
+    }
+
+    private String formatLogMessage(String category, long elapsed, int connectionId, String message) {
         return String.format(
                 "%s [%s] | %d ms | connection=%d %s %s",
                 LINE_SEPARATOR,
@@ -35,12 +51,13 @@ public class P6SpySqlFormatter implements MessageFormattingStrategy {
                 elapsed,
                 connectionId,
                 LINE_SEPARATOR,
-                formattedSql
+                message
         );
     }
 
     private String formatSql(String category, String sql) {
-        if (!Category.STATEMENT.getName().equals(category)) {
+        if (!Category.STATEMENT.getName().equals(category)
+                && !Category.BATCH.getName().equals(category)) {
             return sql;
         }
 

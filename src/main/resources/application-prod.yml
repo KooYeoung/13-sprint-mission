@@ -37,6 +37,7 @@ logging:
 
     # SQL 및 바인딩 값 상세 로그 비활성화
     org.hibernate.SQL: warn
+    org.hibernate.orm.jdbc.batch: warn
     org.hibernate.orm.jdbc.bind: warn
 
 discodeit:
