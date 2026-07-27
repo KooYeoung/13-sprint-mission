@@ -78,7 +78,7 @@ public class MessageFileService {
 
     @Transactional(readOnly = true)
     public List<MessageFile> findAllByMessageIds(List<UUID> messageIds) {
-        return messageFileRepository.findAllByMessage_IdIn(messageIds);
+        return messageFileRepository.findAllByMessageIdIn(messageIds);
     }
 
     private @NonNull List<BinaryContent> convertToBinaryContents(List<MessageFile> messageFiles) {
