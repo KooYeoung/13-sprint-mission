@@ -52,14 +52,14 @@ public class ReadStatusService {
 
     @Transactional(readOnly = true)
     public List<ReadStatus> findAllByChannelId(UUID channelId) {
-        return readStatusRepository.findByChannel_Id(channelId);
+        return readStatusRepository.findByChannelId(channelId);
     }
 
     @Transactional(readOnly = true)
     public List<ReadStatus> findAllByChannelIds(List<UUID> channelIds) {
         if (channelIds.isEmpty()) return List.of();
 
-        return readStatusRepository.findByChannel_IdIn(channelIds);
+        return readStatusRepository.findByChannelIdIn(channelIds);
     }
 
     public void deleteByChannelId(UUID channelId) {
@@ -76,7 +76,7 @@ public class ReadStatusService {
 
     @Transactional(readOnly = true)
     public List<ReadStatusDto> findAllByUserId(UUID userId) {
-        return readStatusRepository.findByUser_Id(userId)
+        return readStatusRepository.findByUserId(userId)
                 .stream()
                 .map(readStatusMapper::toDto)
                 .toList();
