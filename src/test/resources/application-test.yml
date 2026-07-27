@@ -26,9 +26,11 @@ spring:
     properties:
       hibernate:
         show_sql: false
-        # 테스트 SQL 가독성과 배치 조회 설정
+        # 테스트 SQL 가독성, 배치 조회, JDBC 배치 설정
         format_sql: true
         default_batch_fetch_size: 100
+        jdbc:
+          batch_size: 50
 
   flyway:
     # 테스트 스키마는 Hibernate가 생성하므로 Flyway 비활성화
@@ -50,7 +52,7 @@ decorator:
       logging: slf4j
 
       # 사용자 정의 P6SpySqlFormatter가 SQL 포맷을 담당한다.
-      exclude-categories: info,debug,result,resultset,batch,commit,rollback
+      exclude-categories: info,debug,result,resultset,commit,rollback
 
 logging:
   level:
