@@ -47,13 +47,12 @@ class UserStatusRepositoryTest {
         // UserStatus.user는 nullable = false인 연관관계다.
         // 따라서 상태만 단독으로 만들지 않고 먼저 실제 User를 저장한 다음,
         // 저장된 User를 참조하는 실제 UserStatus를 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userCreateCommand, userStatusCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 반환될 수 없다.
         // 즉, 아래 when 절의 결과는 1차 캐시가 아니라 실제 SELECT 결과라는 점이 분명해진다.
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         em.clear();
 
         // when
@@ -105,7 +104,7 @@ class UserStatusRepositoryTest {
         // 따라서 빈 DB에서 Optional.empty가 나오는지만 확인하면 테스트 의미가 약해진다.
         // 실제 UserStatus row를 저장한 뒤, 그 상태의 소유자가 아닌 다른 실제 User의 id로 조회한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUsername",
                 "otherPassword",
                 "otherEmail@gmail.com"
@@ -114,18 +113,17 @@ class UserStatusRepositoryTest {
 
         // UserStatus.user는 nullable = false이고 users.id를 참조한다.
         // 먼저 상태의 실제 소유자인 User를 저장한 뒤, 그 User에 연결된 UserStatus를 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userCreateCommand, userStatusCreateCommand);
 
         // 조회 조건으로 사용할 "틀린 사용자 ID"도 임의 UUID가 아니라 실제 저장된 다른 사용자 id를 사용한다.
         // 이렇게 하면 결과가 비어 있는 이유가 "사용자가 존재하지 않아서"가 아니라
         // "상태 ID와 사용자 ID의 조합이 맞지 않아서"임을 더 정확하게 검증할 수 있다.
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 반환될 수 없다.
         // 즉, 아래 when 절의 결과는 1차 캐시가 아니라 실제 SELECT 결과라는 점이 분명해진다.
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         UUID savedOtherUserId = savedOtherUser.getId();
         em.clear();
 
@@ -161,30 +159,27 @@ class UserStatusRepositoryTest {
         // 그래서 조회 대상 사용자와 다른 사용자를 각각 저장하고, 두 사용자 모두 UserStatus를 갖게 만든다.
         // 그러면 findByUserId(...)가 전달받은 userId 조건으로 정확한 row를 고르는지 확인할 수 있다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUsername",
                 "otherPassword",
                 "otherEmail@gmail.com"
         );
         UserStatusCreateCommand userStatusCreateCommand = userStatusCreateCommand();
-        UserStatusCreateCommand otherUserStatusCreateCommand = new UserStatusCreateCommand(
+        UserStatusCreateCommand otherUserStatusCreateCommand = userStatusCreateCommand(
                 userStatusCreateCommand.createdAt().minusSeconds(60)
         );
 
         // UserStatus.user는 nullable = false인 @OneToOne 연관관계이고 user_id에 unique 제약이 있다.
         // 따라서 각 UserStatus는 먼저 저장된 서로 다른 User를 참조해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, otherUserStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userCreateCommand, userStatusCreateCommand);
+        UserStatusFixture otherFixture = saveUserWithStatus(otherUserCreateCommand, otherUserStatusCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 반환될 수 없다.
         // 즉, 아래 when 절의 결과는 1차 캐시가 아니라 실제 SELECT 결과라는 점이 분명해진다.
-        UUID savedUserId = savedUser.getId();
-        UUID savedOtherUserId = savedOtherUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
-        UUID savedOtherUserStatusId = savedOtherUserStatus.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedOtherUserId = otherFixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
+        UUID savedOtherUserStatusId = otherFixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -244,7 +239,7 @@ class UserStatusRepositoryTest {
         // 이렇게 하면 user_statuses 테이블에 row가 있어도, 조회 대상 user_id와 연결된 row가 없으면
         // Optional.empty를 반환해야 한다는 조건을 더 정확히 검증할 수 있다.
         UserCreateCommand userWithStatusCreateCommand = userCreateCommand();
-        UserCreateCommand userWithoutStatusCreateCommand = new UserCreateCommand(
+        UserCreateCommand userWithoutStatusCreateCommand = userCreateCommand(
                 "userWithoutStatus",
                 "passwordWithoutStatus",
                 "withoutStatus@gmail.com"
@@ -253,18 +248,17 @@ class UserStatusRepositoryTest {
 
         // UserStatus.user는 nullable = false인 @OneToOne 연관관계이고 user_id에 unique 제약이 있다.
         // 따라서 UserStatus를 만들 대상 User를 먼저 저장하고, 그 User를 참조하는 UserStatus를 저장한다.
-        User savedUserWithStatus = userRepository.saveAndFlush(new User(userWithStatusCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUserWithStatus, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userWithStatusCreateCommand, userStatusCreateCommand);
 
         // 조회 대상 사용자는 실제 users row로 저장하되 UserStatus는 만들지 않는다.
         // 이 사용자의 id로 조회했을 때 empty가 반환되어야 이 테스트가 통과한다.
-        User savedUserWithoutStatus = userRepository.saveAndFlush(new User(userWithoutStatusCreateCommand, null));
+        User savedUserWithoutStatus = saveUser(userWithoutStatusCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 반환될 수 없다.
         // 즉, 아래 when 절의 결과는 1차 캐시가 아니라 실제 SELECT 결과라는 점이 분명해진다.
-        UUID savedUserWithStatusId = savedUserWithStatus.getId();
+        UUID savedUserWithStatusId = fixture.user().getId();
         UUID savedUserWithoutStatusId = savedUserWithoutStatus.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -304,11 +298,10 @@ class UserStatusRepositoryTest {
 
         // UserStatus.user는 nullable = false이고 user_id에는 unique 제약이 있다.
         // 따라서 먼저 실제 User를 저장하고, 그 User를 참조하는 UserStatus를 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userCreateCommand, userStatusCreateCommand);
 
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -338,7 +331,7 @@ class UserStatusRepositoryTest {
         // 그래서 상태가 있는 사용자를 하나 저장해 user_statuses 테이블에 row를 만든 뒤,
         // 상태가 없는 다른 실제 사용자 id로 존재 여부를 조회한다.
         UserCreateCommand userWithStatusCreateCommand = userCreateCommand();
-        UserCreateCommand userWithoutStatusCreateCommand = new UserCreateCommand(
+        UserCreateCommand userWithoutStatusCreateCommand = userCreateCommand(
                 "userWithoutStatus",
                 "passwordWithoutStatus",
                 "withoutStatus@gmail.com"
@@ -348,16 +341,15 @@ class UserStatusRepositoryTest {
         // 상태가 있는 사용자와 그 UserStatus를 먼저 저장한다.
         // 이 row는 existsByUser_Id(...)가 단순히 "테이블에 상태가 하나라도 있는지"가 아니라
         // 전달받은 userId 조건을 적용하는지 확인하기 위한 비교 데이터다.
-        User savedUserWithStatus = userRepository.saveAndFlush(new User(userWithStatusCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUserWithStatus, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userWithStatusCreateCommand, userStatusCreateCommand);
 
         // 조회 대상 사용자는 실제 users row로 저장하되 UserStatus는 만들지 않는다.
         // 이 사용자의 id로 조회하면 false가 반환되어야 한다.
-        User savedUserWithoutStatus = userRepository.saveAndFlush(new User(userWithoutStatusCreateCommand, null));
+        User savedUserWithoutStatus = saveUser(userWithoutStatusCreateCommand);
 
-        UUID savedUserWithStatusId = savedUserWithStatus.getId();
+        UUID savedUserWithStatusId = fixture.user().getId();
         UUID savedUserWithoutStatusId = savedUserWithoutStatus.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -398,13 +390,12 @@ class UserStatusRepositoryTest {
 
         // UserStatus.user는 nullable = false인 @OneToOne 연관관계이고 user_id에는 unique 제약이 있다.
         // 먼저 실제 User를 저장하고, 그 User를 참조하는 UserStatus를 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand));
+        UserStatusFixture fixture = saveUserWithStatus(userCreateCommand, userStatusCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 반환될 수 없다.
         // 즉, 아래 when 절의 exists 쿼리는 1차 캐시가 아니라 실제 DB 조회 결과를 기준으로 판단한다.
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -435,31 +426,28 @@ class UserStatusRepositoryTest {
         // 그래서 서로 다른 두 사용자를 저장하고, 두 사용자 모두 UserStatus를 갖게 만든다.
         // 그 다음 첫 번째 사용자의 상태 ID와 두 번째 사용자의 ID를 조합해 조회한다.
         UserCreateCommand ownerCreateCommand = userCreateCommand();
-        UserCreateCommand otherOwnerCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherOwnerCreateCommand = userCreateCommand(
                 "otherOwner",
                 "otherPassword",
                 "otherOwner@gmail.com"
         );
         UserStatusCreateCommand ownerStatusCreateCommand = userStatusCreateCommand();
-        UserStatusCreateCommand otherOwnerStatusCreateCommand = new UserStatusCreateCommand(
+        UserStatusCreateCommand otherOwnerStatusCreateCommand = userStatusCreateCommand(
                 ownerStatusCreateCommand.createdAt().minusSeconds(60)
         );
 
         // 두 UserStatus 모두 실제로 저장한다.
         // 이 구성에서는 user_statuses 테이블에도 row가 있고, users 테이블에도 조회에 사용할 user row가 있다.
         // 따라서 false 결과는 "데이터가 없어서"가 아니라 "상태 ID와 사용자 ID의 소유 관계가 맞지 않아서"여야 한다.
-        User savedOwner = userRepository.saveAndFlush(new User(ownerCreateCommand, null));
-        User savedOtherOwner = userRepository.saveAndFlush(new User(otherOwnerCreateCommand, null));
-
-        UserStatus savedOwnerStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOwner, ownerStatusCreateCommand));
-        UserStatus savedOtherOwnerStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherOwner, otherOwnerStatusCreateCommand));
+        UserStatusFixture ownerFixture = saveUserWithStatus(ownerCreateCommand, ownerStatusCreateCommand);
+        UserStatusFixture otherOwnerFixture = saveUserWithStatus(otherOwnerCreateCommand, otherOwnerStatusCreateCommand);
 
         // em.clear() 이후에는 저장 직후 영속성 컨텍스트에 남아 있는 객체가 결과에 영향을 주지 않는다.
         // existsByIdAndUser_Id(...)가 실제 DB 조건으로 판단하는지 확인하기 위한 정리다.
-        UUID savedOwnerId = savedOwner.getId();
-        UUID savedOtherOwnerId = savedOtherOwner.getId();
-        UUID savedOwnerStatusId = savedOwnerStatus.getId();
-        UUID savedOtherOwnerStatusId = savedOtherOwnerStatus.getId();
+        UUID savedOwnerId = ownerFixture.user().getId();
+        UUID savedOtherOwnerId = otherOwnerFixture.user().getId();
+        UUID savedOwnerStatusId = ownerFixture.userStatus().getId();
+        UUID savedOtherOwnerStatusId = otherOwnerFixture.userStatus().getId();
         em.clear();
 
         // 사전 조건을 먼저 확인한다.
@@ -485,19 +473,45 @@ class UserStatusRepositoryTest {
     }
 
     private UserCreateCommand userCreateCommand() {
-        return new UserCreateCommand(
+        return userCreateCommand(
                 "testUsername",
                 "testPassword",
                 "testEmail@gmail.com"
         );
     }
 
+    private UserCreateCommand userCreateCommand(String username, String password, String email) {
+        return new UserCreateCommand(username, password, email);
+    }
+
     private UserStatusCreateCommand userStatusCreateCommand() {
-        return new UserStatusCreateCommand(Instant.now());
+        return userStatusCreateCommand(Instant.now());
+    }
+
+    private UserStatusCreateCommand userStatusCreateCommand(Instant createdAt) {
+        return new UserStatusCreateCommand(createdAt);
+    }
+
+    private User saveUser(UserCreateCommand command) {
+        return userRepository.saveAndFlush(new User(command, null));
+    }
+
+    private UserStatus saveUserStatus(User user, UserStatusCreateCommand command) {
+        return userStatusRepository.saveAndFlush(new UserStatus(user, command));
+    }
+
+    private UserStatusFixture saveUserWithStatus(UserCreateCommand userCommand, UserStatusCreateCommand statusCommand) {
+        User savedUser = saveUser(userCommand);
+        UserStatus savedUserStatus = saveUserStatus(savedUser, statusCommand);
+
+        return new UserStatusFixture(savedUser, savedUserStatus);
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();
+    }
+
+    private record UserStatusFixture(User user, UserStatus userStatus) {
     }
 
 }

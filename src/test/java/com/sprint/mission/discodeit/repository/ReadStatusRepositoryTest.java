@@ -67,16 +67,15 @@ class ReadStatusRepositoryTest {
 
         // ReadStatus.user와 ReadStatus.channel은 nullable = false인 LAZY 연관관계다.
         // 따라서 읽음 상태만 단독으로 만들지 않고 먼저 실제 User와 Channel을 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreatePublicCommand));
+        User savedUser = saveUser(userCreateCommand);
+        Channel savedChannel = saveChannel(channelCreatePublicCommand);
 
         // findByUserId(...)의 EntityGraph에는 user.userStatus도 포함되어 있다.
         // UserStatus가 없는 사용자만 저장하면 "중첩 그래프가 실제로 함께 조회되는지" 검증하기 어렵다.
         // 그래서 UserStatus row를 함께 저장해, User -> UserStatus 연관 로딩 여부까지 확인할 수 있게 한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
 
-        ReadStatus readStatus = new ReadStatus(savedChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt));
-        ReadStatus savedReadStatus = readStatusRepository.saveAndFlush(readStatus);
+        ReadStatus savedReadStatus = saveReadStatus(savedChannel, savedUser, readAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedUserStatusId = savedUserStatus.getId();
@@ -157,7 +156,7 @@ class ReadStatusRepositoryTest {
         // 그래서 조회 대상 사용자는 ReadStatus가 없게 두고,
         // 다른 사용자의 ReadStatus row는 실제로 저장해 read_statuses 테이블이 비어 있지 않은 상황을 만든다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
@@ -168,19 +167,15 @@ class ReadStatusRepositoryTest {
         // 조회 대상 사용자다.
         // 이 사용자의 UserStatus는 만들지만 ReadStatus는 일부러 만들지 않는다.
         // UserStatus가 있어도 ReadStatus가 없으면 findByUserId(...) 결과는 빈 목록이어야 한다.
-        User savedUserWithoutReadStatus = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedUserWithoutReadStatus, userStatusCreateCommand())
-        );
+        User savedUserWithoutReadStatus = saveUser(userCreateCommand);
+        UserStatus savedUserStatus = saveUserStatus(savedUserWithoutReadStatus);
 
         // 대조군 사용자다.
         // 같은 채널에 대해 이 사용자에게만 ReadStatus를 만들어 두면,
         // Repository가 userId 조건을 무시하거나 잘못 조인하는 경우 테스트가 실패한다.
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreatePublicCommand));
-        ReadStatus savedOtherReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherUserReadAt))
-        );
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        Channel savedChannel = saveChannel(channelCreatePublicCommand);
+        ReadStatus savedOtherReadStatus = saveReadStatus(savedChannel, savedOtherUser, otherUserReadAt);
 
         UUID savedUserId = savedUserWithoutReadStatus.getId();
         UUID savedUserStatusId = savedUserStatus.getId();
@@ -227,13 +222,13 @@ class ReadStatusRepositoryTest {
         // 삭제 대상이 아닌 다른 채널에는 ReadStatus를 1개 저장해 둔다.
         // 이렇게 하면 삭제 조건(channel_id)이 정확히 적용되어 대상 채널의 row만 삭제되는지 함께 검증할 수 있다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -245,28 +240,18 @@ class ReadStatusRepositoryTest {
         // 삭제 대상 채널에 서로 다른 두 사용자의 ReadStatus를 연결한다.
         // 실제 서비스에서는 채널 참여자별 읽음 상태가 여러 개 존재할 수 있으므로,
         // 한 건만 삭제되는 우연한 통과를 피하기 위해 복수 row를 준비한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedUser, userStatusCreateCommand())
-        );
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedOtherUser, userStatusCreateCommand())
-        );
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
-        ReadStatus savedTargetReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), firstReadAt))
-        );
-        ReadStatus savedOtherTargetReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), secondReadAt))
-        );
-        ReadStatus savedRemainingReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), remainingReadAt))
-        );
+        ReadStatus savedTargetReadStatus = saveReadStatus(savedTargetChannel, savedUser, firstReadAt);
+        ReadStatus savedOtherTargetReadStatus = saveReadStatus(savedTargetChannel, savedOtherUser, secondReadAt);
+        ReadStatus savedRemainingReadStatus = saveReadStatus(savedOtherChannel, savedUser, remainingReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -399,13 +384,13 @@ class ReadStatusRepositoryTest {
         // 아래 fixture는 조회 대상 조합과 대조군 조합을 함께 만들어,
         // Repository가 channelId와 userId를 AND 조건으로 정확히 적용하는지 드러내기 위한 구성이다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -417,37 +402,27 @@ class ReadStatusRepositoryTest {
         // 조회 대상 사용자와 대조군 사용자를 각각 저장한다.
         // existsByChannel_IdAndUser_Id(...)는 UserStatus를 직접 사용하지 않지만,
         // 실제 사용자 생성 흐름에서는 UserStatus가 함께 만들어지므로 실제 엔티티 row를 구성해 둔다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedUser, userStatusCreateCommand())
-        );
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedOtherUser, userStatusCreateCommand())
-        );
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // 조회 대상 채널과 대조군 채널을 각각 저장한다.
         // 같은 사용자라도 다른 채널의 ReadStatus는 조회 대상 조합이 아니어야 하고,
         // 같은 채널이라도 다른 사용자의 ReadStatus 역시 조회 대상 조합이 아니어야 한다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // 이 row가 existsByChannel_IdAndUser_Id(savedTargetChannelId, savedUserId)를 true로 만드는 실제 대상 row다.
-        ReadStatus savedTargetReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), targetReadAt))
-        );
+        ReadStatus savedTargetReadStatus = saveReadStatus(savedTargetChannel, savedUser, targetReadAt);
 
         // 대조군 1: 채널은 같지만 사용자가 다르다.
         // Repository가 userId 조건을 무시하면 이 row 때문에 잘못된 true가 나올 수 있다.
-        ReadStatus savedOtherUserReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherUserReadAt))
-        );
+        ReadStatus savedOtherUserReadStatus = saveReadStatus(savedTargetChannel, savedOtherUser, otherUserReadAt);
 
         // 대조군 2: 사용자는 같지만 채널이 다르다.
         // Repository가 channelId 조건을 무시하면 이 row 때문에 잘못된 true가 나올 수 있다.
-        ReadStatus savedOtherChannelReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), otherChannelReadAt))
-        );
+        ReadStatus savedOtherChannelReadStatus = saveReadStatus(savedOtherChannel, savedUser, otherChannelReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -516,13 +491,13 @@ class ReadStatusRepositoryTest {
         // 즉, 단순히 데이터가 없어서 false가 아니라
         // "둘 중 하나의 조건만 맞는 row는 있어도 두 조건을 동시에 만족하는 row는 없어서 false"임을 검증한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -533,32 +508,24 @@ class ReadStatusRepositoryTest {
         // savedUser는 targetChannel에 대한 ReadStatus를 갖는 사용자다.
         // savedOtherUser는 이번 exists 조회에서 사용할 사용자지만,
         // targetChannel에 대한 ReadStatus는 일부러 만들지 않는다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedUser, userStatusCreateCommand())
-        );
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedOtherUser, userStatusCreateCommand())
-        );
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // targetChannel은 조회 대상 채널이고, otherChannel은 대조군 채널이다.
         // savedOtherUser에게는 otherChannel의 ReadStatus만 부여해
         // "사용자는 존재하지만 targetChannel에는 참여하지 않은 상태"를 만든다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // 대조군 1: targetChannel에는 ReadStatus가 있지만 사용자가 savedUser다.
         // Repository가 userId 조건을 무시하면 이 row 때문에 잘못 true가 나올 수 있다.
-        ReadStatus savedTargetReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), targetReadAt))
-        );
+        ReadStatus savedTargetReadStatus = saveReadStatus(savedTargetChannel, savedUser, targetReadAt);
 
         // 대조군 2: savedOtherUser에게도 ReadStatus가 있지만 채널이 otherChannel이다.
         // Repository가 channelId 조건을 무시하면 이 row 때문에 잘못 true가 나올 수 있다.
-        ReadStatus savedOtherUserReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherChannelReadAt))
-        );
+        ReadStatus savedOtherUserReadStatus = saveReadStatus(savedOtherChannel, savedOtherUser, otherChannelReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -616,18 +583,18 @@ class ReadStatusRepositoryTest {
         // 따라서 users와 channel만 실제 DB에 저장한 뒤,
         // readStatusRepository.burkInsert(...)를 직접 호출해 read_statuses row가 생성되는지 확인한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
-        UserCreateCommand excludedUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand excludedUserCreateCommand = userCreateCommand(
                 "excludedUser",
                 "excludedPassword",
                 "excluded@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -636,20 +603,20 @@ class ReadStatusRepositoryTest {
 
         // bulk insert 쿼리는 users 테이블에서 userIds에 해당하는 사용자만 선택한다.
         // 그래서 삽입 대상 사용자 2명과, 요청 목록에 넣지 않을 제외 대상 사용자 1명을 함께 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        User savedExcludedUser = userRepository.saveAndFlush(new User(excludedUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        User savedExcludedUser = saveUser(excludedUserCreateCommand);
 
         // UserStatus는 burkInsert(...) SQL의 직접 조건은 아니지만,
         // 실제 사용자 생성 흐름에서는 User와 함께 존재하는 데이터이므로 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
-        UserStatus savedExcludedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedExcludedUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
+        UserStatus savedExcludedUserStatus = saveUserStatus(savedExcludedUser);
 
         // targetChannel은 bulk insert 대상 채널이고, otherChannel은 대조군 채널이다.
         // burkInsert(...)에 targetChannelId만 전달했으므로 otherChannel에는 ReadStatus가 생성되면 안 된다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -738,18 +705,18 @@ class ReadStatusRepositoryTest {
         // 따라서 요청 목록 안에 DB에 없는 UUID가 섞여 있어도,
         // 존재하는 사용자에 대해서만 ReadStatus가 생성되어야 한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
-        UserCreateCommand excludedUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand excludedUserCreateCommand = userCreateCommand(
                 "excludedUser",
                 "excludedPassword",
                 "excluded@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -759,21 +726,21 @@ class ReadStatusRepositoryTest {
         // 삽입 대상이 될 실제 사용자 2명과,
         // DB에는 존재하지만 요청 목록에는 넣지 않을 제외 대상 사용자 1명을 저장한다.
         // savedExcludedUser는 "DB에 존재한다는 이유만으로 insert 되면 안 된다"는 대조군이다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        User savedExcludedUser = userRepository.saveAndFlush(new User(excludedUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        User savedExcludedUser = saveUser(excludedUserCreateCommand);
 
         // UserStatus는 burkInsert(...)의 where 조건에는 직접 사용되지 않는다.
         // 다만 실제 사용자 데이터 구조를 유지하고,
         // 이후 findByUserId(...), findByChannelId(...)의 EntityGraph 조회가 깨지지 않도록 함께 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
-        UserStatus savedExcludedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedExcludedUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
+        UserStatus savedExcludedUserStatus = saveUserStatus(savedExcludedUser);
 
         // targetChannel은 bulk insert 대상 채널이고, otherChannel은 비대상 채널이다.
         // userId 필터링뿐 아니라 channelId 조건도 의도대로 적용되는지 함께 확인한다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -878,18 +845,18 @@ class ReadStatusRepositoryTest {
         // 따라서 사용자 프로필과 UserStatus를 실제 row로 저장한 뒤,
         // 조회 결과에서 연관 객체가 초기화되어 있는지 PersistenceUnitUtil로 확인한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
-        UserCreateCommand thirdUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand thirdUserCreateCommand = userCreateCommand(
                 "thirdUser",
                 "thirdPassword",
                 "third@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -897,28 +864,23 @@ class ReadStatusRepositoryTest {
         Instant readAt = Instant.now();
         Instant otherChannelReadAt = readAt.plusSeconds(1);
 
-        // user.profile EntityGraph를 검증하기 위해 각 사용자에게 서로 다른 BinaryContent 프로필을 연결한다.
-        // 프로필 id가 모두 달라야 조회 결과에서 어떤 사용자의 프로필이 함께 조회됐는지 명확히 구분할 수 있다.
-        BinaryContent savedUserBinaryContent = binaryContentRepository.saveAndFlush(new BinaryContent("originFile1", "originFileContent", 1_000L));
-        BinaryContent savedOtherUserBinaryContent = binaryContentRepository.saveAndFlush(new BinaryContent("originFile2", "originFileContent", 1_000L));
-        BinaryContent savedThirdUserBinaryContent = binaryContentRepository.saveAndFlush(new BinaryContent("originFile3", "originFileContent", 1_000L));
-
         // 대상 채널에 연결할 사용자 3명을 저장한다.
         // 단건만 저장하면 목록 조회, EntityGraph, channelId 필터링이 우연히 통과할 수 있어 복수 row로 구성한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, savedUserBinaryContent));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, savedOtherUserBinaryContent));
-        User savedThirdUser = userRepository.saveAndFlush(new User(thirdUserCreateCommand, savedThirdUserBinaryContent));
+        // 각 사용자에게 서로 다른 BinaryContent 프로필을 연결해야 조회 결과에서 profile fetch join도 확인할 수 있다.
+        User savedUser = saveUserWithProfile(userCreateCommand, "originFile1");
+        User savedOtherUser = saveUserWithProfile(otherUserCreateCommand, "originFile2");
+        User savedThirdUser = saveUserWithProfile(thirdUserCreateCommand, "originFile3");
 
         // user.userStatus EntityGraph를 검증하기 위해 각 사용자에게 UserStatus를 연결한다.
         // UserStatus가 없는 상태로만 테스트하면 user.userStatus 그래프 누락을 잡기 어렵다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
-        UserStatus savedThirdUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedThirdUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
+        UserStatus savedThirdUserStatus = saveUserStatus(savedThirdUser);
 
         // targetChannel은 조회 대상 채널이고, otherChannel은 channelId 필터링을 검증하기 위한 대조군이다.
         // 두 채널 모두 ReadStatus를 갖게 만들어야 findByChannelId(...)가 대상 채널 row만 반환하는지 확인할 수 있다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -928,9 +890,9 @@ class ReadStatusRepositoryTest {
         UUID savedThirdUserStatusId = savedThirdUserStatus.getId();
         UUID savedTargetChannelId = savedTargetChannel.getId();
         UUID savedOtherChannelId = savedOtherChannel.getId();
-        UUID savedUserBinaryContentId = savedUserBinaryContent.getId();
-        UUID savedOtherUserBinaryContentId = savedOtherUserBinaryContent.getId();
-        UUID savedThirdUserBinaryContentId = savedThirdUserBinaryContent.getId();
+        UUID savedUserBinaryContentId = savedUser.getProfileId();
+        UUID savedOtherUserBinaryContentId = savedOtherUser.getProfileId();
+        UUID savedThirdUserBinaryContentId = savedThirdUser.getProfileId();
 
         List<UUID> userIdsToInsert = List.of(savedUserId, savedOtherUserId, savedThirdUserId);
 
@@ -1040,13 +1002,13 @@ class ReadStatusRepositoryTest {
         // 그래서 다른 채널에는 ReadStatus를 실제로 저장해 두고,
         // 조회 대상 채널에는 ReadStatus를 만들지 않는 방식으로 channel_id 조건을 검증한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand emptyChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand channelWithReadStatusesCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand channelWithReadStatusesCreateCommand = channelCreatePublicCommand(
                 "channelWithReadStatuses",
                 "channelWithReadStatusesDescription",
                 ChannelType.PUBLIC
@@ -1056,19 +1018,19 @@ class ReadStatusRepositoryTest {
         // 대조군 채널에 ReadStatus를 만들 사용자 2명을 저장한다.
         // 조회 대상 채널에는 이 사용자들의 ReadStatus를 생성하지 않으므로,
         // 사용자가 존재하더라도 해당 channelId에 연결된 ReadStatus가 없으면 결과는 빈 목록이어야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 findByChannelId(...)의 빈 결과 자체에는 직접 필요하지 않다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하고,
         // 다른 채널의 ReadStatus 조회가 EntityGraph 때문에 깨지지 않도록 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // emptyChannel은 조회 대상이지만 ReadStatus가 없는 채널이다.
         // channelWithReadStatuses는 대조군으로, 같은 테스트 DB 안에 ReadStatus가 실제로 존재함을 보여준다.
-        Channel savedEmptyChannel = channelRepository.saveAndFlush(new Channel(emptyChannelCreateCommand));
-        Channel savedChannelWithReadStatuses = channelRepository.saveAndFlush(new Channel(channelWithReadStatusesCreateCommand));
+        Channel savedEmptyChannel = saveChannel(emptyChannelCreateCommand);
+        Channel savedChannelWithReadStatuses = saveChannel(channelWithReadStatusesCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1135,18 +1097,18 @@ class ReadStatusRepositoryTest {
         // 단순히 조회 대상 채널의 row만 저장하면 IN 조건이 정확히 동작하는지 확인하기 어렵기 때문에,
         // 포함 채널 2개와 제외 채널 1개를 모두 같은 테스트 DB에 준비한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand firstIncludedChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand secondIncludedChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand secondIncludedChannelCreateCommand = channelCreatePublicCommand(
                 "secondIncludedChannel",
                 "secondIncludedChannelDescription",
                 ChannelType.PUBLIC
         );
-        ChannelCreatePublicCommand excludedChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand excludedChannelCreateCommand = channelCreatePublicCommand(
                 "excludedChannel",
                 "excludedChannelDescription",
                 ChannelType.PUBLIC
@@ -1156,19 +1118,19 @@ class ReadStatusRepositoryTest {
         // 두 사용자를 저장한다.
         // 각 채널에 같은 사용자 2명의 ReadStatus를 생성하면,
         // 결과 검증에서 channelId와 userId 조합을 명확히 확인할 수 있다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 findByChannelIdIn(...)의 channelId 필터링 조건에는 직접 쓰이지 않는다.
         // 다만 Repository의 EntityGraph가 user.userStatus를 포함하므로 실제 연관 row를 함께 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // firstIncludedChannel, secondIncludedChannel은 조회 목록에 포함할 채널이다.
         // excludedChannel은 ReadStatus가 존재하지만 조회 목록에는 넣지 않을 대조군 채널이다.
-        Channel savedFirstIncludedChannel = channelRepository.saveAndFlush(new Channel(firstIncludedChannelCreateCommand));
-        Channel savedSecondIncludedChannel = channelRepository.saveAndFlush(new Channel(secondIncludedChannelCreateCommand));
-        Channel savedExcludedChannel = channelRepository.saveAndFlush(new Channel(excludedChannelCreateCommand));
+        Channel savedFirstIncludedChannel = saveChannel(firstIncludedChannelCreateCommand);
+        Channel savedSecondIncludedChannel = saveChannel(secondIncludedChannelCreateCommand);
+        Channel savedExcludedChannel = saveChannel(excludedChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1261,13 +1223,13 @@ class ReadStatusRepositoryTest {
         // "ReadStatus가 존재해서 true"인지 테스트 의도가 흐려질 수 있다.
         // 그래서 ReadStatus가 있는 targetChannel과, 채널 row만 있고 ReadStatus는 없는 emptyChannel을 함께 준비한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand emptyChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand emptyChannelCreateCommand = channelCreatePublicCommand(
                 "emptyChannel",
                 "emptyChannelDescription",
                 ChannelType.PUBLIC
@@ -1276,19 +1238,19 @@ class ReadStatusRepositoryTest {
 
         // targetChannel에 연결할 사용자 2명을 저장한다.
         // ReadStatus가 여러 건 있어도 existsByChannel_Id(...)의 결과는 true 하나로 수렴해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 existsByChannel_Id(...) 조건에는 직접 쓰이지 않는다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하고,
         // ReadStatus 조회를 통한 사전 검증 시 EntityGraph가 깨지지 않도록 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // targetChannel에는 ReadStatus를 생성하고, emptyChannel에는 생성하지 않는다.
         // 이렇게 해야 existsByChannel_Id(...)가 Channel 존재 여부가 아니라 ReadStatus 존재 여부를 기준으로 판단하는지 확인할 수 있다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedEmptyChannel = channelRepository.saveAndFlush(new Channel(emptyChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedEmptyChannel = saveChannel(emptyChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1356,13 +1318,13 @@ class ReadStatusRepositoryTest {
         // 그래서 targetChannel에는 ReadStatus를 만들고,
         // emptyChannel은 Channel row만 저장한 뒤 ReadStatus는 연결하지 않는다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand emptyChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand emptyChannelCreateCommand = channelCreatePublicCommand(
                 "emptyChannel",
                 "emptyChannelDescription",
                 ChannelType.PUBLIC
@@ -1372,19 +1334,19 @@ class ReadStatusRepositoryTest {
         // targetChannel에 ReadStatus를 만들 사용자 2명을 저장한다.
         // emptyChannel에도 같은 사용자들이 존재한다고 해서 ReadStatus가 자동으로 생기는 것은 아니므로,
         // existsByChannel_Id(...)는 users가 아니라 read_statuses의 channel_id 존재 여부를 기준으로 판단해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 existsByChannel_Id(...) 조건에는 직접 쓰이지 않는다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하고,
         // ReadStatus 사전 조회 시 EntityGraph가 user.userStatus를 함께 조회해도 문제가 없도록 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // targetChannel은 ReadStatus가 존재하는 대조군 채널이다.
         // emptyChannel은 조회 대상이지만 ReadStatus가 없는 채널이다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedEmptyChannel = channelRepository.saveAndFlush(new Channel(emptyChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedEmptyChannel = saveChannel(emptyChannelCreateCommand);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1450,13 +1412,13 @@ class ReadStatusRepositoryTest {
         // 단건 조회 결과에서 ReadStatus.user와 ReadStatus.channel이 함께 로딩되어야 한다.
         // 또한 id 기반 조회가 정확히 동작하는지 확인하기 위해 조회 대상 ReadStatus와 대조군 ReadStatus를 함께 저장한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -1467,30 +1429,26 @@ class ReadStatusRepositoryTest {
         // 조회 대상 ReadStatus와 대조군 ReadStatus에 사용할 사용자 2명을 저장한다.
         // findById(...)는 userId 조건으로 조회하지 않지만, 서로 다른 사용자와 채널을 준비하면
         // 반환된 row가 조회 대상 id에 해당하는 정확한 row인지 더 명확히 검증할 수 있다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 findById(...)의 EntityGraph 대상은 아니다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하기 위해 실제 row로 저장한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // 조회 대상 ReadStatus는 targetChannel + savedUser 조합으로 저장한다.
         // ReadStatus 생성자에는 User 엔티티와 ReadStatusCreateCommand가 함께 들어가므로,
         // command의 userId도 실제 연결 사용자(savedUser)의 id와 맞춰 테스트 fixture가 헷갈리지 않게 한다.
-        ReadStatus savedReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt))
-        );
+        ReadStatus savedReadStatus = saveReadStatus(savedTargetChannel, savedUser, readAt);
 
         // 대조군 ReadStatus를 하나 더 저장한다.
         // 이 row가 있어야 findById(savedReadStatusId)가 단순히 첫 번째 row를 우연히 가져온 것이 아니라,
         // 전달한 id에 해당하는 row를 정확히 조회한다는 점을 함께 확인할 수 있다.
-        ReadStatus savedOtherReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherReadAt))
-        );
+        ReadStatus savedOtherReadStatus = saveReadStatus(savedOtherChannel, savedOtherUser, otherReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1567,13 +1525,13 @@ class ReadStatusRepositoryTest {
         // 그래서 실제 ReadStatus row를 2건 저장해 둔 뒤,
         // 그 어떤 row의 id와도 일치하지 않는 UUID로 조회해 empty가 반환되는지 검증한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -1583,28 +1541,24 @@ class ReadStatusRepositoryTest {
 
         // 서로 다른 ReadStatus row를 만들기 위해 사용자 2명을 저장한다.
         // 조회 대상이 아닌 기존 row가 여러 개 있어도, id가 일치하지 않으면 findById(...)는 empty를 반환해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 findById(...)의 empty 결과 자체에는 직접 필요하지 않다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하기 위해 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // 서로 다른 채널 2개를 저장해, 기존 ReadStatus row들이 서로 다른 user/channel 조합을 갖도록 한다.
         // 이렇게 하면 notSavedReadStatusId가 기존 어떤 row와도 매칭되지 않는다는 점이 더 명확해진다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // DB에 실제로 존재하는 ReadStatus 2건을 저장한다.
         // 이 row들은 notSavedReadStatusId 조회 시 반환되면 안 되는 대조군이다.
-        ReadStatus savedReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt))
-        );
+        ReadStatus savedReadStatus = saveReadStatus(savedTargetChannel, savedUser, readAt);
 
-        ReadStatus savedOtherReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherReadAt))
-        );
+        ReadStatus savedOtherReadStatus = saveReadStatus(savedOtherChannel, savedOtherUser, otherReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1670,13 +1624,13 @@ class ReadStatusRepositoryTest {
         // "ReadStatus가 존재해서 true"인지 구분할 수 없다.
         // 그래서 savedUser에는 ReadStatus를 만들고, savedOtherUser에는 별도 ReadStatus를 만들어 대조군으로 둔다.
         UserCreateCommand userCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -1686,31 +1640,27 @@ class ReadStatusRepositoryTest {
 
         // 조회 대상 사용자와 대조군 사용자를 저장한다.
         // existsByUser_Id(savedUserId)는 savedUser에 연결된 ReadStatus 존재 여부만 확인해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 existsByUser_Id(...) 조건에는 직접 쓰이지 않는다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하고,
         // ReadStatus 사전 조회 시 EntityGraph가 user.userStatus를 함께 조회해도 문제가 없도록 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // 서로 다른 채널을 저장해 두 사용자 각각의 ReadStatus가 서로 다른 row임을 명확히 한다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // 조회 대상 사용자(savedUser)에 연결된 ReadStatus다.
         // existsByUser_Id(savedUserId)가 true를 반환해야 하는 직접 근거가 되는 row다.
-        ReadStatus savedReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt))
-        );
+        ReadStatus savedReadStatus = saveReadStatus(savedTargetChannel, savedUser, readAt);
 
         // 대조군 사용자(savedOtherUser)에도 ReadStatus를 저장한다.
         // 이 row가 있어야 existsByUser_Id(...)가 단순히 read_statuses 테이블에 row가 있으면 true를 반환하는 것이 아니라,
         // 전달한 userId와 매칭되는 row를 기준으로 판단하는지 함께 확인할 수 있다.
-        ReadStatus savedOtherReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherReadAt))
-        );
+        ReadStatus savedOtherReadStatus = saveReadStatus(savedOtherChannel, savedOtherUser, otherReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1784,18 +1734,18 @@ class ReadStatusRepositoryTest {
         // "사용자 row는 존재하지만 read_statuses row가 없는 사용자"를 조회 대상으로 둔다.
         // 그래야 existsByUser_Id(...)가 User 존재 여부가 아니라 ReadStatus.user_id 존재 여부를 기준으로 판단하는지 확인할 수 있다.
         UserCreateCommand userWithReadStatusCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
-        UserCreateCommand userWithoutReadStatusCreateCommand = new UserCreateCommand(
+        UserCreateCommand userWithoutReadStatusCreateCommand = userCreateCommand(
                 "userWithoutReadStatus",
                 "userWithoutReadStatusPassword",
                 "userWithoutReadStatus@gmail.com"
         );
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -1806,34 +1756,28 @@ class ReadStatusRepositoryTest {
         // ReadStatus를 가진 사용자 2명과, ReadStatus가 없는 조회 대상 사용자 1명을 저장한다.
         // 조회 대상 사용자도 users 테이블에는 실제로 존재해야 false 결과가 "사용자 부재"가 아니라
         // "읽음 상태 부재" 때문이라는 점을 검증할 수 있다.
-        User savedUser = userRepository.saveAndFlush(new User(userWithReadStatusCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
-        User savedUserWithoutReadStatus = userRepository.saveAndFlush(new User(userWithoutReadStatusCreateCommand, null));
+        User savedUser = saveUser(userWithReadStatusCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
+        User savedUserWithoutReadStatus = saveUser(userWithoutReadStatusCreateCommand);
 
         // UserStatus는 existsByUser_Id(...) 조건에는 직접 쓰이지 않는다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하고,
         // findByUserId(...) 사전 조회 시 EntityGraph가 user.userStatus를 함께 조회해도 문제가 없도록 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
-        UserStatus savedUserWithoutReadStatusStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedUserWithoutReadStatus, userStatusCreateCommand())
-        );
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
+        UserStatus savedUserWithoutReadStatusStatus = saveUserStatus(savedUserWithoutReadStatus);
 
         // ReadStatus를 저장할 서로 다른 채널 2개를 준비한다.
         // 조회 대상 사용자(savedUserWithoutReadStatus)에는 어떤 채널의 ReadStatus도 연결하지 않는다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // savedUser와 savedOtherUser에는 ReadStatus를 각각 1건씩 저장한다.
         // 이 row들은 DB에 ReadStatus가 실제로 존재하는 상황에서도,
         // 조회 대상 userId와 매칭되는 row가 없으면 false를 반환해야 한다는 대조군이다.
-        ReadStatus savedReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt))
-        );
+        ReadStatus savedReadStatus = saveReadStatus(savedTargetChannel, savedUser, readAt);
 
-        ReadStatus savedOtherReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), otherReadAt))
-        );
+        ReadStatus savedOtherReadStatus = saveReadStatus(savedOtherChannel, savedOtherUser, otherReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -1917,14 +1861,14 @@ class ReadStatusRepositoryTest {
         // 대조군 사용자(savedOtherUser)에게는 targetChannel의 ReadStatus 1건을 만들어 둔다.
         // 이렇게 하면 deleteByUser_Id(...)가 user_id 조건으로만 삭제되는지 확인할 수 있다.
         UserCreateCommand userWithReadStatusCreateCommand = userCreateCommand();
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
+        UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
                 "otherPassword",
                 "other@gmail.com"
         );
 
         ChannelCreatePublicCommand targetChannelCreateCommand = channelCreatePublicCommand();
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelCreatePublicCommand otherChannelCreateCommand = channelCreatePublicCommand(
                 "otherChannel",
                 "otherChannelDescription",
                 ChannelType.PUBLIC
@@ -1935,35 +1879,29 @@ class ReadStatusRepositoryTest {
 
         // 삭제 대상 사용자와 대조군 사용자를 저장한다.
         // deleteByUser_Id(savedUserId)는 savedUser의 ReadStatus만 삭제해야 한다.
-        User savedUser = userRepository.saveAndFlush(new User(userWithReadStatusCreateCommand, null));
-        User savedOtherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User savedUser = saveUser(userWithReadStatusCreateCommand);
+        User savedOtherUser = saveUser(otherUserCreateCommand);
 
         // UserStatus는 deleteByUser_Id(...)의 삭제 조건에는 직접 쓰이지 않는다.
         // 다만 실제 사용자 생성 흐름과 유사한 fixture를 유지하기 위해 실제 row로 구성한다.
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
-        UserStatus savedOtherUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedOtherUser, userStatusCreateCommand()));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+        UserStatus savedOtherUserStatus = saveUserStatus(savedOtherUser);
 
         // 삭제 대상 사용자의 ReadStatus를 여러 채널에 만들기 위해 채널 2개를 저장한다.
         // 대조군 사용자도 targetChannel에 ReadStatus를 갖게 해서, 같은 channel_id라도 user_id가 다르면 삭제되지 않아야 함을 확인한다.
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
+        Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
         // 삭제 대상 사용자(savedUser)의 첫 번째 ReadStatus다.
-        ReadStatus savedTargetReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), readAt))
-        );
+        ReadStatus savedTargetReadStatus = saveReadStatus(savedTargetChannel, savedUser, readAt);
 
         // 삭제 대상 사용자(savedUser)의 두 번째 ReadStatus다.
         // 한 건만 저장하면 delete가 한 row만 지워도 테스트가 통과하므로, 복수 row 삭제를 확인하기 위해 추가한다.
-        ReadStatus savedOtherChannelReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedOtherChannel, savedUser, new ReadStatusCreateCommand(savedUser.getId(), secondReadAt))
-        );
+        ReadStatus savedOtherChannelReadStatus = saveReadStatus(savedOtherChannel, savedUser, secondReadAt);
 
         // 대조군 사용자(savedOtherUser)의 ReadStatus다.
         // targetChannel에 함께 존재하지만 user_id가 다르므로 deleteByUser_Id(savedUserId) 이후에도 남아 있어야 한다.
-        ReadStatus savedRemainingReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(savedTargetChannel, savedOtherUser, new ReadStatusCreateCommand(savedOtherUser.getId(), remainingReadAt))
-        );
+        ReadStatus savedRemainingReadStatus = saveReadStatus(savedTargetChannel, savedOtherUser, remainingReadAt);
 
         UUID savedUserId = savedUser.getId();
         UUID savedOtherUserId = savedOtherUser.getId();
@@ -2058,11 +1996,15 @@ class ReadStatusRepositoryTest {
     }
 
     private UserCreateCommand userCreateCommand() {
-        return new UserCreateCommand(
+        return userCreateCommand(
                 "testUser",
                 "testPassword",
                 "test@gmail.com"
         );
+    }
+
+    private UserCreateCommand userCreateCommand(String username, String password, String email) {
+        return new UserCreateCommand(username, password, email);
     }
 
     private UserStatusCreateCommand userStatusCreateCommand() {
@@ -2070,10 +2012,51 @@ class ReadStatusRepositoryTest {
     }
 
     private ChannelCreatePublicCommand channelCreatePublicCommand() {
-        return new ChannelCreatePublicCommand(
+        return channelCreatePublicCommand(
                 "testChannel",
                 "testChannelDescription",
                 ChannelType.PUBLIC
+        );
+    }
+
+    private ChannelCreatePublicCommand channelCreatePublicCommand(
+            String channelName,
+            String channelDescription
+    ) {
+        return channelCreatePublicCommand(channelName, channelDescription, ChannelType.PUBLIC);
+    }
+
+    private ChannelCreatePublicCommand channelCreatePublicCommand(
+            String channelName,
+            String channelDescription,
+            ChannelType channelType
+    ) {
+        return new ChannelCreatePublicCommand(channelName, channelDescription, channelType);
+    }
+
+    private User saveUser(UserCreateCommand command) {
+        return userRepository.saveAndFlush(new User(command, null));
+    }
+
+    private User saveUserWithProfile(UserCreateCommand command, String originalFileName) {
+        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
+                new BinaryContent(originalFileName, "originFileContent", 1_000L)
+        );
+
+        return userRepository.saveAndFlush(new User(command, savedProfile));
+    }
+
+    private UserStatus saveUserStatus(User user) {
+        return userStatusRepository.saveAndFlush(new UserStatus(user, userStatusCreateCommand()));
+    }
+
+    private Channel saveChannel(ChannelCreatePublicCommand command) {
+        return channelRepository.saveAndFlush(new Channel(command));
+    }
+
+    private ReadStatus saveReadStatus(Channel channel, User user, Instant readAt) {
+        return readStatusRepository.saveAndFlush(
+                new ReadStatus(channel, user, new ReadStatusCreateCommand(user.getId(), readAt))
         );
     }
 

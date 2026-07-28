@@ -56,63 +56,32 @@ class ChannelRepositoryTest {
         // findVisibleChannels(...)의 가시성 규칙은 두 가지다.
         // 1. PUBLIC 채널은 ReadStatus 참여 여부와 관계없이 반환한다.
         // 2. PRIVATE 채널은 해당 userId의 ReadStatus가 있는, 즉 참여 중인 채널만 반환한다.
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
-                "otherUser",
-                "otherUserPassword",
-                "otherUserEmail@gmail.com"
-        );
-
         // 조회 대상 사용자와 비교 대상 사용자를 모두 실제 DB에 저장한다.
         // 비교 대상 사용자는 "다른 사용자만 참여한 PRIVATE 채널"을 만들기 위한 데이터다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User otherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User user = saveUser("testUser");
+        User otherUser = saveUser("otherUser");
 
         // PUBLIC 채널은 ReadStatus 없이도 조회되어야 한다.
         // 이 구성이 있어야 publicType 조건(c.type = PUBLIC)이 실제로 적용되는지 확인할 수 있다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         // 조회 대상 사용자가 참여한 PRIVATE 채널이다.
         // findVisibleChannels(...)는 exists(ReadStatus) 조건으로 이 채널을 포함해야 한다.
-        ChannelCreatePrivateCommand createParticipatingPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(user.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel participatingPrivateChannel = channelRepository.saveAndFlush(new Channel(createParticipatingPrivateCommand));
+        PrivateChannelFixture participatingPrivateChannelFixture = savePrivateChannelFor(user);
+        ChannelCreatePrivateCommand createParticipatingPrivateCommand = participatingPrivateChannelFixture.command();
+        Channel participatingPrivateChannel = participatingPrivateChannelFixture.channel();
 
         // 다른 사용자만 참여한 PRIVATE 채널이다.
         // 이 채널이 결과에 포함되면 userId 기반 exists 조건이 제대로 동작하지 않는 것이다.
-        ChannelCreatePrivateCommand createOtherPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(otherUser.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel otherPrivateChannel = channelRepository.saveAndFlush(new Channel(createOtherPrivateCommand));
+        PrivateChannelFixture otherPrivateChannelFixture = savePrivateChannelFor(otherUser);
+        Channel otherPrivateChannel = otherPrivateChannelFixture.channel();
 
         // PRIVATE 채널 참여 여부는 ReadStatus row로 표현된다.
         // PUBLIC 채널에는 일부러 ReadStatus를 만들지 않아도 조회되는지 확인한다.
-        ReadStatus participatingPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        participatingPrivateChannel,
-                        user,
-                        new ReadStatusCreateCommand(user.getId(), Instant.now())
-                )
-        );
-        ReadStatus otherPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        otherPrivateChannel,
-                        otherUser,
-                        new ReadStatusCreateCommand(otherUser.getId(), Instant.now())
-                )
-        );
+        ReadStatus participatingPrivateReadStatus = joinChannel(participatingPrivateChannel, user);
+        ReadStatus otherPrivateReadStatus = joinChannel(otherPrivateChannel, otherUser);
 
         UUID userId = user.getId();
         UUID otherUserId = otherUser.getId();
@@ -192,50 +161,27 @@ class ChannelRepositoryTest {
     @DisplayName("사용자별 채널 목록 조회 성공 - 참여하지 않은 비공개 채널 제외")
     void findVisibleChannels_excludesPrivateChannelsWithoutReadStatus_whenUserIsNotParticipant() {
 
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
-                "otherUser",
-                "otherUserPassword",
-                "otherUserEmail@gmail.com"
-        );
-
         // user는 PRIVATE 채널에 참여한 사용자다.
         // otherUser는 이번 조회 대상 사용자이며, PRIVATE 채널에 참여하지 않는다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User otherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User user = saveUser("testUser");
+        User otherUser = saveUser("otherUser");
 
         // PUBLIC 채널은 조회 대상 사용자의 참여 여부와 관계없이 반환되어야 한다.
         // 이 채널까지 제외되면 publicType 조건(c.type = PUBLIC)이 깨진 것이다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         // PRIVATE 채널은 실제로 존재하지만 조회 대상 사용자가 참여하지 않은 채널이다.
         // ChannelCreatePrivateCommand의 participantIds는 command 값일 뿐이고,
         // 현재 쿼리에서 실제 참여 여부는 ReadStatus row 존재 여부로 판단한다.
-        ChannelCreatePrivateCommand createParticipatingPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(user.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel participatingPrivateChannel = channelRepository.saveAndFlush(new Channel(createParticipatingPrivateCommand));
+        PrivateChannelFixture participatingPrivateChannelFixture = savePrivateChannelFor(user);
+        Channel participatingPrivateChannel = participatingPrivateChannelFixture.channel();
 
         // PRIVATE 채널 참여 상태를 user에게만 만든다.
         // otherUser에게는 같은 채널의 ReadStatus를 만들지 않는다.
         // 따라서 otherUser 기준 findVisibleChannels(...) 결과에는 이 PRIVATE 채널이 포함되면 안 된다.
-        ReadStatus participatingPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        participatingPrivateChannel,
-                        user,
-                        new ReadStatusCreateCommand(user.getId(), Instant.now())
-                )
-        );
+        ReadStatus participatingPrivateReadStatus = joinChannel(participatingPrivateChannel, user);
 
         UUID userId = user.getId();
         UUID otherUserId = otherUser.getId();
@@ -318,59 +264,33 @@ class ChannelRepositoryTest {
         // 1. PUBLIC 채널: 조회 대상 사용자의 참여 여부와 관계없이 항상 반환되어야 한다.
         // 2. 다른 사용자가 ReadStatus로 참여 중인 PRIVATE 채널: 조회 대상 사용자에게는 보이면 안 된다.
         // 3. 조회 대상 사용자 id가 command에 들어간 PRIVATE 채널: ReadStatus가 없으므로 보이면 안 된다.
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-        UserCreateCommand otherUserCreateCommand = new UserCreateCommand(
-                "otherUser",
-                "otherUserPassword",
-                "otherUserEmail@gmail.com"
-        );
-
         // user는 PRIVATE 채널에 실제로 참여한 사용자다.
         // otherUser는 이번 조회 대상 사용자이며, 어떤 ReadStatus도 갖지 않도록 구성한다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
-        User otherUser = userRepository.saveAndFlush(new User(otherUserCreateCommand, null));
+        User user = saveUser("testUser");
+        User otherUser = saveUser("otherUser");
 
         // PUBLIC 채널은 ReadStatus 없이도 결과에 포함되어야 한다.
         // 이 채널이 빠지면 publicType 조건(c.type = PUBLIC)이 깨진 것이다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         // user가 실제로 참여한 PRIVATE 채널이다.
         // 아래에서 user의 ReadStatus를 만들기 때문에 user 기준 조회에는 보이지만,
         // ReadStatus가 없는 otherUser 기준 조회에는 보이면 안 된다.
-        ChannelCreatePrivateCommand createParticipatingPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(user.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel participatingPrivateChannel = channelRepository.saveAndFlush(new Channel(createParticipatingPrivateCommand));
+        PrivateChannelFixture participatingPrivateChannelFixture = savePrivateChannelFor(user);
+        Channel participatingPrivateChannel = participatingPrivateChannelFixture.channel();
 
         // otherUser id가 command에 포함된 PRIVATE 채널이다.
         // 현재 Channel 엔티티 생성자는 participantIds를 별도 참여 row로 저장하지 않는다.
         // findVisibleChannels(...)도 command 값이 아니라 ReadStatus row를 조회하므로,
         // 이 채널에 대한 otherUser의 ReadStatus를 만들지 않으면 결과에서 제외되어야 한다.
-        ChannelCreatePrivateCommand createOtherPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(otherUser.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel otherPrivateChannel = channelRepository.saveAndFlush(new Channel(createOtherPrivateCommand));
+        PrivateChannelFixture otherPrivateChannelFixture = savePrivateChannelFor(otherUser);
+        Channel otherPrivateChannel = otherPrivateChannelFixture.channel();
 
         // PRIVATE 채널 참여 여부를 user에게만 부여한다.
         // otherUser의 ReadStatus는 일부러 만들지 않는다.
-        ReadStatus participatingPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        participatingPrivateChannel,
-                        user,
-                        new ReadStatusCreateCommand(user.getId(), Instant.now())
-                )
-        );
+        ReadStatus participatingPrivateReadStatus = joinChannel(participatingPrivateChannel, user);
 
         UUID userId = user.getId();
         UUID otherUserId = otherUser.getId();
@@ -456,43 +376,26 @@ class ChannelRepositoryTest {
         // 따라서 한 채널에 메시지 2개를 저장하고, 더 늦게 생성된 메시지의 createdAt이
         // 해당 채널의 lastMessageAt으로 선택되는지 실제 DB 쿼리 결과로 검증한다.
         // Repository 슬라이스 테스트이므로 User, Channel, ReadStatus, Message는 모두 실제 엔티티로 저장한다.
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-
         // 조회 대상 사용자다.
         // 이 사용자가 참여한 PRIVATE 채널도 함께 반환되도록 ReadStatus를 만들 것이다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
+        User user = saveUser("testUser");
 
         // PUBLIC 채널은 참여 여부와 관계없이 visible channel 결과에 포함된다.
         // 메시지는 이 PUBLIC 채널에만 저장해서 lastMessageAt 계산을 명확히 검증한다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         // 조회 대상 사용자가 참여한 PRIVATE 채널이다.
         // 이 채널에는 메시지를 저장하지 않는다.
         // 그래서 같은 조회 결과 안에서 "메시지가 있는 채널은 최신 createdAt", "메시지가 없는 채널은 null"을 함께 확인할 수 있다.
-        ChannelCreatePrivateCommand createParticipatingPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(user.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel participatingPrivateChannel = channelRepository.saveAndFlush(new Channel(createParticipatingPrivateCommand));
+        PrivateChannelFixture participatingPrivateChannelFixture = savePrivateChannelFor(user);
+        ChannelCreatePrivateCommand createParticipatingPrivateCommand = participatingPrivateChannelFixture.command();
+        Channel participatingPrivateChannel = participatingPrivateChannelFixture.channel();
 
         // PRIVATE 채널의 visible 여부는 ReadStatus row 존재 여부로 판단된다.
         // 이 row가 없으면 participatingPrivateChannel은 user 기준 결과에 포함되지 않는다.
-        ReadStatus participatingPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        participatingPrivateChannel,
-                        user,
-                        new ReadStatusCreateCommand(user.getId(), Instant.now())
-                )
-        );
+        ReadStatus participatingPrivateReadStatus = joinChannel(participatingPrivateChannel, user);
 
 
         UUID userId = user.getId();
@@ -519,22 +422,12 @@ class ChannelRepositoryTest {
         // 같은 PUBLIC 채널에 메시지 2개를 순서대로 저장한다.
         // createdAt은 JPA Auditing이 저장 시점에 채우므로, 두 메시지의 생성 시각이 같아지지 않도록 짧게 대기한다.
         // 이 간격이 있어야 max(m.createdAt)이 두 번째 메시지를 선택했다는 검증이 의미를 가진다.
-        MessageCreateCommand firstMessageCreateCommand = new MessageCreateCommand(
-                "messageContent1",
-                userId,
-                publicChannelId
-        );
-        Message firstMessage = messageRepository.saveAndFlush(new Message(user, publicChannel, firstMessageCreateCommand));
+        Message firstMessage = saveMessage(user, publicChannel, "messageContent1");
         Instant firstMessageCreatedAt = firstMessage.getCreatedAt();
 
         Thread.sleep(100);
 
-        MessageCreateCommand latestMessageCreateCommand = new MessageCreateCommand(
-                "messageContent2",
-                userId,
-                publicChannelId
-        );
-        Message latestMessage = messageRepository.saveAndFlush(new Message(user, publicChannel, latestMessageCreateCommand));
+        Message latestMessage = saveMessage(user, publicChannel, "messageContent2");
         Instant latestMessageCreatedAt = latestMessage.getCreatedAt();
 
         // 메시지 두 건이 모두 같은 PUBLIC 채널에 저장되었고, 두 번째 메시지가 실제로 더 늦게 생성되었는지 확인한다.
@@ -623,42 +516,25 @@ class ChannelRepositoryTest {
         //
         // 최신 메시지 선택 로직은 findVisibleChannels_setsLastMessageAtToLatestMessageCreatedAt_whenMessagesExist()
         // 테스트에서 검증하므로, 이 테스트에서는 Message를 하나도 저장하지 않는다.
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-
         // 조회 대상 사용자다.
         // PUBLIC 채널은 참여 여부와 관계없이 보이고, PRIVATE 채널은 이 사용자의 ReadStatus가 있어야 보인다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
+        User user = saveUser("testUser");
 
         // 메시지가 없는 PUBLIC 채널이다.
         // left join이 inner join처럼 동작하면 이 채널은 결과에서 누락되므로, null 집계 검증에 필요하다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         // 메시지가 없는 PRIVATE 채널이다.
         // 조회 대상 사용자의 visible 목록에 포함시키기 위해 아래에서 ReadStatus를 별도로 저장한다.
-        ChannelCreatePrivateCommand createParticipatingPrivateCommand = new ChannelCreatePrivateCommand(
-                List.of(user.getId()),
-                ChannelType.PRIVATE
-        );
-        Channel participatingPrivateChannel = channelRepository.saveAndFlush(new Channel(createParticipatingPrivateCommand));
+        PrivateChannelFixture participatingPrivateChannelFixture = savePrivateChannelFor(user);
+        ChannelCreatePrivateCommand createParticipatingPrivateCommand = participatingPrivateChannelFixture.command();
+        Channel participatingPrivateChannel = participatingPrivateChannelFixture.channel();
 
         // PRIVATE 채널 참여 여부는 ReadStatus row로 판단된다.
         // Message가 없어도 ReadStatus가 있으면 visible channel 목록에는 포함되어야 한다.
-        ReadStatus participatingPrivateReadStatus = readStatusRepository.saveAndFlush(
-                new ReadStatus(
-                        participatingPrivateChannel,
-                        user,
-                        new ReadStatusCreateCommand(user.getId(), Instant.now())
-                )
-        );
+        ReadStatus participatingPrivateReadStatus = joinChannel(participatingPrivateChannel, user);
 
         UUID userId = user.getId();
         UUID publicChannelId = publicChannel.getId();
@@ -741,24 +617,15 @@ class ChannelRepositoryTest {
         //
         // 따라서 같은 채널에 메시지 2개를 저장한 뒤, 더 늦게 생성된 메시지 시간이
         // lastMessageAt으로 계산되는지 실제 DB 조회 결과로 검증한다.
-        UserCreateCommand userCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testUserPassword",
-                "testUserEmail@gmail.com"
-        );
-
         // 메시지를 저장하려면 작성자 User가 필요하다.
         // findByDetail(...) 자체는 사용자 가시성 조건을 보지 않지만, Message 엔티티의 author를 채우기 위한 데이터다.
-        User user = userRepository.saveAndFlush(new User(userCreateCommand, null));
+        User user = saveUser("testUser");
 
         // 상세 조회 대상 채널이다.
         // PUBLIC/PRIVATE 여부와 관계없이 findByDetail(...)은 channelId가 일치하는 채널만 조회한다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         UUID userId = user.getId();
         UUID publicChannelId = publicChannel.getId();
@@ -769,22 +636,12 @@ class ChannelRepositoryTest {
         // 같은 채널에 메시지를 2개 저장한다.
         // createdAt은 JPA Auditing이 저장 시점에 채우므로, 두 메시지의 생성 시각이 명확히 달라지도록 짧게 대기한다.
         // 이 데이터가 있어야 max(m.createdAt)이 최신 메시지를 선택했다는 점을 검증할 수 있다.
-        MessageCreateCommand firstMessageCreateCommand = new MessageCreateCommand(
-                "messageContent1",
-                userId,
-                publicChannelId
-        );
-        Message firstMessage = messageRepository.saveAndFlush(new Message(user, publicChannel, firstMessageCreateCommand));
+        Message firstMessage = saveMessage(user, publicChannel, "messageContent1");
         Instant firstMessageCreatedAt = firstMessage.getCreatedAt();
 
         Thread.sleep(100);
 
-        MessageCreateCommand latestMessageCreateCommand = new MessageCreateCommand(
-                "messageContent2",
-                userId,
-                publicChannelId
-        );
-        Message latestMessage = messageRepository.saveAndFlush(new Message(user, publicChannel, latestMessageCreateCommand));
+        Message latestMessage = saveMessage(user, publicChannel, "messageContent2");
         Instant latestMessageCreatedAt = latestMessage.getCreatedAt();
 
         // 사전 조건을 확인한다.
@@ -839,12 +696,9 @@ class ChannelRepositoryTest {
         //
         // findByDetail(...)은 channelId만 조건으로 사용한다.
         // 메시지를 만들지 않는 이 케이스에서는 User나 ReadStatus가 필요하지 않다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        ChannelCreatePublicCommand createPublicCommand = publicChannelFixture.command();
+        Channel publicChannel = publicChannelFixture.channel();
 
         UUID publicChannelId = publicChannel.getId();
 
@@ -886,12 +740,8 @@ class ChannelRepositoryTest {
         //
         // 다만 테이블이 완전히 비어 있으면 "어떤 id로 조회해도 empty"라는 너무 약한 상황이 된다.
         // 그래서 다른 채널을 하나 저장해 둔 상태에서, 그 id와 다른 missingChannelId로 조회한다.
-        ChannelCreatePublicCommand createPublicCommand = new ChannelCreatePublicCommand(
-                "publicChannel",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
-        );
-        Channel publicChannel = channelRepository.saveAndFlush(new Channel(createPublicCommand));
+        PublicChannelFixture publicChannelFixture = savePublicChannel();
+        Channel publicChannel = publicChannelFixture.channel();
 
         UUID existingChannelId = publicChannel.getId();
         UUID missingChannelId = UUID.randomUUID();
@@ -916,5 +766,70 @@ class ChannelRepositoryTest {
         // channelId가 일치하는 Channel row가 없으므로 projection을 만들 수 없고 Optional.empty가 반환되어야 한다.
         // DB에 다른 채널이 존재하더라도 다른 id의 채널이 잘못 반환되면 안 된다.
         assertThat(channelSummary).isEmpty();
+    }
+
+    // ChannelRepository는 JPQL projection, exists subquery, left join 집계를 실제 DB에서 검증하는 테스트 대상이다.
+    // 따라서 User를 mock으로 대체하지 않고 실제 row로 저장해 ReadStatus와 Message의 FK 조건이 JPA 매핑을 통과하게 한다.
+    private User saveUser(String username) {
+        UserCreateCommand command = new UserCreateCommand(
+                username,
+                username + "Password",
+                username + "Email@gmail.com"
+        );
+
+        return userRepository.saveAndFlush(new User(command, null));
+    }
+
+    // PUBLIC 채널은 findVisibleChannels(...)에서 ReadStatus 없이도 항상 보이는 대상이다.
+    // command와 entity를 함께 반환해 given 절은 짧게 유지하고, then 절에서는 projection의 name/description을 원본 command와 비교한다.
+    private PublicChannelFixture savePublicChannel() {
+        ChannelCreatePublicCommand command = new ChannelCreatePublicCommand(
+                "publicChannel",
+                "publicChannelDescription",
+                ChannelType.PUBLIC
+        );
+
+        return new PublicChannelFixture(channelRepository.saveAndFlush(new Channel(command)), command);
+    }
+
+    // PRIVATE 채널의 command.participantIds는 생성 입력값이고, visible 여부의 실제 기준은 ReadStatus row다.
+    // 그래서 private channel 생성과 참여 row 생성을 분리해 테스트마다 "ReadStatus를 만들었는지"가 드러나게 한다.
+    private PrivateChannelFixture savePrivateChannelFor(User participant) {
+        ChannelCreatePrivateCommand command = new ChannelCreatePrivateCommand(
+                List.of(participant.getId()),
+                ChannelType.PRIVATE
+        );
+
+        return new PrivateChannelFixture(channelRepository.saveAndFlush(new Channel(command)), command);
+    }
+
+    // findVisibleChannels(...)의 PRIVATE 참여 조건은 read_statuses 테이블에 해당 user/channel 조합이 존재하는지다.
+    // 참여가 필요한 테스트에서만 이 헬퍼를 호출해, 참여 여부 fixture를 명시적으로 만든다.
+    private ReadStatus joinChannel(Channel channel, User user) {
+        return readStatusRepository.saveAndFlush(
+                new ReadStatus(
+                        channel,
+                        user,
+                        new ReadStatusCreateCommand(user.getId(), Instant.now())
+                )
+        );
+    }
+
+    // lastMessageAt 검증은 Message.createdAt을 DB에서 max(...)로 집계하는지 확인한다.
+    // 실제 Message row를 저장해야 left join과 집계가 Repository 쿼리 경로 그대로 검증된다.
+    private Message saveMessage(User author, Channel channel, String content) {
+        MessageCreateCommand command = new MessageCreateCommand(
+                content,
+                author.getId(),
+                channel.getId()
+        );
+
+        return messageRepository.saveAndFlush(new Message(author, channel, command));
+    }
+
+    private record PublicChannelFixture(Channel channel, ChannelCreatePublicCommand command) {
+    }
+
+    private record PrivateChannelFixture(Channel channel, ChannelCreatePrivateCommand command) {
     }
 }

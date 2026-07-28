@@ -44,13 +44,11 @@ class BinaryContentRepositoryTest {
                 createBinaryContent("profile.jpg", "image/jpeg", 2_000L),
                 createBinaryContent("manual.pdf", "application/pdf", 3_000L)
         );
-        BinaryContent binaryContentToExclude = createBinaryContent("excluded.txt", "text/plain", 4_000L);
-
         // saveAllAndFlush(...)로 insert SQL을 즉시 DB에 반영한다.
         // saveAll(...)만 사용하면 flush 시점이 테스트 흐름 밖으로 미뤄질 수 있어,
         // Repository 쿼리가 실제 DB row를 대상으로 동작한다는 의도가 덜 분명해진다.
         List<BinaryContent> savedBinaryContents = binaryContentRepository.saveAllAndFlush(binaryContentsToFind);
-        BinaryContent savedBinaryContentToExclude = binaryContentRepository.saveAndFlush(binaryContentToExclude);
+        BinaryContent savedBinaryContentToExclude = saveBinaryContent("excluded.txt", "text/plain", 4_000L);
 
         // 조회 조건으로 사용할 ID 목록은 저장된 조회 대상 파일에서만 만든다.
         // 제외 대상 파일의 ID는 DB에 존재하지만 이 목록에는 포함하지 않는다.
@@ -119,12 +117,10 @@ class BinaryContentRepositoryTest {
                 createBinaryContent("profile.jpg", "image/jpeg", 2_000L),
                 createBinaryContent("manual.pdf", "application/pdf", 3_000L)
         );
-        BinaryContent savedExtraCandidate = createBinaryContent("excluded.txt", "text/plain", 4_000L);
-
         // saveAllAndFlush(...)와 saveAndFlush(...)로 insert SQL을 즉시 DB에 반영한다.
         // 이후 조회가 영속성 컨텍스트의 객체가 아니라 실제 DB row를 기준으로 동작한다는 의도를 명확히 한다.
         List<BinaryContent> savedBinaryContents = binaryContentRepository.saveAllAndFlush(savedTargetCandidates);
-        BinaryContent savedBinaryContentToExclude = binaryContentRepository.saveAndFlush(savedExtraCandidate);
+        BinaryContent savedBinaryContentToExclude = saveBinaryContent("excluded.txt", "text/plain", 4_000L);
 
         List<UUID> savedBinaryContentIds = savedBinaryContents.stream()
                 .map(BinaryContent::getId)
@@ -171,12 +167,10 @@ class BinaryContentRepositoryTest {
                 createBinaryContent("profile.jpg", "image/jpeg", 2_000L),
                 createBinaryContent("manual.pdf", "application/pdf", 3_000L)
         );
-        BinaryContent binaryContentToExclude = createBinaryContent("excluded.txt", "text/plain", 4_000L);
-
         // saveAllAndFlush(...)로 삭제 대상 파일들을 먼저 DB에 반영한다.
         // 제외 대상도 별도로 flush해 두어, 삭제 전후에 실제 DB row로 비교할 수 있게 한다.
         List<BinaryContent> savedBinaryContents = binaryContentRepository.saveAllAndFlush(binaryContentsToDelete);
-        BinaryContent savedBinaryContentToExclude = binaryContentRepository.saveAndFlush(binaryContentToExclude);
+        BinaryContent savedBinaryContentToExclude = saveBinaryContent("excluded.txt", "text/plain", 4_000L);
 
         // 삭제 조건으로 사용할 ID 목록은 삭제 대상 파일에서만 만든다.
         // 제외 대상 파일의 ID는 DB에 존재하지만 삭제 조건 목록에는 포함하지 않는다.
@@ -244,5 +238,9 @@ class BinaryContentRepositoryTest {
 
     private BinaryContent createBinaryContent(String originalFileName, String contentType, Long size) {
         return new BinaryContent(originalFileName, contentType, size);
+    }
+
+    private BinaryContent saveBinaryContent(String originalFileName, String contentType, Long size) {
+        return binaryContentRepository.saveAndFlush(createBinaryContent(originalFileName, contentType, size));
     }
 }

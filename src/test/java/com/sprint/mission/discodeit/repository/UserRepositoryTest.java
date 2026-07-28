@@ -50,11 +50,10 @@ class UserRepositoryTest {
         // 따라서 UserRepository는 실제 Spring Data JPA Repository로 동작하고,
         // 아래 saveAndFlush(...)는 테스트 DB에 실제 insert SQL을 실행한다.
         UserCreateCommand command = userCreateCommand();
-        User user = new User(command, null);
 
         // existsByUsername(...)가 영속성 컨텍스트의 객체가 아니라 DB에 저장된 row를 기준으로 동작하는지 보려면
         // save(...)만 두는 것보다 flush까지 명시하는 편이 테스트 의도가 분명하다.
-        User savedUser = userRepository.saveAndFlush(user);
+        User savedUser = saveUser(command);
 
         // 조회 조건으로 사용할 username은 저장한 command에서 꺼내 사용한다.
         // 문자열을 다시 직접 쓰면 저장 데이터와 조회 조건이 우연히 달라져도 알아차리기 어렵다.
@@ -81,7 +80,7 @@ class UserRepositoryTest {
         // 그래서 다른 username을 가진 사용자를 하나 저장해 두고,
         // 조회 조건과 일치하는 username만 없다는 상황을 만든다.
         UserCreateCommand command = userCreateCommand();
-        userRepository.saveAndFlush(new User(command, null));
+        saveUser(command);
 
         String username = "missingUsername";
 
@@ -102,12 +101,11 @@ class UserRepositoryTest {
         // users 테이블의 email 컬럼을 기준으로 존재 여부를 올바르게 판단하는지 검증한다.
         // Repository 테스트이므로 UserRepository와 테스트 DB를 실제로 사용하고, User 엔티티도 실제 객체로 만든다.
         UserCreateCommand command = userCreateCommand();
-        User user = new User(command, null);
 
         // saveAndFlush(...)로 insert SQL을 즉시 DB에 반영한다.
         // save(...)만 호출하면 영속성 컨텍스트에만 머무는 상태처럼 보일 수 있으므로,
         // Repository의 실제 DB 조회 결과를 확인한다는 의도를 flush로 명확히 한다.
-        User savedUser = userRepository.saveAndFlush(user);
+        User savedUser = saveUser(command);
 
         // when
         // 저장한 사용자와 동일한 email을 조회 조건으로 사용한다.
@@ -130,7 +128,7 @@ class UserRepositoryTest {
         // 그래서 다른 email을 가진 사용자를 먼저 저장해 두고,
         // 조회하려는 email만 존재하지 않는 상황을 만든다.
         UserCreateCommand command = userCreateCommand();
-        User savedUser = userRepository.saveAndFlush(new User(command, null));
+        User savedUser = saveUser(command);
 
         // 저장된 email과 명확히 다른 값을 조회 조건으로 사용한다.
         // 랜덤 prefix를 붙이는 방식보다 고정된 값이 실패 원인을 재현하고 읽기 쉽다.
@@ -157,18 +155,14 @@ class UserRepositoryTest {
         // 따라서 이 테스트는 단순히 User 목록이 반환되는지만 보는 것이 아니라,
         // User와 연관된 UserStatus, profile(BinaryContent)이 함께 로딩되는지까지 검증한다.
         UserCreateCommand command = userCreateCommand();
-        BinaryContent profile = new BinaryContent("profile.png", "image/png", 1024L);
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(profile);
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        User user = new User(command, savedProfile);
-        User savedUser = userRepository.saveAndFlush(user);
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
+        UserFixture fixture = saveUserWithProfileAndStatus(command);
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedProfileId = fixture.profile().getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
 
         // 영속성 컨텍스트를 비워야 findAll()이 1차 캐시에 남아 있는 엔티티를 그대로 반환하지 않는다.
         // 이 clear() 덕분에 아래 조회는 실제 DB에서 다시 읽어 오는 흐름이 된다.
@@ -218,18 +212,14 @@ class UserRepositoryTest {
         // 따라서 이 테스트는 단순히 id로 User 단건을 찾는지만 보는 것이 아니라,
         // 단건 조회 시 User와 연관된 UserStatus, profile(BinaryContent)이 함께 로딩되는지까지 검증한다.
         UserCreateCommand command = userCreateCommand();
-        BinaryContent profile = new BinaryContent("profile.png", "image/png", 1024L);
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(profile);
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        User user = new User(command, savedProfile);
-        User savedUser = userRepository.saveAndFlush(user);
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
+        UserFixture fixture = saveUserWithProfileAndStatus(command);
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
+        UUID savedProfileId = fixture.profile().getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
 
         // 영속성 컨텍스트를 비워야 findById(...)가 1차 캐시에 남아 있는 savedUser를 그대로 반환하지 않는다.
         // 이 clear() 덕분에 아래 조회는 실제 DB에서 다시 읽어 오는 흐름이 된다.
@@ -274,7 +264,7 @@ class UserRepositoryTest {
         // findById(...)가 "존재하지 않는 id"에 대해 Optional.empty를 반환하는지 검증한다.
         // 테스트 DB가 완전히 비어 있어서 우연히 empty가 되는 상황과 구분하기 위해
         // 실제 User row를 하나 저장한 뒤, 그 id와 다른 UUID를 조회 대상으로 사용한다.
-        User savedUser = userRepository.saveAndFlush(new User(userCreateCommand(), null));
+        User savedUser = saveUser(userCreateCommand());
         UUID savedUserId = savedUser.getId();
         UUID missingUserId = UUID.randomUUID();
 
@@ -303,17 +293,14 @@ class UserRepositoryTest {
         // 따라서 이 테스트는 사용자명과 비밀번호가 모두 일치하는 User를 찾는지뿐 아니라,
         // 인증 조회 결과에 UserStatus와 profile(BinaryContent)이 함께 로딩되는지도 검증한다.
         UserCreateCommand command = userCreateCommand();
-        BinaryContent profile = new BinaryContent("profile.png", "image/png", 1024L);
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(profile);
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        User savedUser = userRepository.saveAndFlush(new User(command, savedProfile));
-        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(new UserStatus(savedUser, userStatusCreateCommand()));
+        UserFixture fixture = saveUserWithProfileAndStatus(command);
 
-        UUID savedUserId = savedUser.getId();
-        UUID savedUserStatusId = savedUserStatus.getId();
-        UUID savedProfileId = savedProfile.getId();
+        UUID savedUserId = fixture.user().getId();
+        UUID savedUserStatusId = fixture.userStatus().getId();
+        UUID savedProfileId = fixture.profile().getId();
 
         assertThat(savedUserId).isNotNull();
         assertThat(savedUserStatusId).isNotNull();
@@ -363,7 +350,7 @@ class UserRepositoryTest {
         // 결과가 empty인 실패 인증 조회에서는 UserStatus나 profile을 반환받을 수 없다.
         // 따라서 이 테스트에서는 연관관계 로딩이 아니라 username/password 조건 적용이 관심사이므로
         // 불필요한 BinaryContent, UserStatus를 만들지 않고 실제 User row만 저장한다.
-        User savedUser = userRepository.saveAndFlush(new User(command, null));
+        User savedUser = saveUser(command);
         UUID savedUserId = savedUser.getId();
 
         assertThat(savedUserId).isNotNull();
@@ -404,8 +391,30 @@ class UserRepositoryTest {
         return new UserStatusCreateCommand(Instant.now());
     }
 
+    private User saveUser(UserCreateCommand command) {
+        return userRepository.saveAndFlush(new User(command, null));
+    }
+
+    private BinaryContent saveProfile() {
+        return binaryContentRepository.saveAndFlush(new BinaryContent("profile.png", "image/png", 1_024L));
+    }
+
+    private UserStatus saveUserStatus(User user) {
+        return userStatusRepository.saveAndFlush(new UserStatus(user, userStatusCreateCommand()));
+    }
+
+    private UserFixture saveUserWithProfileAndStatus(UserCreateCommand command) {
+        BinaryContent savedProfile = saveProfile();
+        User savedUser = userRepository.saveAndFlush(new User(command, savedProfile));
+        UserStatus savedUserStatus = saveUserStatus(savedUser);
+
+        return new UserFixture(savedUser, savedProfile, savedUserStatus);
+    }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();
+    }
+
+    private record UserFixture(User user, BinaryContent profile, UserStatus userStatus) {
     }
 }

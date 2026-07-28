@@ -58,48 +58,21 @@ class MessageFileRepositoryTest {
         // 단순히 Message row만 저장하면 "메시지가 존재해서 true"인지,
         // "message_files row가 존재해서 true"인지 테스트 의도가 흐려질 수 있다.
         // 그래서 첨부 파일이 있는 targetMessage와, Message row는 있지만 첨부 파일이 없는 messageWithoutFile을 함께 준비한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // 메시지는 author와 channel FK를 가지므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // targetMessage는 첨부 파일을 연결할 조회 대상 메시지다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // messageWithoutFile은 Message row만 존재하는 대조군이다.
         // 이 메시지에 파일을 연결하지 않아야 existsByMessage_Id(...)가 Message 존재 여부가 아니라
         // MessageFile 존재 여부를 기준으로 판단한다는 점을 확인할 수 있다.
-        MessageCreateCommand messageWithoutFileCreateCommand = new MessageCreateCommand(
-                "messageWithoutFile",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithoutFile = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithoutFileCreateCommand)
-        );
+        Message savedMessageWithoutFile = saveMessage(savedAuthor, savedChannel, "messageWithoutFile");
 
         // bulkInsert(...)는 binary_contents에서 fileIds에 해당하는 row를 select해서 message_files에 insert한다.
         // 따라서 MessageFile을 직접 save하지 않고, 실제 BinaryContent row를 만든 뒤 bulkInsert(...)를 호출한다.
-        BinaryContent savedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("testFileName", "image/png", 1_000L)
-        );
+        BinaryContent savedBinaryContent = saveBinaryContent("testFileName", "image/png", 1_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -158,48 +131,21 @@ class MessageFileRepositoryTest {
         // 여기서 검증하려는 상황은 "Message row가 없어서 false"가 아니라,
         // "Message row는 존재하지만 message_files row가 없어서 false"인 경우다.
         // 그래서 첨부 파일이 있는 targetMessage와 첨부 파일이 없는 messageWithoutFile을 함께 저장한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // targetMessage는 첨부 파일을 연결할 대조군 메시지다.
         // 이 row가 있어야 false 결과가 "message_files 테이블이 비어서" 나온 것이 아님을 확인할 수 있다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // messageWithoutFile은 조회 대상 메시지다.
         // Message row는 실제로 존재하지만, 이 메시지에는 MessageFile을 연결하지 않는다.
-        MessageCreateCommand messageWithoutFileCreateCommand = new MessageCreateCommand(
-                "messageWithoutFile",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithoutFile = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithoutFileCreateCommand)
-        );
+        Message savedMessageWithoutFile = saveMessage(savedAuthor, savedChannel, "messageWithoutFile");
 
         // targetMessage에만 연결할 실제 파일 row를 저장한다.
         // existsByMessage_Id(messageWithoutFileId)는 이 파일이 다른 메시지에 연결되어 있어도 false여야 한다.
-        BinaryContent savedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("testFileName", "image/png", 1_000L)
-        );
+        BinaryContent savedBinaryContent = saveBinaryContent("testFileName", "image/png", 1_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -259,57 +205,24 @@ class MessageFileRepositoryTest {
         // 다른 메시지에 연결된 MessageFile은 같은 작성자/채널에 있더라도 삭제되면 안 된다.
         // 따라서 삭제 대상 targetMessage에는 파일 3건을 연결하고,
         // 대조군 otherMessage에는 파일 1건을 연결해 message_id 조건이 정확히 적용되는지 검증한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // targetMessage는 삭제 대상 MessageFile들이 연결될 메시지다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // otherMessage는 삭제 대상이 아닌 대조군 메시지다.
         // 이 메시지에 연결된 MessageFile은 deleteByMessage_Id(targetMessageId) 이후에도 남아 있어야 한다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
-        );
+        Message savedOtherMessage = saveMessage(savedAuthor, savedChannel, "otherMessage");
 
         // targetMessage에 연결할 파일 3건과 otherMessage에 연결할 파일 1건을 저장한다.
         // 파일 id가 모두 달라야 message_files의 unique(message_id, file_id) 제약을 피하면서
         // 삭제 전/후 남는 row를 명확히 구분할 수 있다.
-        BinaryContent savedTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile1", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile2", "image/png", 2_000L)
-        );
-        BinaryContent savedThirdTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile3", "image/png", 3_000L)
-        );
-        BinaryContent savedRemainingBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("remainingFile", "image/png", 4_000L)
-        );
+        BinaryContent savedTargetBinaryContent = saveBinaryContent("targetFile1", "image/png", 1_000L);
+        BinaryContent savedSecondTargetBinaryContent = saveBinaryContent("targetFile2", "image/png", 2_000L);
+        BinaryContent savedThirdTargetBinaryContent = saveBinaryContent("targetFile3", "image/png", 3_000L);
+        BinaryContent savedRemainingBinaryContent = saveBinaryContent("remainingFile", "image/png", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -416,57 +329,24 @@ class MessageFileRepositoryTest {
         // Repository에 선언된 EntityGraph(binaryContent)에 의해 BinaryContent도 함께 로딩되어야 한다.
         // 그래서 targetMessage에는 파일 3건을 연결하고,
         // otherMessage에는 별도 파일 1건을 연결해 message_id 조건과 EntityGraph를 함께 검증한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // targetMessage는 조회 대상 메시지다.
         // findAllByMessage_Id(targetMessageId)는 이 메시지에 연결된 MessageFile만 반환해야 한다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // otherMessage는 대조군 메시지다.
         // 이 메시지에도 MessageFile을 연결해 두어, 조회 결과가 targetMessage로 제한되는지 확인한다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
-        );
+        Message savedOtherMessage = saveMessage(savedAuthor, savedChannel, "otherMessage");
 
         // targetMessage에 연결할 파일 3건과 otherMessage에 연결할 파일 1건을 저장한다.
         // BinaryContent의 필드 값을 서로 다르게 구성하면, EntityGraph로 함께 조회된 실제 파일 엔티티를 더 명확히 검증할 수 있다.
-        BinaryContent savedTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile1", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile2", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdTargetBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("targetFile3", "application/pdf", 3_000L)
-        );
-        BinaryContent savedRemainingBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("remainingFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedTargetBinaryContent = saveBinaryContent("targetFile1", "image/png", 1_000L);
+        BinaryContent savedSecondTargetBinaryContent = saveBinaryContent("targetFile2", "image/jpeg", 2_000L);
+        BinaryContent savedThirdTargetBinaryContent = saveBinaryContent("targetFile3", "application/pdf", 3_000L);
+        BinaryContent savedRemainingBinaryContent = saveBinaryContent("remainingFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -574,54 +454,23 @@ class MessageFileRepositoryTest {
         // 특정 messageId에 연결된 MessageFile이 없으면 빈 목록을 반환해야 한다.
         // 단순히 message_files 테이블을 비워 둔 상태에서 조회하면 "테이블이 비어서 빈 목록"인 경우와 구분하기 어렵다.
         // 그래서 파일이 연결된 messageWithFiles와, Message row는 존재하지만 파일이 없는 messageWithoutFiles를 함께 준비한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // messageWithFiles는 대조군 메시지다.
         // 이 메시지에는 MessageFile을 실제로 연결해 두어, 빈 결과가 전체 테이블 부재 때문이 아님을 확인한다.
-        MessageCreateCommand messageWithFilesCreateCommand = new MessageCreateCommand(
-                "messageWithFiles",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithFiles = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithFilesCreateCommand)
-        );
+        Message savedMessageWithFiles = saveMessage(savedAuthor, savedChannel, "messageWithFiles");
 
         // messageWithoutFiles는 조회 대상 메시지다.
         // Message row는 실제로 존재하지만 이 메시지에는 MessageFile을 하나도 연결하지 않는다.
-        MessageCreateCommand messageWithoutFilesCreateCommand = new MessageCreateCommand(
-                "messageWithoutFiles",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithoutFiles = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithoutFilesCreateCommand)
-        );
+        Message savedMessageWithoutFiles = saveMessage(savedAuthor, savedChannel, "messageWithoutFiles");
 
         // messageWithFiles에 연결할 실제 파일 3건을 저장한다.
         // 조회 대상 messageWithoutFiles에는 이 파일들을 연결하지 않아야 한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -695,64 +544,22 @@ class MessageFileRepositoryTest {
         // Repository에 선언된 EntityGraph(binaryContent, message)에 의해 두 연관 객체가 함께 로딩되어야 한다.
         // 단일 메시지만 저장하면 IN 조건을 검증하기 어렵기 때문에,
         // 포함 메시지 2개와 제외 메시지 1개를 모두 같은 테스트 DB에 준비한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // firstIncludedMessage와 secondIncludedMessage는 조회 목록에 포함할 메시지다.
         // excludedMessage는 MessageFile이 존재하지만 조회 목록에는 넣지 않을 대조군 메시지다.
-        MessageCreateCommand firstIncludedMessageCreateCommand = new MessageCreateCommand(
-                "firstIncludedMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedFirstIncludedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, firstIncludedMessageCreateCommand)
-        );
-
-        MessageCreateCommand secondIncludedMessageCreateCommand = new MessageCreateCommand(
-                "secondIncludedMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedSecondIncludedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, secondIncludedMessageCreateCommand)
-        );
-
-        MessageCreateCommand excludedMessageCreateCommand = new MessageCreateCommand(
-                "excludedMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedExcludedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, excludedMessageCreateCommand)
-        );
+        Message savedFirstIncludedMessage = saveMessage(savedAuthor, savedChannel, "firstIncludedMessage");
+        Message savedSecondIncludedMessage = saveMessage(savedAuthor, savedChannel, "secondIncludedMessage");
+        Message savedExcludedMessage = saveMessage(savedAuthor, savedChannel, "excludedMessage");
 
         // 포함 메시지 2개와 제외 메시지 1개에 연결할 파일을 저장한다.
         // 파일 메타데이터를 서로 다르게 두면 EntityGraph로 함께 조회된 BinaryContent가 정확한 row인지 검증하기 쉽다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -877,72 +684,26 @@ class MessageFileRepositoryTest {
         // 단일 채널의 데이터만 저장하면 channel_id 조건이 정확히 적용되는지 확인하기 어렵다.
         // 그래서 대상 채널에는 메시지 2개와 파일 3건을 연결하고,
         // 다른 채널에는 메시지 1개와 파일 1건을 연결해 대조군으로 둔다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
-                "otherChannel",
-                "otherChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedTargetChannel = savePublicChannel("testChannel");
+        Channel savedOtherChannel = savePublicChannel("otherChannel");
 
         // firstTargetMessage와 secondTargetMessage는 조회 대상 채널에 속한 메시지다.
         // findAllByChannelId(targetChannelId)는 이 두 메시지에 연결된 MessageFile만 반환해야 한다.
-        MessageCreateCommand firstTargetMessageCreateCommand = new MessageCreateCommand(
-                "firstTargetMessage",
-                savedAuthor.getId(),
-                savedTargetChannel.getId()
-        );
-        Message savedFirstTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedTargetChannel, firstTargetMessageCreateCommand)
-        );
-
-        MessageCreateCommand secondTargetMessageCreateCommand = new MessageCreateCommand(
-                "secondTargetMessage",
-                savedAuthor.getId(),
-                savedTargetChannel.getId()
-        );
-        Message savedSecondTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedTargetChannel, secondTargetMessageCreateCommand)
-        );
+        Message savedFirstTargetMessage = saveMessage(savedAuthor, savedTargetChannel, "firstTargetMessage");
+        Message savedSecondTargetMessage = saveMessage(savedAuthor, savedTargetChannel, "secondTargetMessage");
 
         // otherChannelMessage는 다른 채널에 속한 대조군 메시지다.
         // 이 메시지에도 파일을 연결하지만 targetChannel 조회 결과에는 포함되면 안 된다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessage",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
-        );
+        Message savedOtherChannelMessage = saveMessage(savedAuthor, savedOtherChannel, "otherChannelMessage");
 
         // 대상 채널 메시지들에 연결할 파일 3건과 다른 채널 메시지에 연결할 파일 1건을 저장한다.
         // 파일 메타데이터를 서로 다르게 두면 EntityGraph로 함께 조회된 BinaryContent가 정확한 row인지 검증하기 쉽다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedTargetChannelId = savedTargetChannel.getId();
@@ -1071,78 +832,26 @@ class MessageFileRepositoryTest {
         //
         // 반대로 다른 채널에는 MessageFile을 실제로 저장해 둔다.
         // 이 대조군이 있어야 전체 DB가 비어 있어서 우연히 빈 목록이 반환되는 테스트가 되지 않는다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand targetChannelCreateCommand = new ChannelCreatePublicCommand(
-                "targetChannel",
-                "targetChannelDescription",
-                ChannelType.PUBLIC
-        );
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
-                "otherChannel",
-                "otherChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // Message는 author와 channel을 참조하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedTargetChannel = channelRepository.saveAndFlush(new Channel(targetChannelCreateCommand));
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedTargetChannel = savePublicChannel("targetChannel");
+        Channel savedOtherChannel = savePublicChannel("otherChannel");
 
         // 조회 대상 채널에 메시지 2건을 만든다.
         // 이 메시지들에는 일부러 MessageFile을 연결하지 않는다.
-        MessageCreateCommand firstTargetMessageCreateCommand = new MessageCreateCommand(
-                "firstTargetMessage",
-                savedAuthor.getId(),
-                savedTargetChannel.getId()
-        );
-        Message savedFirstTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedTargetChannel, firstTargetMessageCreateCommand)
-        );
-
-        MessageCreateCommand secondTargetMessageCreateCommand = new MessageCreateCommand(
-                "secondTargetMessage",
-                savedAuthor.getId(),
-                savedTargetChannel.getId()
-        );
-        Message savedSecondTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedTargetChannel, secondTargetMessageCreateCommand)
-        );
+        Message savedFirstTargetMessage = saveMessage(savedAuthor, savedTargetChannel, "firstTargetMessage");
+        Message savedSecondTargetMessage = saveMessage(savedAuthor, savedTargetChannel, "secondTargetMessage");
 
         // 다른 채널에는 메시지 2건을 만들고, 여기에만 MessageFile을 연결한다.
         // 조회 대상 channelId가 정확히 적용된다면 이 MessageFile들은 결과에 포함되면 안 된다.
-        MessageCreateCommand firstOtherChannelMessageCreateCommand = new MessageCreateCommand(
-                "firstOtherChannelMessage",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedFirstOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, firstOtherChannelMessageCreateCommand)
-        );
-
-        MessageCreateCommand secondOtherChannelMessageCreateCommand = new MessageCreateCommand(
-                "secondOtherChannelMessage",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedSecondOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, secondOtherChannelMessageCreateCommand)
-        );
+        Message savedFirstOtherChannelMessage = saveMessage(savedAuthor, savedOtherChannel, "firstOtherChannelMessage");
+        Message savedSecondOtherChannelMessage = saveMessage(savedAuthor, savedOtherChannel, "secondOtherChannelMessage");
 
         // 대조군 채널 메시지에 연결할 파일 3건을 저장한다.
         // 대상 채널에는 이 파일들을 연결하지 않는다.
-        BinaryContent savedFirstOtherBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("otherFile1", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondOtherBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("otherFile2", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdOtherBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("otherFile3", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstOtherBinaryContent = saveBinaryContent("otherFile1", "image/png", 1_000L);
+        BinaryContent savedSecondOtherBinaryContent = saveBinaryContent("otherFile2", "image/jpeg", 2_000L);
+        BinaryContent savedThirdOtherBinaryContent = saveBinaryContent("otherFile3", "application/pdf", 3_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedTargetChannelId = savedTargetChannel.getId();
@@ -1251,58 +960,25 @@ class MessageFileRepositoryTest {
         //
         // 또한 bulkInsert 대상이 아닌 다른 메시지와 전달하지 않은 파일을 함께 준비한다.
         // 이 대조군이 있어야 bulkInsert가 입력으로 받은 messageId와 fileIds 범위 안에서만 row를 생성하는지 확인할 수 있다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // MessageFile은 Message와 BinaryContent를 연결하는 엔티티다.
         // 먼저 Message 생성에 필요한 author와 channel을 실제 엔티티로 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // bulkInsert 대상 메시지다.
         // 아래 fileIdsToInsert에 포함된 파일들은 모두 이 메시지에 연결되어야 한다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // bulkInsert 대상이 아닌 대조군 메시지다.
         // 같은 채널에 있어도 messageId를 전달하지 않았으므로 MessageFile이 생성되면 안 된다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
-        );
+        Message savedOtherMessage = saveMessage(savedAuthor, savedChannel, "otherMessage");
 
         // bulkInsert 대상 파일 3건과 제외 파일 1건을 저장한다.
         // 제외 파일은 binary_contents에는 존재하지만 fileIdsToInsert에는 넣지 않아 MessageFile 생성 대상에서 제외되는지 확인한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -1420,60 +1096,27 @@ class MessageFileRepositoryTest {
         // 따라서 fileIds 안에 존재하지 않는 UUID가 섞여 있어도 예외가 발생하는 것이 아니라
         // DB에 존재하는 BinaryContent id만 생성 대상이 되어야 한다.
         // 이 테스트는 그 동작을 반환 row count와 실제 재조회 결과로 함께 검증한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // MessageFile은 Message와 BinaryContent를 연결하는 엔티티다.
         // 먼저 Message 생성에 필요한 author와 channel을 실제 엔티티로 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // bulkInsert 대상 메시지다.
         // 존재하는 파일 id 3건만 이 메시지에 연결되어야 하고, 존재하지 않는 파일 id는 무시되어야 한다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // 대조군 메시지다.
         // 같은 채널에 있어도 bulkInsert에 이 messageId를 전달하지 않았으므로 MessageFile이 생성되면 안 된다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
-        );
+        Message savedOtherMessage = saveMessage(savedAuthor, savedChannel, "otherMessage");
 
         // 존재하는 파일 3건은 bulkInsert 입력에 포함한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
 
         // 존재하지만 입력 목록에는 넣지 않는 파일이다.
         // 이 파일이 MessageFile로 생성되지 않아야 fileIds 조건이 정확히 적용된 것이다.
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -1615,59 +1258,26 @@ class MessageFileRepositoryTest {
         // otherMessage는 같은 채널에 있지만 파일을 연결하지 않는다.
         // 이 구성을 통해 채널 안의 모든 메시지가 파일을 가져야 true가 아니라,
         // 채널 안에 MessageFile이 하나 이상 존재하면 true라는 Repository 계약을 확인한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // MessageFile은 Message를 통해 Channel을 판단하므로 실제 User, Channel, Message를 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // 파일을 연결할 대상 메시지다.
         // 이 메시지에 MessageFile이 생성되면 existsByMessage_Channel_Id(channelId)는 true를 반환해야 한다.
-        MessageCreateCommand targetMessageCreateCommand = new MessageCreateCommand(
-                "targetMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedTargetMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, targetMessageCreateCommand)
-        );
+        Message savedTargetMessage = saveMessage(savedAuthor, savedChannel, "targetMessage");
 
         // 같은 채널에 속하지만 파일이 없는 대조군 메시지다.
         // 이 메시지가 비어 있어도 채널 전체 기준으로는 targetMessage의 파일 때문에 true가 되어야 한다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessage",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
-        );
+        Message savedOtherMessage = saveMessage(savedAuthor, savedChannel, "otherMessage");
 
         // targetMessage에 연결할 파일 3건을 저장한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
 
         // 존재하지만 bulkInsert 입력에는 넣지 않는 파일이다.
         // 이 파일이 MessageFile로 생성되지 않아야 fileIds 조건이 정확히 적용된 것이다.
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -1764,65 +1374,27 @@ class MessageFileRepositoryTest {
         //
         // 반대로 다른 채널에는 MessageFile을 실제로 저장해 둔다.
         // 이 대조군이 있어야 DB 전체가 비어 있어서 우연히 false가 되는 테스트가 되지 않는다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelWithoutMessageFilesCreateCommand = new ChannelCreatePublicCommand(
-                "channelWithoutMessageFiles",
-                "channelWithoutMessageFilesDescription",
-                ChannelType.PUBLIC
-        );
-        ChannelCreatePublicCommand channelWithMessageFilesCreateCommand = new ChannelCreatePublicCommand(
-                "channelWithMessageFiles",
-                "channelWithMessageFilesDescription",
-                ChannelType.PUBLIC
-        );
-
         // MessageFile 존재 여부는 Message의 channel을 기준으로 판단하므로 실제 User와 Channel을 먼저 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannelWithoutMessageFiles = channelRepository.saveAndFlush(new Channel(channelWithoutMessageFilesCreateCommand));
-        Channel savedChannelWithMessageFiles = channelRepository.saveAndFlush(new Channel(channelWithMessageFilesCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannelWithoutMessageFiles = savePublicChannel("channelWithoutMessageFiles");
+        Channel savedChannelWithMessageFiles = savePublicChannel("channelWithMessageFiles");
 
         // 조회 대상 채널에 속한 메시지다.
         // 이 메시지는 실제로 존재하지만 첨부 파일을 연결하지 않는다.
-        MessageCreateCommand messageWithoutFilesCreateCommand = new MessageCreateCommand(
-                "messageWithoutFiles",
-                savedAuthor.getId(),
-                savedChannelWithoutMessageFiles.getId()
-        );
-        Message savedMessageWithoutFiles = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannelWithoutMessageFiles, messageWithoutFilesCreateCommand)
-        );
+        Message savedMessageWithoutFiles = saveMessage(savedAuthor, savedChannelWithoutMessageFiles, "messageWithoutFiles");
 
         // 다른 채널에 속한 메시지다.
         // 여기에만 첨부 파일을 연결해 exists 쿼리가 channel_id 조건을 정확히 적용하는지 확인한다.
-        MessageCreateCommand messageWithFilesCreateCommand = new MessageCreateCommand(
-                "messageWithFiles",
-                savedAuthor.getId(),
-                savedChannelWithMessageFiles.getId()
-        );
-        Message savedMessageWithFiles = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannelWithMessageFiles, messageWithFilesCreateCommand)
-        );
+        Message savedMessageWithFiles = saveMessage(savedAuthor, savedChannelWithMessageFiles, "messageWithFiles");
 
         // 대조군 채널 메시지에 연결할 파일 3건을 저장한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
 
         // 존재하지만 bulkInsert 입력에는 넣지 않는 파일이다.
         // 이 파일이 MessageFile로 생성되지 않아야 fileIds 조건이 정확히 적용된 것이다.
-        BinaryContent savedExcludedBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("excludedFile", "text/plain", 4_000L)
-        );
+        BinaryContent savedExcludedBinaryContent = saveBinaryContent("excludedFile", "text/plain", 4_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelWithoutMessageFilesId = savedChannelWithoutMessageFiles.getId();
@@ -1921,53 +1493,22 @@ class MessageFileRepositoryTest {
         // 삭제 대상 MessageFile 2건과 삭제 대상이 아닌 MessageFile 1건을 함께 저장한다.
         // 이렇게 하면 deleteAllByIdIn(ids)가 전달받은 id에 해당하는 row만 삭제하고,
         // 목록에 포함되지 않은 row는 그대로 남기는지 검증할 수 있다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
-                "testChannel",
-                "testChannelDescription",
-                ChannelType.PUBLIC
-        );
-
         // MessageFile은 Message와 BinaryContent를 연결하는 엔티티다.
         // 먼저 Message 생성에 필요한 author와 channel을 실제 엔티티로 저장한다.
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, null));
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        User savedAuthor = saveAuthor();
+        Channel savedChannel = savePublicChannel("testChannel");
 
         // 삭제 대상 MessageFile 2건을 연결할 메시지다.
-        MessageCreateCommand messageWithFilesToDeleteCreateCommand = new MessageCreateCommand(
-                "messageWithFilesToDelete",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithFilesToDelete = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithFilesToDeleteCreateCommand)
-        );
+        Message savedMessageWithFilesToDelete = saveMessage(savedAuthor, savedChannel, "messageWithFilesToDelete");
 
         // 삭제 대상이 아닌 MessageFile 1건을 연결할 메시지다.
         // 이 row가 삭제 후에도 남아 있어야 id 조건이 정확히 적용됐음을 확인할 수 있다.
-        MessageCreateCommand messageWithRemainingFileCreateCommand = new MessageCreateCommand(
-                "messageWithRemainingFile",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessageWithRemainingFile = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageWithRemainingFileCreateCommand)
-        );
+        Message savedMessageWithRemainingFile = saveMessage(savedAuthor, savedChannel, "messageWithRemainingFile");
 
         // 삭제 대상 메시지에 연결할 파일 2건과 남겨 둘 파일 1건을 저장한다.
-        BinaryContent savedFirstBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("firstFile", "image/png", 1_000L)
-        );
-        BinaryContent savedSecondBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("secondFile", "image/jpeg", 2_000L)
-        );
-        BinaryContent savedThirdBinaryContent = binaryContentRepository.saveAndFlush(
-                new BinaryContent("thirdFile", "application/pdf", 3_000L)
-        );
+        BinaryContent savedFirstBinaryContent = saveBinaryContent("firstFile", "image/png", 1_000L);
+        BinaryContent savedSecondBinaryContent = saveBinaryContent("secondFile", "image/jpeg", 2_000L);
+        BinaryContent savedThirdBinaryContent = saveBinaryContent("thirdFile", "application/pdf", 3_000L);
 
         UUID savedAuthorId = savedAuthor.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -2078,6 +1619,50 @@ class MessageFileRepositoryTest {
         // 전체 MessageFile 개수도 보조적으로 확인한다.
         // given에서 3건을 만들고 id 목록에 포함된 2건만 삭제했으므로 최종적으로 1건만 남아야 한다.
         assertThat(messageFileRepository.count()).isEqualTo(1);
+    }
+
+    // MessageFileRepository 테스트는 MessageFile -> Message -> Channel, MessageFile -> BinaryContent 연관 쿼리를
+    // 실제 DB와 JPA 매핑으로 검증한다. 따라서 author는 mock이 아니라 실제 User row로 저장한다.
+    private User saveAuthor() {
+        UserCreateCommand command = new UserCreateCommand(
+                "testUser",
+                "testPassword",
+                "test@gmail.com"
+        );
+
+        return userRepository.saveAndFlush(new User(command, null));
+    }
+
+    // Message.channel은 nullable = false 연관관계다.
+    // 채널 기준 조회/존재 여부 테스트에서 channel_id 조건이 실제 FK를 따라 동작하도록 PUBLIC Channel row를 저장한다.
+    private Channel savePublicChannel(String channelName) {
+        ChannelCreatePublicCommand command = new ChannelCreatePublicCommand(
+                channelName,
+                channelName + "Description",
+                ChannelType.PUBLIC
+        );
+
+        return channelRepository.saveAndFlush(new Channel(command));
+    }
+
+    // MessageFile은 message_id를 FK로 가지므로, MessageFile fixture를 만들기 전에 실제 Message row가 필요하다.
+    // content만 테스트마다 다르게 넘겨 given 절에는 "어떤 메시지가 대상인지"만 남긴다.
+    private Message saveMessage(User author, Channel channel, String content) {
+        MessageCreateCommand command = new MessageCreateCommand(
+                content,
+                author.getId(),
+                channel.getId()
+        );
+
+        return messageRepository.saveAndFlush(new Message(author, channel, command));
+    }
+
+    // bulkInsert(...)는 전달받은 fileIds를 그대로 insert하지 않고 binary_contents에서 존재하는 row를 select한다.
+    // 그래서 BinaryContent도 실제 row로 저장해야 native insert의 file_id 필터링을 검증할 수 있다.
+    private BinaryContent saveBinaryContent(String originalFileName, String contentType, long size) {
+        return binaryContentRepository.saveAndFlush(
+                new BinaryContent(originalFileName, contentType, size)
+        );
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {

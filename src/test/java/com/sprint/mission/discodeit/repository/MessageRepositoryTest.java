@@ -62,57 +62,34 @@ class MessageRepositoryTest {
         // 단순히 Message row만 저장하고 content만 확인하면 findById의 fetch 계약을 검증할 수 없다.
         // 그래서 작성자 프로필(BinaryContent), 작성자 상태(UserStatus), 채널까지 모두 실제 엔티티로 저장한 뒤
         // 영속성 컨텍스트를 비우고 DB에서 다시 조회해 EntityGraph 적용 여부를 확인한다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
-
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
 
         // 조회 대상 메시지다.
         // findById(savedMessageId)는 이 메시지와 연결된 author/channel을 함께 반환해야 한다.
-        MessageCreateCommand messageCreateCommand = new MessageCreateCommand(
-                "testMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageCreateCommand)
+        MessageFixture messageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "testMessageContent"
         );
 
         // 대조군 메시지를 추가해 findById(...)가 요청한 id의 메시지만 반환하는지 확인한다.
         // 같은 작성자와 채널을 공유하더라도 message id가 다르면 조회 결과가 섞이면 안 된다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
+        MessageFixture otherMessageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "otherMessageContent"
         );
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
-        UUID savedMessageId = savedMessage.getId();
-        UUID savedOtherMessageId = savedOtherMessage.getId();
-        UUID savedChannelId = savedChannel.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
+        UUID savedMessageId = messageFixture.message().getId();
+        UUID savedOtherMessageId = otherMessageFixture.message().getId();
+        UUID savedChannelId = channelFixture.channel().getId();
 
         // 테스트 fixture가 의도대로 저장됐는지 확인한다.
         // 여기서 id가 null이면 findById 검증 실패 원인을 Repository 문제가 아니라 given 구성 문제로 봐야 한다.
@@ -123,8 +100,8 @@ class MessageRepositoryTest {
         assertThat(savedOtherMessageId).isNotNull();
         assertThat(savedChannelId).isNotNull();
         assertThat(savedOtherMessageId).isNotEqualTo(savedMessageId);
-        assertThat(savedMessage.getChannelId()).isEqualTo(savedChannelId);
-        assertThat(savedOtherMessage.getChannelId()).isEqualTo(savedChannelId);
+        assertThat(messageFixture.message().getChannelId()).isEqualTo(savedChannelId);
+        assertThat(otherMessageFixture.message().getChannelId()).isEqualTo(savedChannelId);
 
         // 저장 직후 영속성 컨텍스트를 비운다.
         // 그래야 아래 findById(...)가 1차 캐시에 있는 엔티티를 반환하는 것이 아니라,
@@ -141,12 +118,12 @@ class MessageRepositoryTest {
         assertFetchedMessageFixture(
                 foundMessage,
                 savedMessageId,
-                messageCreateCommand,
+                messageFixture.command(),
                 savedAuthorId,
-                authorCreateCommand,
+                authorFixture.command(),
                 savedAuthorStatusId,
-                savedProfile,
-                channelCreateCommand,
+                authorFixture.profile(),
+                channelFixture.command(),
                 savedChannelId
         );
     }
@@ -161,64 +138,40 @@ class MessageRepositoryTest {
         // 빈 DB에서 임의 UUID를 조회하면 당연히 empty가 나오므로, 그 경우만으로는
         // "id 조건이 정확히 적용됐다"는 근거가 약하다. 그래서 조회 대상이 아닌 Message row를 실제로 저장해
         // messages 테이블에는 데이터가 있지만 요청한 id의 row만 없는 상황을 만든다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가진다.
         // findById(...)에는 author, author.userStatus, author.profile EntityGraph도 걸려 있으므로,
         // 성공 조회가 가능한 완전한 메시지 fixture를 만들어 두면 음성 케이스의 전제도 더 선명해진다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // 작성자 상태는 음성 조회 결과 자체에는 직접 사용되지 않는다.
-        // 다만 저장된 메시지를 사전 조회할 때 findById(...)의 EntityGraph가 접근할 수 있는 연관 row로 둔다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // 따라서 메시지를 실제 DB에 저장하려면 먼저 실제 Channel row가 필요하다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
 
         // 첫 번째 메시지는 "존재하는 id로는 findById(...)가 정상 조회된다"는 사전 검증 대상이다.
-        MessageCreateCommand messageCreateCommand = new MessageCreateCommand(
-                "testMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageCreateCommand)
+        MessageFixture messageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "testMessageContent"
         );
 
         // 두 번째 메시지는 대조군이다.
         // messages 테이블에 row가 하나만 있는 상황보다, 여러 row 중에서도 요청한 id가 없을 때 empty가 나오는지를
         // 확인하는 편이 "PK 조건으로 정확히 조회한다"는 의도를 더 잘 드러낸다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
+        MessageFixture otherMessageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "otherMessageContent"
         );
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
-        UUID savedMessageId = savedMessage.getId();
-        UUID savedOtherMessageId = savedOtherMessage.getId();
-        UUID savedChannelId = savedChannel.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
+        UUID savedMessageId = messageFixture.message().getId();
+        UUID savedOtherMessageId = otherMessageFixture.message().getId();
+        UUID savedChannelId = channelFixture.channel().getId();
 
         UUID nonExistentMessageId;
         do {
@@ -238,8 +191,8 @@ class MessageRepositoryTest {
         assertThat(nonExistentMessageId)
                 .isNotEqualTo(savedMessageId)
                 .isNotEqualTo(savedOtherMessageId);
-        assertThat(savedMessage.getChannelId()).isEqualTo(savedChannelId);
-        assertThat(savedOtherMessage.getChannelId()).isEqualTo(savedChannelId);
+        assertThat(messageFixture.message().getChannelId()).isEqualTo(savedChannelId);
+        assertThat(otherMessageFixture.message().getChannelId()).isEqualTo(savedChannelId);
         assertThat(messageRepository.count()).isEqualTo(2);
 
         // 저장 직후의 Message, User, Channel 등이 1차 캐시에 남아 있어도 missing id 조회에는 직접 영향이 없지만,
@@ -249,8 +202,8 @@ class MessageRepositoryTest {
         // 조회 대상이 아닌 메시지는 실제로 DB에서 찾을 수 있어야 한다.
         // 이 사전 검증이 있어야 아래 empty 결과가 "테이블이 비어서"가 아니라
         // "조회한 Message PK와 일치하는 row가 없어서" 발생했다는 점이 분명해진다.
-        assertMessageDetails(savedMessageId, messageCreateCommand, savedChannelId);
-        assertMessageDetails(savedOtherMessageId, otherMessageCreateCommand, savedChannelId);
+        assertMessageDetails(savedMessageId, messageFixture.command(), savedChannelId);
+        assertMessageDetails(savedOtherMessageId, otherMessageFixture.command(), savedChannelId);
 
         // when
         // messages 테이블에 존재하지 않는 Message PK로 단건 조회한다.
@@ -276,51 +229,27 @@ class MessageRepositoryTest {
         // 따라서 단순히 메시지 1건만 저장하면 정렬과 채널 조건을 검증할 수 없다.
         // 대상 채널에는 메시지 2건을 저장하고, 다른 채널에는 더 늦게 생성된 메시지를 저장해
         // "전체 메시지 중 최신"이 아니라 "요청한 채널 안에서 최신" 메시지를 반환하는지 확인한다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가지므로 실제 User를 연결한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // findTop1ByChannel_IdOrderByCreatedAtDesc(...)는 author 상태를 조회하는 메서드는 아니다.
-        // 다만 메시지 fixture를 실제 서비스 데이터에 가깝게 구성하기 위해 작성자 상태도 실제 row로 저장한다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // targetChannel은 조회 대상 채널이고, otherChannel은 channel.id 조건 검증을 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
 
         // 대상 채널의 오래된 메시지다.
         // 아래 최신 메시지와 createdAt이 명확히 달라야 order by createdAt desc 검증이 의미를 가진다.
-        MessageCreateCommand messageCreateCommand = new MessageCreateCommand(
-                "testMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageCreateCommand)
+        MessageFixture messageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "testMessageContent"
         );
 
         // createdAt은 JPA Auditing이 저장 시점에 채운다.
@@ -329,36 +258,30 @@ class MessageRepositoryTest {
 
         // 대상 채널의 최신 메시지다.
         // 이 메시지가 findTop1ByChannel_IdOrderByCreatedAtDesc(savedChannelId)의 반환 대상이어야 한다.
-        MessageCreateCommand otherMessageCreateCommand = new MessageCreateCommand(
-                "otherMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOtherMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, otherMessageCreateCommand)
+        MessageFixture otherMessageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "otherMessageContent"
         );
 
         Thread.sleep(100);
 
         // 다른 채널의 메시지는 대상 채널의 최신 메시지보다 더 늦게 저장한다.
         // 이 row가 있어야 Repository 메서드가 channel.id 조건 없이 전체 최신 메시지를 고르는 버그를 잡을 수 있다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(
+                authorFixture.user(),
+                otherChannelFixture.channel(),
+                "otherChannelMessageContent"
         );
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
-        UUID savedMessageId = savedMessage.getId();
-        UUID savedOtherMessageId = savedOtherMessage.getId();
-        UUID savedChannelId = savedChannel.getId();
-        UUID savedOtherChannelId = savedOtherChannel.getId();
-        UUID savedOtherChannelMessageId = savedOtherChannelMessage.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
+        UUID savedMessageId = messageFixture.message().getId();
+        UUID savedOtherMessageId = otherMessageFixture.message().getId();
+        UUID savedChannelId = channelFixture.channel().getId();
+        UUID savedOtherChannelId = otherChannelFixture.channel().getId();
+        UUID savedOtherChannelMessageId = otherChannelMessageFixture.message().getId();
 
         // 사전 조건을 먼저 고정한다.
         // 여기서 id나 createdAt이 비정상이면 최신 메시지 조회 실패인지 fixture 구성 실패인지 구분하기 어렵다.
@@ -375,14 +298,14 @@ class MessageRepositoryTest {
         assertThat(savedOtherChannelMessageId)
                 .isNotEqualTo(savedMessageId)
                 .isNotEqualTo(savedOtherMessageId);
-        assertThat(savedMessage.getChannelId()).isEqualTo(savedChannelId);
-        assertThat(savedOtherMessage.getChannelId()).isEqualTo(savedChannelId);
-        assertThat(savedOtherChannelMessage.getChannelId()).isEqualTo(savedOtherChannelId);
-        assertThat(savedMessage.getCreatedAt()).isNotNull();
-        assertThat(savedOtherMessage.getCreatedAt()).isNotNull();
-        assertThat(savedOtherChannelMessage.getCreatedAt()).isNotNull();
-        assertThat(savedOtherMessage.getCreatedAt()).isAfter(savedMessage.getCreatedAt());
-        assertThat(savedOtherChannelMessage.getCreatedAt()).isAfter(savedOtherMessage.getCreatedAt());
+        assertThat(messageFixture.message().getChannelId()).isEqualTo(savedChannelId);
+        assertThat(otherMessageFixture.message().getChannelId()).isEqualTo(savedChannelId);
+        assertThat(otherChannelMessageFixture.message().getChannelId()).isEqualTo(savedOtherChannelId);
+        assertThat(messageFixture.message().getCreatedAt()).isNotNull();
+        assertThat(otherMessageFixture.message().getCreatedAt()).isNotNull();
+        assertThat(otherChannelMessageFixture.message().getCreatedAt()).isNotNull();
+        assertThat(otherMessageFixture.message().getCreatedAt()).isAfter(messageFixture.message().getCreatedAt());
+        assertThat(otherChannelMessageFixture.message().getCreatedAt()).isAfter(otherMessageFixture.message().getCreatedAt());
         assertThat(messageRepository.count()).isEqualTo(3);
 
         // 저장 직후의 Message가 1차 캐시에 남아 있으면 정렬 쿼리 결과와 캐시 상태를 혼동할 수 있다.
@@ -399,12 +322,12 @@ class MessageRepositoryTest {
         // 다른 채널의 메시지가 전체 DB에서 더 최신이어도 channel.id 조건 때문에 반환되면 안 된다.
 
         assertThat(message.getId()).isEqualTo(savedOtherMessageId);
-        assertThat(message.getContent()).isEqualTo(otherMessageCreateCommand.content());
+        assertThat(message.getContent()).isEqualTo(otherMessageFixture.command().content());
         assertThat(message.getChannelId()).isEqualTo(savedChannelId);
 
         // DB에서 다시 조회한 createdAt은 timestamp 정밀도 때문에 저장 직후 엔티티의 Instant와
         // 나노초 단위까지 완전히 같지 않을 수 있다. 그래서 H2의 마이크로초 정밀도 수준의 오차만 허용한다.
-        assertThat(Duration.between(message.getCreatedAt(), savedOtherMessage.getCreatedAt()).abs())
+        assertThat(Duration.between(message.getCreatedAt(), otherMessageFixture.message().getCreatedAt()).abs())
                 .isLessThanOrEqualTo(Duration.ofNanos(1_000));
     }
 
@@ -422,61 +345,38 @@ class MessageRepositoryTest {
         // 동시에 다른 채널에는 Message를 저장해 둔다.
         // 이 대조군이 있어야 messages 테이블 전체가 비어서 우연히 empty가 되는 테스트가 아니라,
         // channel.id 조건이 적용되어 대상 채널의 메시지만 찾는다는 점을 확인할 수 있다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // 대조군 메시지를 만들려면 작성자가 필요하므로 실제 User를 저장한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // 작성자 상태는 findTop1ByChannel_IdOrderByCreatedAtDesc(...)의 직접 검증 대상은 아니다.
-        // 다만 대조군 메시지 fixture를 실제 서비스 데이터에 가깝게 만들기 위해 실제 row로 저장한다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이다. 이 채널에는 메시지를 하나도 연결하지 않는다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
 
         // savedOtherChannel은 대조군 채널이다.
         // messages 테이블에 row가 존재하는 상황을 만들기 위해 이 채널에만 메시지를 연결한다.
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
 
         // 대조군 메시지다.
         // 이 메시지가 존재하더라도 savedChannel에는 메시지가 없으므로 savedChannelId 조회 결과는 empty여야 한다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(
+                authorFixture.user(),
+                otherChannelFixture.channel(),
+                "otherChannelMessageContent"
         );
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
-        UUID savedChannelId = savedChannel.getId();
-        UUID savedOtherChannelId = savedOtherChannel.getId();
-        UUID savedOtherChannelMessageId = savedOtherChannelMessage.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
+        UUID savedChannelId = channelFixture.channel().getId();
+        UUID savedOtherChannelId = otherChannelFixture.channel().getId();
+        UUID savedOtherChannelMessageId = otherChannelMessageFixture.message().getId();
 
         // 사전 조건을 먼저 고정한다.
         // 여기서 id가 null이거나 채널이 구분되지 않으면 이후 empty 검증이 Repository 동작 실패인지,
@@ -488,8 +388,8 @@ class MessageRepositoryTest {
         assertThat(savedOtherChannelId).isNotNull();
         assertThat(savedOtherChannelMessageId).isNotNull();
         assertThat(savedOtherChannelId).isNotEqualTo(savedChannelId);
-        assertThat(savedOtherChannelMessage.getChannelId()).isEqualTo(savedOtherChannelId);
-        assertThat(savedOtherChannelMessage.getCreatedAt()).isNotNull();
+        assertThat(otherChannelMessageFixture.message().getChannelId()).isEqualTo(savedOtherChannelId);
+        assertThat(otherChannelMessageFixture.message().getCreatedAt()).isNotNull();
         assertThat(messageRepository.count()).isEqualTo(1);
 
         // 저장 직후의 Channel과 Message가 1차 캐시에 남아 있어도 empty 조회에는 직접 영향이 크지 않지만,
@@ -502,7 +402,7 @@ class MessageRepositoryTest {
         assertThat(messageRepository.findTop1ByChannel_IdOrderByCreatedAtDesc(savedOtherChannelId))
                 .hasValueSatisfying(foundOtherChannelMessage -> {
                     assertThat(foundOtherChannelMessage.getId()).isEqualTo(savedOtherChannelMessageId);
-                    assertThat(foundOtherChannelMessage.getContent()).isEqualTo(otherChannelMessageCreateCommand.content());
+                    assertThat(foundOtherChannelMessage.getContent()).isEqualTo(otherChannelMessageFixture.command().content());
                     assertThat(foundOtherChannelMessage.getChannelId()).isEqualTo(savedOtherChannelId);
                 });
 
@@ -530,95 +430,52 @@ class MessageRepositoryTest {
         // 그래서 대상 채널에는 메시지 3건을 오래된 순서로 저장하고, pageSize는 2로 둔다.
         // 다른 채널에는 대상 채널의 최신 메시지보다 더 늦게 생성된 메시지를 저장해
         // 전체 최신 메시지가 아니라 요청한 채널의 메시지만 첫 페이지에 포함되는지 확인한다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가지므로 실제 User를 연결한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // findAllByChannelId(...)는 메시지 목록을 반환하는 메서드다.
-        // 커스텀 Querydsl 구현에서 author, profile, userStatus를 fetch join하므로 실제 연관 row를 함께 둔다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이고, savedOtherChannel은 channel.id 조건 검증을 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        Channel savedChannel = channelFixture.channel();
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedOtherChannel = otherChannelFixture.channel();
 
         // 대상 채널의 가장 오래된 메시지다.
         // createdAt은 JPA Auditing이 저장 시점에 채우므로, 각 메시지 사이에 짧게 대기해 정렬 기준을 분명히 한다.
-        MessageCreateCommand oldestMessageCreateCommand = new MessageCreateCommand(
-                "oldestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOldestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, oldestMessageCreateCommand)
-        );
+        MessageFixture oldestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "oldestMessageContent");
+        Message savedOldestMessage = oldestMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 중간 메시지다.
         // pageSize를 2로 조회하면 최신 메시지 다음 두 번째 항목으로 반환되어야 한다.
-        MessageCreateCommand middleMessageCreateCommand = new MessageCreateCommand(
-                "middleMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMiddleMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, middleMessageCreateCommand)
-        );
+        MessageFixture middleMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "middleMessageContent");
+        Message savedMiddleMessage = middleMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 최신 메시지다.
         // cursor가 null인 첫 페이지에서는 이 메시지가 content의 첫 번째 요소로 와야 한다.
-        MessageCreateCommand newestMessageCreateCommand = new MessageCreateCommand(
-                "newestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedNewestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, newestMessageCreateCommand)
-        );
+        MessageFixture newestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "newestMessageContent");
+        Message savedNewestMessage = newestMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대조군 채널의 메시지다.
         // 대상 채널의 최신 메시지보다 더 늦게 저장되지만, channelId가 다르므로 조회 결과에 포함되면 안 된다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
-        );
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(authorFixture.user(), savedOtherChannel, "otherChannelMessageContent");
+        Message savedOtherChannelMessage = otherChannelMessageFixture.message();
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
         UUID savedOldestMessageId = savedOldestMessage.getId();
         UUID savedMiddleMessageId = savedMiddleMessage.getId();
         UUID savedNewestMessageId = savedNewestMessage.getId();
@@ -687,7 +544,7 @@ class MessageRepositoryTest {
                 .containsExactly(savedNewestMessageId, savedMiddleMessageId);
         assertThat(allByChannelId.getContent())
                 .extracting(Message::getContent)
-                .containsExactly(newestMessageCreateCommand.content(), middleMessageCreateCommand.content());
+                .containsExactly(newestMessageFixture.command().content(), middleMessageFixture.command().content());
         assertThat(allByChannelId.getContent())
                 .allSatisfy(message -> assertThat(message.getChannelId()).isEqualTo(savedChannelId));
     }
@@ -708,96 +565,53 @@ class MessageRepositoryTest {
         // 그래서 대상 채널에는 오래된 메시지, cursor로 사용할 중간 메시지, 최신 메시지를 저장한다.
         // 대조군 채널에는 cursor보다 오래된 메시지를 저장해,
         // channelId 조건이 빠지면 결과에 섞일 수 있는 상황을 만든다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가지므로 실제 User를 연결한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // findAllByChannelId(...)는 메시지 목록을 반환하는 메서드다.
-        // 커스텀 Querydsl 구현에서 author, profile, userStatus를 fetch join하므로 실제 연관 row를 함께 둔다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이고, savedOtherChannel은 channel.id 조건 검증을 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        Channel savedChannel = channelFixture.channel();
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedOtherChannel = otherChannelFixture.channel();
 
         // 대조군 채널의 메시지다.
         // 이 메시지는 cursor보다 오래되도록 가장 먼저 저장한다.
         // channelId 조건이 빠진 구현이라면 이 메시지가 결과에 섞일 수 있으므로 좋은 대조군이 된다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
-        );
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(authorFixture.user(), savedOtherChannel, "otherChannelMessageContent");
+        Message savedOtherChannelMessage = otherChannelMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 가장 오래된 메시지다.
         // cursor보다 오래된 대상 채널 메시지이므로 조회 결과에 포함되어야 한다.
-        MessageCreateCommand oldestMessageCreateCommand = new MessageCreateCommand(
-                "oldestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOldestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, oldestMessageCreateCommand)
-        );
+        MessageFixture oldestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "oldestMessageContent");
+        Message savedOldestMessage = oldestMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 중간 메시지다. 이 메시지의 createdAt을 cursor로 사용한다.
         // 구현이 lt(cursor)가 아니라 lte(cursor)를 사용하면 이 메시지가 결과에 포함되어 테스트가 실패해야 한다.
-        MessageCreateCommand middleMessageCreateCommand = new MessageCreateCommand(
-                "middleMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMiddleMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, middleMessageCreateCommand)
-        );
+        MessageFixture middleMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "middleMessageContent");
+        Message savedMiddleMessage = middleMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 최신 메시지다.
         // cursor보다 최신인 메시지이므로 조회 결과에 포함되면 안 된다.
-        MessageCreateCommand newestMessageCreateCommand = new MessageCreateCommand(
-                "newestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedNewestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, newestMessageCreateCommand)
-        );
+        MessageFixture newestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "newestMessageContent");
+        Message savedNewestMessage = newestMessageFixture.message();
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
         UUID savedOtherChannelMessageId = savedOtherChannelMessage.getId();
         UUID savedOldestMessageId = savedOldestMessage.getId();
         UUID savedMiddleMessageId = savedMiddleMessage.getId();
@@ -880,7 +694,7 @@ class MessageRepositoryTest {
                 .containsExactly(savedOldestMessageId);
         assertThat(allByChannelId.getContent())
                 .extracting(Message::getContent)
-                .containsExactly(oldestMessageCreateCommand.content());
+                .containsExactly(oldestMessageFixture.command().content());
         assertThat(allByChannelId.getContent())
                 .allSatisfy(message -> assertThat(message.getChannelId()).isEqualTo(savedChannelId));
     }
@@ -899,75 +713,40 @@ class MessageRepositoryTest {
         // 따라서 대상 채널에 메시지 3건을 저장하고 pageSize를 2로 조회한다.
         // 이 경우 Repository 내부에서는 3건을 읽어 hasNext=true를 계산하되,
         // Slice content에는 pageSize에 맞춰 최신 2건만 남겨야 한다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가지므로 실제 User를 연결한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // findAllByChannelId(...)는 메시지 목록을 반환하는 메서드다.
-        // 커스텀 Querydsl 구현에서 author, profile, userStatus를 fetch join하므로 실제 연관 row를 함께 둔다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이고, savedOtherChannel은 channel.id 조건 검증을 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
+        Channel savedChannel = channelFixture.channel();
 
         // 대상 채널의 가장 오래된 메시지다.
         // 이 메시지는 pageSize + 1로 조회되는 초과분이며, hasNext 계산에는 사용되지만 content에서는 제거되어야 한다.
-        MessageCreateCommand oldestMessageCreateCommand = new MessageCreateCommand(
-                "oldestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOldestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, oldestMessageCreateCommand)
-        );
+        MessageFixture oldestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "oldestMessageContent");
+        Message savedOldestMessage = oldestMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 중간 메시지다.
         // pageSize가 2일 때 content의 두 번째 요소로 남아야 한다.
-        MessageCreateCommand middleMessageCreateCommand = new MessageCreateCommand(
-                "middleMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMiddleMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, middleMessageCreateCommand)
-        );
+        MessageFixture middleMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "middleMessageContent");
+        Message savedMiddleMessage = middleMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 최신 메시지다.
         // cursor가 null인 첫 페이지에서 content의 첫 번째 요소로 반환되어야 한다.
-        MessageCreateCommand newestMessageCreateCommand = new MessageCreateCommand(
-                "newestMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedNewestMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, newestMessageCreateCommand)
-        );
+        MessageFixture newestMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "newestMessageContent");
+        Message savedNewestMessage = newestMessageFixture.message();
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
         UUID savedOldestMessageId = savedOldestMessage.getId();
         UUID savedMiddleMessageId = savedMiddleMessage.getId();
         UUID savedNewestMessageId = savedNewestMessage.getId();
@@ -1025,7 +804,7 @@ class MessageRepositoryTest {
                 .containsExactly(savedNewestMessageId, savedMiddleMessageId);
         assertThat(allByChannelId.getContent())
                 .extracting(Message::getContent)
-                .containsExactly(newestMessageCreateCommand.content(), middleMessageCreateCommand.content());
+                .containsExactly(newestMessageFixture.command().content(), middleMessageFixture.command().content());
         assertThat(allByChannelId.getContent())
                 .extracting(Message::getId)
                 .doesNotContain(savedOldestMessageId);
@@ -1047,82 +826,45 @@ class MessageRepositoryTest {
         // 대조군 채널에는 메시지를 1건 더 저장한다.
         // 전체 messages 테이블에는 pageSize보다 많은 row가 있더라도,
         // 조회 대상 채널의 결과 수가 pageSize 이하이면 hasNext=false가 되어야 하기 때문이다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // Message.author는 nullable이지만 실제 서비스 흐름의 메시지는 작성자를 가지므로 실제 User를 연결한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // findAllByChannelId(...)는 메시지 목록을 반환하는 메서드다.
-        // 커스텀 Querydsl 구현에서 author, profile, userStatus를 fetch join하므로 실제 연관 row를 함께 둔다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이고, savedOtherChannel은 channel.id 조건 검증을 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        Channel savedChannel = channelFixture.channel();
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedOtherChannel = otherChannelFixture.channel();
 
         // 대상 채널의 가장 오래된 메시지다.
         // pageSize가 2일 때 content의 두 번째 요소로 반환되어야 한다.
-        MessageCreateCommand olderMessageCreateCommand = new MessageCreateCommand(
-                "olderMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedOlderMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, olderMessageCreateCommand)
-        );
+        MessageFixture olderMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "olderMessageContent");
+        Message savedOlderMessage = olderMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대상 채널의 최신 메시지다.
         // cursor가 null인 첫 페이지에서 content의 첫 번째 요소로 반환되어야 한다.
-        MessageCreateCommand newerMessageCreateCommand = new MessageCreateCommand(
-                "newerMessageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedNewerMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, newerMessageCreateCommand)
-        );
+        MessageFixture newerMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "newerMessageContent");
+        Message savedNewerMessage = newerMessageFixture.message();
 
         Thread.sleep(100);
 
         // 대조군 채널의 메시지다.
         // 전체 테이블 기준으로는 세 번째 메시지지만, channelId가 다르므로 savedChannelId 조회의 hasNext 판단에 영향을 주면 안 된다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
-        );
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(authorFixture.user(), savedOtherChannel, "otherChannelMessageContent");
+        Message savedOtherChannelMessage = otherChannelMessageFixture.message();
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
         UUID savedOlderMessageId = savedOlderMessage.getId();
         UUID savedNewerMessageId = savedNewerMessage.getId();
         UUID savedOtherChannelMessageId = savedOtherChannelMessage.getId();
@@ -1183,7 +925,7 @@ class MessageRepositoryTest {
                 .containsExactly(savedNewerMessageId, savedOlderMessageId);
         assertThat(allByChannelId.getContent())
                 .extracting(Message::getContent)
-                .containsExactly(newerMessageCreateCommand.content(), olderMessageCreateCommand.content());
+                .containsExactly(newerMessageFixture.command().content(), olderMessageFixture.command().content());
         assertThat(allByChannelId.getContent())
                 .allSatisfy(message -> assertThat(message.getChannelId()).isEqualTo(savedChannelId));
     }
@@ -1203,67 +945,36 @@ class MessageRepositoryTest {
         // 단순히 Message content나 channelId만 확인하면 fetch join이 적용됐는지 검증할 수 없다.
         // 따라서 영속성 컨텍스트를 비운 뒤 다시 조회하고,
         // 연관 객체 getter를 호출하기 전에 PersistenceUnitUtil.isLoaded(...)로 로딩 여부를 확인한다.
-        BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent("test.png", "image/png", 1_024L)
-        );
-
         // Repository 슬라이스 테스트이므로 Mock을 사용하지 않고 실제 Entity를 저장한다.
         // author.profile fetch join을 검증하려면 User가 실제 BinaryContent profile을 참조해야 한다.
-        UserCreateCommand authorCreateCommand = new UserCreateCommand(
-                "testUser",
-                "testPassword",
-                "test@gmail.com"
-        );
-        User savedAuthor = userRepository.saveAndFlush(new User(authorCreateCommand, savedProfile));
-
-        // author.userStatus fetch join을 검증하려면 실제 UserStatus row가 필요하다.
-        // UserStatus는 User와 mappedBy OneToOne 관계이므로 실제 User를 먼저 저장한 뒤 연결한다.
-        Instant lastActiveAt = Instant.now();
-        UserStatus savedAuthorStatus = userStatusRepository.saveAndFlush(
-                new UserStatus(savedAuthor, new UserStatusCreateCommand(lastActiveAt))
-        );
+        AuthorFixture authorFixture = saveAuthorFixture("testUser", "test@gmail.com");
 
         // Message.channel은 nullable = false 연관관계다.
         // savedChannel은 조회 대상 채널이고, savedOtherChannel은 channelId 조건이 적용되는지 확인하기 위한 대조군 채널이다.
-        ChannelCreatePublicCommand channelCreateCommand = new ChannelCreatePublicCommand(
+        ChannelFixture channelFixture = savePublicChannelFixture(
                 "publicChannelName",
-                "publicChannelDescription",
-                ChannelType.PUBLIC
+                "publicChannelDescription"
         );
-        Channel savedChannel = channelRepository.saveAndFlush(new Channel(channelCreateCommand));
-
-        ChannelCreatePublicCommand otherChannelCreateCommand = new ChannelCreatePublicCommand(
+        Channel savedChannel = channelFixture.channel();
+        ChannelFixture otherChannelFixture = savePublicChannelFixture(
                 "otherPublicChannelName",
-                "otherPublicChannelDescription",
-                ChannelType.PUBLIC
+                "otherPublicChannelDescription"
         );
-        Channel savedOtherChannel = channelRepository.saveAndFlush(new Channel(otherChannelCreateCommand));
+        Channel savedOtherChannel = otherChannelFixture.channel();
 
         // 조회 대상 메시지다.
         // 이 메시지를 다시 조회했을 때 channel, author, author.profile, author.userStatus가 모두 로딩되어 있어야 한다.
-        MessageCreateCommand messageCreateCommand = new MessageCreateCommand(
-                "messageContent",
-                savedAuthor.getId(),
-                savedChannel.getId()
-        );
-        Message savedMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedChannel, messageCreateCommand)
-        );
+        MessageFixture messageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "messageContent");
+        Message savedMessage = messageFixture.message();
 
         // 대조군 채널의 메시지다.
         // 이 row가 있어야 messages 테이블에 다른 채널의 메시지가 있어도 savedChannelId 조회 결과에 섞이지 않는다는 점을 함께 확인할 수 있다.
-        MessageCreateCommand otherChannelMessageCreateCommand = new MessageCreateCommand(
-                "otherChannelMessageContent",
-                savedAuthor.getId(),
-                savedOtherChannel.getId()
-        );
-        Message savedOtherChannelMessage = messageRepository.saveAndFlush(
-                new Message(savedAuthor, savedOtherChannel, otherChannelMessageCreateCommand)
-        );
+        MessageFixture otherChannelMessageFixture = saveMessageFixture(authorFixture.user(), savedOtherChannel, "otherChannelMessageContent");
+        Message savedOtherChannelMessage = otherChannelMessageFixture.message();
 
-        UUID savedProfileId = savedProfile.getId();
-        UUID savedAuthorId = savedAuthor.getId();
-        UUID savedAuthorStatusId = savedAuthorStatus.getId();
+        UUID savedProfileId = authorFixture.profile().getId();
+        UUID savedAuthorId = authorFixture.user().getId();
+        UUID savedAuthorStatusId = authorFixture.userStatus().getId();
         UUID savedMessageId = savedMessage.getId();
         UUID savedOtherChannelMessageId = savedOtherChannelMessage.getId();
         UUID savedChannelId = savedChannel.getId();
@@ -1326,31 +1037,31 @@ class MessageRepositoryTest {
 
         // 조회된 Message가 given에서 저장한 대상 메시지인지 식별자와 주요 필드로 확인한다.
         assertThat(foundMessage.getId()).isEqualTo(savedMessageId);
-        assertThat(foundMessage.getContent()).isEqualTo(messageCreateCommand.content());
+        assertThat(foundMessage.getContent()).isEqualTo(messageFixture.command().content());
         assertThat(foundMessage.getChannelId()).isEqualTo(savedChannelId);
 
         // fetch join으로 함께 조회된 Channel이 실제 저장한 대상 채널인지 확인한다.
         assertThat(channel.getId()).isEqualTo(savedChannelId);
-        assertThat(channel.getName()).isEqualTo(channelCreateCommand.channelName());
-        assertThat(channel.getDescription()).isEqualTo(channelCreateCommand.channelDescription());
-        assertThat(channel.getType()).isEqualTo(channelCreateCommand.channelType());
+        assertThat(channel.getName()).isEqualTo(channelFixture.command().channelName());
+        assertThat(channel.getDescription()).isEqualTo(channelFixture.command().channelDescription());
+        assertThat(channel.getType()).isEqualTo(channelFixture.command().channelType());
 
         // fetch join으로 함께 조회된 User가 실제 작성자인지 확인한다.
         assertThat(author.getId()).isEqualTo(savedAuthorId);
-        assertThat(author.getUsername()).isEqualTo(authorCreateCommand.username());
-        assertThat(author.getEmail()).isEqualTo(authorCreateCommand.email());
+        assertThat(author.getUsername()).isEqualTo(authorFixture.command().username());
+        assertThat(author.getEmail()).isEqualTo(authorFixture.command().email());
 
         // fetch join으로 함께 조회된 profile이 실제 BinaryContent row인지 확인한다.
         assertThat(profile.getId()).isEqualTo(savedProfileId);
-        assertThat(profile.getOriginalFileName()).isEqualTo(savedProfile.getOriginalFileName());
-        assertThat(profile.getContentType()).isEqualTo(savedProfile.getContentType());
-        assertThat(profile.getSize()).isEqualTo(savedProfile.getSize());
+        assertThat(profile.getOriginalFileName()).isEqualTo(authorFixture.profile().getOriginalFileName());
+        assertThat(profile.getContentType()).isEqualTo(authorFixture.profile().getContentType());
+        assertThat(profile.getSize()).isEqualTo(authorFixture.profile().getSize());
         assertThat(author.getProfileId()).isEqualTo(savedProfileId);
 
         // fetch join으로 함께 조회된 UserStatus가 실제 작성자 상태 row인지 확인한다.
         assertThat(userStatus.getId()).isEqualTo(savedAuthorStatusId);
         assertThat(userStatus.getUserId()).isEqualTo(savedAuthorId);
-        assertThat(Duration.between(lastActiveAt, userStatus.getLastActiveAt()).abs())
+        assertThat(Duration.between(authorFixture.userStatus().getLastActiveAt(), userStatus.getLastActiveAt()).abs())
                 .isLessThanOrEqualTo(Duration.ofNanos(1_000));
     }
 
@@ -1772,48 +1483,94 @@ class MessageRepositoryTest {
     // 따라서 단순히 User만 저장하지 않고 실제 BinaryContent와 UserStatus까지 함께 저장해
     // Repository 쿼리가 실제 서비스 데이터 형태에 가까운 row를 대상으로 실행되게 한다.
     private User saveUserWithProfileAndStatus(String username, String email) {
+        return saveAuthorFixture(username, email).user();
+    }
+
+    private AuthorFixture saveAuthorFixture(String username, String email) {
         BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
                 new BinaryContent(username + ".png", "image/png", 1_024L)
         );
-        User savedUser = userRepository.saveAndFlush(
-                new User(new UserCreateCommand(username, "testPassword", email), savedProfile)
-        );
-        userStatusRepository.saveAndFlush(
+        UserCreateCommand command = new UserCreateCommand(username, "testPassword", email);
+        User savedUser = userRepository.saveAndFlush(new User(command, savedProfile));
+        UserStatus savedUserStatus = userStatusRepository.saveAndFlush(
                 new UserStatus(savedUser, new UserStatusCreateCommand(Instant.now()))
         );
 
-        return savedUser;
+        return new AuthorFixture(savedUser, command, savedUserStatus, savedProfile);
     }
 
     // Message.channel은 nullable = false 연관관계다.
     // 메시지 Repository 테스트에서는 채널 존재 여부와 channel_id 조건을 자주 구분해야 하므로
     // 테스트마다 실제 PUBLIC Channel row를 저장해 명확한 조회 대상과 대조군을 만든다.
     private Channel savePublicChannel(String channelName) {
-        return channelRepository.saveAndFlush(
-                new Channel(new ChannelCreatePublicCommand(
-                        channelName,
-                        channelName + "Description",
-                        ChannelType.PUBLIC
-                ))
+        return savePublicChannelFixture(channelName).channel();
+    }
+
+    private ChannelFixture savePublicChannelFixture(String channelName) {
+        ChannelCreatePublicCommand command = new ChannelCreatePublicCommand(
+                channelName,
+                channelName + "Description",
+                ChannelType.PUBLIC
         );
+        Channel savedChannel = channelRepository.saveAndFlush(new Channel(command));
+
+        return new ChannelFixture(savedChannel, command);
+    }
+
+    private ChannelFixture savePublicChannelFixture(
+            String channelName,
+            String channelDescription
+    ) {
+        ChannelCreatePublicCommand command = new ChannelCreatePublicCommand(
+                channelName,
+                channelDescription,
+                ChannelType.PUBLIC
+        );
+        Channel savedChannel = channelRepository.saveAndFlush(new Channel(command));
+
+        return new ChannelFixture(savedChannel, command);
+    }
+
+    private Message saveMessage(User author, Channel channel, String content) {
+        return saveMessageFixture(author, channel, content).message();
     }
 
     // MessageCreateCommand에는 authorId와 channelId가 들어가지만,
     // Repository 테스트에서는 FK 값만 흉내 내지 않고 실제 User, Channel 엔티티를 연결한다.
     // 그래야 save, find, exists, delete, bulk update가 모두 실제 JPA 연관관계 매핑을 통해 검증된다.
-    private Message saveMessage(User author, Channel channel, String content) {
-        return messageRepository.saveAndFlush(
-                new Message(author, channel, new MessageCreateCommand(
-                        content,
-                        author.getId(),
-                        channel.getId()
-                ))
+    private MessageFixture saveMessageFixture(User author, Channel channel, String content) {
+        MessageCreateCommand command = new MessageCreateCommand(
+                content,
+                author.getId(),
+                channel.getId()
         );
+        Message savedMessage = messageRepository.saveAndFlush(new Message(author, channel, command));
+
+        return new MessageFixture(savedMessage, command);
+    }
+
+    private MessageFixture saveMessageFixture(User author, Channel channel, MessageCreateCommand command) {
+        Message savedMessage = messageRepository.saveAndFlush(new Message(author, channel, command));
+
+        return new MessageFixture(savedMessage, command);
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();
     }
 
+    private record AuthorFixture(
+            User user,
+            UserCreateCommand command,
+            UserStatus userStatus,
+            BinaryContent profile
+    ) {
+    }
+
+    private record ChannelFixture(Channel channel, ChannelCreatePublicCommand command) {
+    }
+
+    private record MessageFixture(Message message, MessageCreateCommand command) {
+    }
 
 }

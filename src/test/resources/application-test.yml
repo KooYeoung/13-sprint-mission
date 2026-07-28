@@ -26,11 +26,13 @@ spring:
     properties:
       hibernate:
         show_sql: false
-        # 테스트 SQL 가독성, 배치 조회, JDBC 배치 설정
+        # 테스트 SQL 가독성, 배치 조회, JDBC 배치 및 배치 정렬 설정
         format_sql: true
         default_batch_fetch_size: 100
         jdbc:
           batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   flyway:
     # 테스트 스키마는 Hibernate가 생성하므로 Flyway 비활성화

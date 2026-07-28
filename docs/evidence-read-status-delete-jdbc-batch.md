@@ -105,6 +105,8 @@ spring:
         default_batch_fetch_size: 100
         jdbc:
           batch_size: 50
+        order_inserts: true
+        order_updates: true
 ```
 
 테스트 환경에서는 SQL과 batch trace를 확인할 수 있도록 다음 로그 레벨을 사용한다.
@@ -314,6 +316,8 @@ where channel_id = ?
 hibernate:
   jdbc:
     batch_size: 50
+  order_inserts: true
+  order_updates: true
 ```
 
 삭제 대상은 2건뿐이다.
@@ -338,7 +342,7 @@ Executing JDBC batch (20 / 50)
 
 현재 테스트는 최소 evidence로 2건 삭제만 사용한다. batch 분할까지 검증하고 싶다면 별도의 성능/진단용 테스트를 두는 편이 좋다.
 
-### 6. `order_updates` 설정이 필요한 상황인지
+### 6. `order_inserts`, `order_updates` 설정이 필요한 상황인지
 
 Hibernate에는 batch 효율을 높이기 위한 정렬 설정도 있다.
 
@@ -350,13 +354,15 @@ hibernate:
 
 삭제 작업에는 이름 그대로 직접적인 delete 정렬 설정은 아니지만, insert/update batch를 더 안정적으로 묶고 싶을 때 같이 검토할 수 있다.
 
-현재 evidence에서는 `ReadStatus#DELETE` 2건이 이미 같은 SQL 템플릿으로 모여 실행되는 것을 확인했으므로, 이 설정은 필수 확인 사항은 아니다.
+공통 설정에는 `batch_size`와 함께 `order_inserts`, `order_updates`를 켜 두었다.
+서로 다른 엔티티의 insert/update가 섞이는 흐름에서도 같은 SQL 템플릿이 연속해서 모일 가능성을 높이기 위한 설정이다.
+현재 evidence의 `ReadStatus#DELETE` 2건은 이미 같은 SQL 템플릿으로 모여 실행되는 것을 확인했으므로, 이 설정 자체의 효과를 직접 증명하는 사례는 아니다.
 
 ### 7. 운영 로그 레벨은 trace로 두지 않는지
 
 `org.hibernate.orm.jdbc.batch: trace`는 batch 진단에는 유용하지만 로그가 매우 많아진다.
 
-운영 환경에서는 현재처럼 상세 SQL과 batch 내부 로그를 낮추지 않는 편이 좋다.
+운영 환경에서는 현재처럼 상세 SQL과 batch 내부 로그 수준을 낮춰 두는 편이 좋다.
 
 ```yaml
 logging:
