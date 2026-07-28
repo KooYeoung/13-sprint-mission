@@ -49,7 +49,7 @@
     -->
     <property
             name="LOG_PATTERN"
-            value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+            value="%d{yy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId:-} | %X{requestMethod:-} | %X{requestUri:-}] - %msg%n"
     />
 
     <!-- 콘솔 로그 출력 -->
