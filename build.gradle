@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.14'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
 }
 
 group = 'com.sprint.mission'
@@ -88,6 +89,7 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
 }
 
 
@@ -104,4 +106,16 @@ sourceSets {
 
 tasks.withType(JavaCompile).configureEach {
 	options.annotationProcessorGeneratedSourcesDirectory = generated.get().asFile
+}
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.named('build') {
+	finalizedBy tasks.named('jacocoTestReport')
 }
