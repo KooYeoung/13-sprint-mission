@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,10 +45,18 @@ public class BinaryContentService {
                 file.getSize()
         ));
 
-        binaryContentStorage.put(binaryContent.getId(), getBytes(file));
+        binaryContentStorage.put(binaryContent.getId(), getInputStreamFromFile(file));
 
         log.info("파일 업로드 완료. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);
+    }
+
+    private InputStream getInputStreamFromFile(MultipartFile file) {
+        try {
+            return file.getInputStream();
+        } catch (IOException e) {
+            throw new FileReadFailedException(file.getOriginalFilename(), e);
+        }
     }
 
     @Transactional(readOnly = true)

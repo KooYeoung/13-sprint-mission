@@ -11,13 +11,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.PathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
@@ -48,20 +48,27 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     }
 
     @Override
-    public UUID put(UUID fileId, byte[] bytes) {
+    public UUID put(UUID fileId, InputStream inputStream) {
         Path savePath = resolvePath(fileId);
+        boolean fileCreated = false;
         try {
-            Files.write(
-                    savePath,
-                    bytes,
-                    StandardOpenOption.CREATE_NEW
-            );
+
+            try (OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                fileCreated = true;
+                inputStream.transferTo(os);
+            }
 
             transactionManager.deleteOnRollback(savePath);
 
             return fileId;
-
         } catch (IOException e) {
+            if (fileCreated) {
+                try {
+                    Files.deleteIfExists(savePath);
+                } catch (IOException deleteException) {
+                    e.addSuppressed(deleteException);
+                }
+            }
             throw new FileSaveFailedException(savePath, e);
         }
     }
