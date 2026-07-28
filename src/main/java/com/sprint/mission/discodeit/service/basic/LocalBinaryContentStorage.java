@@ -12,6 +12,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.PathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
@@ -89,7 +90,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     @Override
     public Resource download(BinaryContentDto binaryContentDto) {
-        return new InputStreamResource(get(binaryContentDto.id()));
+        return new PathResource(resolvePath(binaryContentDto.id()));
     }
 
     @Override
