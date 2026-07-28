@@ -155,6 +155,32 @@ class P6SpySqlFormatterTest {
     }
 
     @Test
+    @DisplayName("P6Spy SQL formatting - batch SQL with question mark literal is not logged")
+    void formatMessage_logsSafeBatchEvent_whenBatchSqlContainsQuestionMarkInsideLiteral() {
+        // given
+        String sql = "insert into users (email, id) "
+                + "values ('a?b@example.com', '11111111-1111-1111-1111-111111111111')";
+
+        // when
+        String message = formatter.formatMessage(
+                1,
+                "",
+                3L,
+                Category.BATCH.getName(),
+                "",
+                sql,
+                ""
+        );
+
+        // then
+        assertThat(message).contains("[batch] | 3 ms | connection=1");
+        assertThat(message).contains("JDBC batch executed");
+        assertThat(message)
+                .doesNotContain("a?b@example.com")
+                .doesNotContain("11111111-1111-1111-1111-111111111111");
+    }
+
+    @Test
     @DisplayName("P6Spy SQL 포맷 성공 - 배치 이벤트도 SQL이 없으면 실행 여부만 출력")
     void formatMessage_logsBatchEvent_whenPreparedSqlAndSqlAreBlank() {
         // given

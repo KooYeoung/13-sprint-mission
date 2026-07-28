@@ -46,7 +46,8 @@ public class P6SpySqlFormatter implements MessageFormattingStrategy {
     private boolean isSafeTemplateSql(String sql) {
         return sql != null
                 && !sql.isBlank()
-                && sql.contains("?");
+                && sql.contains("?")
+                && !sql.contains("'");
     }
 
     private String formatLogMessage(String category, long elapsed, int connectionId, String message) {
