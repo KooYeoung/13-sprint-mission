@@ -33,6 +33,16 @@ springBoot {
 	}
 }
 
+ext {
+	set('springBootAdminVersion', "3.5.7")
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "de.codecentric:spring-boot-admin-dependencies:${springBootAdminVersion}"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
@@ -71,6 +81,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	implementation 'de.codecentric:spring-boot-admin-starter-client'
+
 }
 
 tasks.named('test') {

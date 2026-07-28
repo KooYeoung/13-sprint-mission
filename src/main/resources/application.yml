@@ -2,6 +2,11 @@ spring:
   application:
     # 애플리케이션 식별 이름
     name: discodeit
+  boot:
+    admin:
+      client:
+        instance:
+          name: discodeit
 
   profiles:
     # 별도 프로파일을 지정하지 않으면 개발 환경 적용

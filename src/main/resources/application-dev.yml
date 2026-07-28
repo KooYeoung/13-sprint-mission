@@ -2,6 +2,10 @@ server:
   port: 8080
 
 spring:
+  boot:
+    admin:
+      client:
+        url: http://localhost:9090
   docker:
     compose:
       # 애플리케이션 실행 시 Docker Compose 자동 실행
