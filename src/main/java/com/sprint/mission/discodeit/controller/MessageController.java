@@ -6,6 +6,7 @@ import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.service.MessageService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,7 +30,7 @@ public class MessageController implements MessageApi {
 
     @PostMapping
     public ResponseEntity<MessageDto> create(
-            @RequestPart MessageCreateRequest messageCreateRequest,
+            @Valid @RequestPart MessageCreateRequest messageCreateRequest,
             @RequestPart(required = false) List<MultipartFile> attachments
     ) {
         MessageDto save = messageService.save(messageCreateRequest.toCommand(), attachments);
@@ -46,7 +46,7 @@ public class MessageController implements MessageApi {
                     direction = Sort.Direction.DESC
             )
             Pageable pageable,
-            @RequestParam(required = false) Instant cursor
+            @RequestParam(required = false) UUID cursor
     ) {
 
         log.info("cursor : {}", cursor);
@@ -57,7 +57,7 @@ public class MessageController implements MessageApi {
     @PatchMapping("/{messageId}")
     public ResponseEntity<MessageDto> update(
             @PathVariable UUID messageId,
-            @RequestBody MessageUpdateRequest request
+            @Valid @RequestBody MessageUpdateRequest request
     ) {
         return ResponseEntity.ok(messageService.update(messageId, request.toCommand()));
     }

@@ -1,15 +1,16 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.file.CustomFileNotFoundException;
-import com.sprint.mission.discodeit.exception.file.FileError;
+import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +26,7 @@ import java.util.UUID;
 @Service
 @Transactional
 @RequiredArgsConstructor
+@Slf4j
 public class BinaryContentService {
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
@@ -42,9 +45,18 @@ public class BinaryContentService {
                 file.getSize()
         ));
 
-        binaryContentStorage.put(binaryContent.getId(), getBytes(file));
+        binaryContentStorage.put(binaryContent.getId(), getInputStreamFromFile(file));
 
+        log.info("파일 업로드 완료. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);
+    }
+
+    private InputStream getInputStreamFromFile(MultipartFile file) {
+        try {
+            return file.getInputStream();
+        } catch (IOException e) {
+            throw new FileReadFailedException(file.getOriginalFilename(), e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -71,6 +83,7 @@ public class BinaryContentService {
         Optional<BinaryContent> existingContent = binaryContentRepository.findById(id);
 
         if (existingContent.isEmpty()) {
+            log.warn("파일이 존재하지 않습니다. binaryContentId={}", id);
             return;
         }
 
@@ -102,6 +115,7 @@ public class BinaryContentService {
         binaryContentRepository.deleteAllByIdIn(binaryContentIds);
     }
 
+    @LogAction(value = "파일 다운로드")
     public DownloadDto download(UUID binaryContentId) {
         BinaryContent binaryContent = getBinaryContentById(binaryContentId);
         Resource resource = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
@@ -113,12 +127,12 @@ public class BinaryContentService {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+            throw new FileReadFailedException(file.getOriginalFilename(), e);
         }
     }
 
     private @NonNull BinaryContent getBinaryContentById(UUID id) {
         return binaryContentRepository.findById(id)
-                .orElseThrow(CustomFileNotFoundException::new);
+                .orElseThrow(() -> new FileNotFoundException(id));
     }
 }

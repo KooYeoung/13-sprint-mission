@@ -15,6 +15,7 @@ public class ChannelReader {
     private final ChannelRepository channelRepository;
 
     public Channel getChannel(UUID channelId) {
-        return channelRepository.findById(channelId).orElseThrow(ChannelNotFoundException::new);
+        return channelRepository.findById(channelId)
+                .orElseThrow(() -> new ChannelNotFoundException(channelId));
     }
 }

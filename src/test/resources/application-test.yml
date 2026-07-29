@@ -1,0 +1,75 @@
+server:
+  # 테스트 실행 시 사용 가능한 임의 포트 할당
+  port: 0
+
+spring:
+  docker:
+    compose:
+      # 테스트에서는 PostgreSQL Docker Compose를 실행하지 않음
+      enabled: false
+
+  datasource:
+    # PostgreSQL 호환 모드의 H2 인메모리 DB 사용
+    url: jdbc:h2:mem:discodeit;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    show-sql: false
+    hibernate:
+      # 테스트 시작 시 스키마 생성, 종료 시 삭제
+      ddl-auto: create-drop
+
+    open-in-view: false
+
+    properties:
+      hibernate:
+        show_sql: false
+        # 테스트 SQL 가독성, 배치 조회, JDBC 배치 및 배치 정렬 설정
+        format_sql: true
+        default_batch_fetch_size: 100
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    # 테스트 스키마는 Hibernate가 생성하므로 Flyway 비활성화
+    enabled: false
+
+  servlet:
+    multipart:
+      # 파일 업로드 테스트 크기 제한
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+decorator:
+  datasource:
+    # 테스트에서 P6Spy SQL 로그 활성화
+    enabled: true
+
+    p6spy:
+      enable-logging: true
+      logging: slf4j
+
+      # 사용자 정의 P6SpySqlFormatter가 SQL 포맷을 담당한다.
+      exclude-categories: info,debug,result,resultset,commit,rollback
+
+logging:
+  level:
+    # 테스트 및 SQL 디버깅 로그
+    root: info
+    com.sprint.mission.discodeit: debug
+    p6spy: info
+
+    # Hibernate JDBC batch에서 P6Spy가 SQL 템플릿을 제공하지 않는 경우에도 DML을 확인할 수 있도록 SQL 로그 활성화
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.batch: trace
+    org.hibernate.orm.jdbc.bind: off
+
+discodeit:
+  storage:
+    # 테스트 파일은 build 하위의 별도 경로에 저장
+    type: local
+    path: ./build/test-uploads

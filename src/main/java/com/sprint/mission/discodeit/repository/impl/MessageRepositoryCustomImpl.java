@@ -1,20 +1,17 @@
 package com.sprint.mission.discodeit.repository.impl;
 
-import com.querydsl.core.types.Order;
-import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.sprint.mission.discodeit.entity.Message;
+import com.sprint.mission.discodeit.entity.QMessage;
 import com.sprint.mission.discodeit.repository.MessageRepositoryCustom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,7 +26,7 @@ public class MessageRepositoryCustomImpl implements MessageRepositoryCustom {
     private final JPAQueryFactory jpaQueryFactory;
 
     @Override
-    public Slice<Message> findAllByChannelId(UUID channelId, Pageable pageable, Instant cursor) {
+    public Slice<Message> findAllByChannelId(UUID channelId, Pageable pageable, UUID cursor) {
 
         int pageSize = pageable.getPageSize();
 
@@ -41,25 +38,38 @@ public class MessageRepositoryCustomImpl implements MessageRepositoryCustom {
                 .leftJoin(user.userStatus).fetchJoin()
                 .where(
                         filterByChannelId(channelId),
-                        filterByCreatedAt(cursor)
+                        filterByCursor(channelId, cursor)
                 )
-                .orderBy(message.createdAt.desc())
-                .limit(pageSize + 1)
+                .orderBy(message.createdAt.desc(), message.id.desc())
+                .limit(pageSize + 1L)
                 .fetch();
 
         boolean hasNext = messages.size() > pageSize;
 
-        if(hasNext){
+        if (hasNext) {
             messages.remove(pageSize);
         }
 
         return new SliceImpl<>(messages, pageable, hasNext);
     }
 
-    private BooleanExpression filterByCreatedAt(Instant cursor) {
+    private BooleanExpression filterByCursor(UUID channelId, UUID cursor) {
         if (cursor == null) return null;
 
-        return message.createdAt.lt(cursor);
+        QMessage cursorMessage = new QMessage("cursorMessage");
+        var cursorCreatedAt = JPAExpressions
+                .select(cursorMessage.createdAt)
+                .from(cursorMessage)
+                .where(
+                        cursorMessage.id.eq(cursor),
+                        cursorMessage.channel.id.eq(channelId)
+                );
+
+        return message.createdAt.lt(cursorCreatedAt)
+                .or(
+                        message.createdAt.eq(cursorCreatedAt)
+                                .and(message.id.lt(cursor))
+                );
     }
 
     private BooleanExpression filterByChannelId(UUID channelId) {
@@ -68,26 +78,4 @@ public class MessageRepositoryCustomImpl implements MessageRepositoryCustom {
         return channel.id.eq(channelId);
     }
 
-    // example..
-    private OrderSpecifier<?>[] getOrderSpecifiers(Pageable pageable) {
-        if (pageable.getSort().isUnsorted()) {
-            return new OrderSpecifier[]{
-                    message.createdAt.desc()
-            };
-        }
-
-        List<OrderSpecifier<?>> orders = new ArrayList<>();
-
-        for (Sort.Order sortOrder : pageable.getSort()) {
-            Order direction = sortOrder.isAscending() ? Order.ASC : Order.DESC;
-
-            switch (sortOrder.getProperty()) {
-                case "createdAt" -> orders.add(new OrderSpecifier<>(direction, message.createdAt));
-                case "updatedAt" -> orders.add(new OrderSpecifier<>(direction, message.updatedAt));
-                default -> throw new IllegalArgumentException("지원하지 않는 정렬 필드입니다: " + sortOrder.getProperty());
-            }
-        }
-
-        return orders.toArray(OrderSpecifier[]::new);
-    }
 }

@@ -14,8 +14,9 @@ import java.util.UUID;
 
 public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
 
-    @EntityGraph(attributePaths = {"user", "channel"})
-    List<ReadStatus> findByUser_Id(UUID userId);
+    @EntityGraph(attributePaths = {"user", "channel", "user.userStatus"})
+    @Query("SELECT rs FROM ReadStatus rs WHERE rs.user.id = :userId")
+    List<ReadStatus> findByUserId(@Param("userId") UUID userId);
 
     void deleteByChannel_Id(UUID channelId);
 
@@ -44,16 +45,17 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
             nativeQuery = true)
     int burkInsert(@Param("channelId") UUID channelId, @Param("userIds") List<UUID> userIds, @Param("readAt") Instant readAt);
 
-    @EntityGraph(attributePaths = {"user", "user.profile", "channel"})
-    List<ReadStatus> findByChannel_Id(UUID channelId);
+    @EntityGraph(attributePaths = {"user", "user.profile", "user.userStatus", "channel"})
+    @Query("SELECT rs FROM ReadStatus rs WHERE rs.channel.id = :channelId")
+    List<ReadStatus> findByChannelId(@Param("channelId") UUID channelId);
 
-
-    @EntityGraph(attributePaths = {"user", "user.profile", "channel"})
-    List<ReadStatus> findByChannel_IdIn(List<UUID> channelIds);
+    @EntityGraph(attributePaths = {"user", "user.profile", "user.userStatus", "channel"})
+    @Query("SELECT rs FROM ReadStatus rs WHERE rs.channel.id IN :channelIds")
+    List<ReadStatus> findByChannelIdIn(List<UUID> channelIds);
 
     boolean existsByChannel_Id(UUID channelId);
 
-    @EntityGraph(attributePaths = {"user", "channel"})
+    @EntityGraph(attributePaths = {"user", "user.userStatus", "channel"})
     @Override
     Optional<ReadStatus> findById(UUID id);
 

@@ -5,6 +5,7 @@ import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusCreateReque
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
 import com.sprint.mission.discodeit.service.basic.ReadStatusService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,7 @@ public class ReadStatusController implements ReadStatusApi {
     private final ReadStatusService readStatusService;
 
     @PostMapping
-    public ResponseEntity<ReadStatusDto> save(@RequestBody ReadStatusCreateRequest request) {
+    public ResponseEntity<ReadStatusDto> save( @Valid @RequestBody ReadStatusCreateRequest request) {
         ReadStatusDto save = readStatusService.save(
                 request.channelId(),
                 request.toCommand()
@@ -40,7 +41,7 @@ public class ReadStatusController implements ReadStatusApi {
     @PatchMapping("/{readStatusId}")
     public ResponseEntity<ReadStatusDto> update(
             @PathVariable UUID readStatusId,
-            @RequestBody ReadStatusUpdateRequest request
+            @Valid @RequestBody ReadStatusUpdateRequest request
     ) {
         ReadStatusDto update = readStatusService.update(
                 readStatusId,

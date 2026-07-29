@@ -1,11 +1,12 @@
 package com.sprint.mission.discodeit.exception;
 
-public class CustomInternalServerException extends RuntimeException {
-    public CustomInternalServerException(String message) {
-        super(message);
+public class CustomInternalServerException extends DiscodeitException {
+
+    public CustomInternalServerException(ErrorCode errorCode) {
+        super(errorCode);
     }
 
-    public CustomInternalServerException(String message, Throwable cause) {
-        super(message, cause);
+    public CustomInternalServerException(ErrorCode errorCode, Throwable cause) {
+        super(errorCode, cause);
     }
 }

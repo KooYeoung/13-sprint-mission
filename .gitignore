@@ -53,3 +53,7 @@ analysis/
 
 ## 업로드 폴더
 uploads/
+
+## log
+*.log
+*.log.gz

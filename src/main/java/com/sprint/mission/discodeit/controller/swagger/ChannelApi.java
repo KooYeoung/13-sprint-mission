@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,11 +26,11 @@ public interface ChannelApi {
 
     @Operation(summary = "Public Channel 생성")
     @ApiResponse(responseCode = "201", description = "Public Channel이 성공적으로 생성됨")
-    ResponseEntity<ChannelDto> createPublic(@RequestBody PublicChannelCreateRequest request);
+    ResponseEntity<ChannelDto> createPublic(@Valid @RequestBody PublicChannelCreateRequest request);
 
     @Operation(summary = "Private Channel 생성")
     @ApiResponse(responseCode = "201", description = "Private Channel이 성공적으로 생성됨")
-    ResponseEntity<ChannelDto> createPrivate(@RequestBody PrivateChannelCreateRequest request);
+    ResponseEntity<ChannelDto> createPrivate(@Valid @RequestBody PrivateChannelCreateRequest request);
 
     @Operation(summary = "User가 참여 중인 Channel 목록 조회")
     @ApiResponse(responseCode = "200", description = "Channel 목록 조회 성공")
@@ -64,7 +65,7 @@ public interface ChannelApi {
             @Parameter(description = "수정할 Channel ID", required = true)
             UUID channelId,
 
-            @RequestBody ChannelUpdateRequest request
+            @Valid @RequestBody ChannelUpdateRequest request
     );
 
     @Operation(summary = "Channel 삭제")
