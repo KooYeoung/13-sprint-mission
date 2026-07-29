@@ -93,10 +93,14 @@ public class BasicUserService implements UserService {
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
+        UUID userStatusId = user.getStatusId();
+        user.detachUserStatus();
 
-        userStatusService.delete(user.getStatusId(), userId);
         readStatusService.deleteByUserId(userId);
         messageService.detachByAuthorId(userId);
+        if (userStatusId != null) {
+            userStatusService.delete(userStatusId, userId);
+        }
 
         userRepository.deleteById(user.getId());
 

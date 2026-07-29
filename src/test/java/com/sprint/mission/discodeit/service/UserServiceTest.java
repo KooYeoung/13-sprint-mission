@@ -8,6 +8,7 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserUsernameDuplicatedException;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -912,8 +914,12 @@ class UserServiceTest {
             // User를 mock으로 만들기보다 실제 엔티티에 id를 넣어 사용하는 편이 안전하다.
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
+            UUID userStatusId = UUID.randomUUID();
             User user = new User(command, null);
             ReflectionTestUtils.setField(user, "id", userId);
+            UserStatus userStatus = new UserStatus(user, new UserStatusCreateCommand(Instant.now()));
+            ReflectionTestUtils.setField(userStatus, "id", userStatusId);
+            ReflectionTestUtils.setField(user, "userStatus", userStatus);
 
             // userId로 조회하면 삭제 대상 사용자가 존재하는 상황을 만든다.
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -925,17 +931,18 @@ class UserServiceTest {
             // then
             // 삭제 성공 흐름은 순서가 중요하다.
             // 1. 삭제 대상 사용자 조회
-            // 2. 사용자 상태 삭제
-            // 3. 읽음 상태 삭제
-            // 4. 메시지 작성자 연결 해제
+            // 2. 읽음 상태 삭제
+            // 3. 메시지 작성자 연결 해제
+            // 4. 사용자 상태 명시 삭제
             // 5. 사용자 엔티티 삭제
             // 프로필 이미지가 없으면 파일 삭제는 실행되지 않는다.
-            InOrder inOrder = inOrder(userRepository, userStatusService, readStatusService, messageService);
+            InOrder inOrder = inOrder(userRepository, readStatusService, messageService, userStatusService);
             inOrder.verify(userRepository).findById(userId);
-            inOrder.verify(userStatusService).delete(user.getStatusId(), userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
+            inOrder.verify(userStatusService).delete(userStatusId, userId);
             inOrder.verify(userRepository).deleteById(userId);
+            assertThat(user.getStatusId()).isNull();
 
             // 프로필 이미지가 없는 사용자이므로 파일 삭제는 실행되지 않아야 한다.
             verify(binaryContentService, never()).delete(any(BinaryContent.class));
@@ -977,10 +984,14 @@ class UserServiceTest {
             // User.isProfileImageExist()와 User.getProfile()의 실제 동작이 필요하므로 실제 User/파일 엔티티를 사용한다.
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
+            UUID userStatusId = UUID.randomUUID();
 
             BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
             User user = new User(command, profile);
             ReflectionTestUtils.setField(user, "id", userId);
+            UserStatus userStatus = new UserStatus(user, new UserStatusCreateCommand(Instant.now()));
+            ReflectionTestUtils.setField(userStatus, "id", userStatusId);
+            ReflectionTestUtils.setField(user, "userStatus", userStatus);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
@@ -991,13 +1002,14 @@ class UserServiceTest {
             // then
             // 프로필이 있는 경우에도 먼저 사용자와 연결된 도메인 데이터를 정리한 뒤 사용자 엔티티를 삭제한다.
             // 파일 삭제는 DB 사용자 삭제 요청 이후에 수행되는 후처리다.
-            InOrder inOrder = inOrder(userRepository, userStatusService, readStatusService, messageService, binaryContentService);
+            InOrder inOrder = inOrder(userRepository, readStatusService, messageService, userStatusService, binaryContentService);
             inOrder.verify(userRepository).findById(userId);
-            inOrder.verify(userStatusService).delete(user.getStatusId(), userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
+            inOrder.verify(userStatusService).delete(userStatusId, userId);
             inOrder.verify(userRepository).deleteById(userId);
             inOrder.verify(binaryContentService).delete(profile);
+            assertThat(user.getStatusId()).isNull();
 
             // delete()는 DTO를 반환하지 않으므로 mapper를 사용하지 않는다.
             verifyNoInteractions(userMapper);
