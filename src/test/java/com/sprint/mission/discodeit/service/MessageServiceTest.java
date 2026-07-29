@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.service;
 
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
+import com.sprint.mission.discodeit.dto.repository.MessagePagingCondition;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.dto.response.PageResponse;
@@ -12,6 +13,7 @@ import com.sprint.mission.discodeit.entity.MessageFile;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.ErrorCode;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
+import com.sprint.mission.discodeit.exception.message.MessageInvalidPagingConditionException;
 import com.sprint.mission.discodeit.exception.message.MessageNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.MessageMapper;
@@ -437,6 +439,7 @@ class MessageServiceTest {
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
             UUID cursor = UUID.randomUUID();
+            MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
 
             // 목록 조회 결과로 반환될 Message를 준비한다.
             // 서비스는 Message.getId()로 첨부 파일을 한 번에 조회하고, 다시 Message별 첨부 파일 목록을 매칭한다.
@@ -474,7 +477,7 @@ class MessageServiceTest {
             PageResponse<MessageDto> pageResponse = createPageResponse(messageDto, nextCursor, pageable, true);
 
             // repository가 다음 페이지가 있는 메시지 Slice를 반환하는 상황을 만든다.
-            given(messageRepository.findAllByChannelId(channelId, pageable, cursor))
+            given(messageRepository.findAllByCondition(condition))
                     .willReturn(sliceMessage);
 
             // 서비스는 조회된 메시지 ID 목록으로 첨부 파일을 한 번에 조회한다.
@@ -499,8 +502,8 @@ class MessageServiceTest {
 
             InOrder inOrder = inOrder(messageRepository, messageFileService, messageMapper, messageDtoPageResponseMapper);
 
-            // 1. 채널 ID, 페이지 조건, cursor로 메시지 Slice를 조회한다.
-            inOrder.verify(messageRepository).findAllByChannelId(channelId, pageable, cursor);
+            // 1. 채널 ID, 페이지 조건, cursor를 담은 condition으로 메시지 Slice를 조회한다.
+            inOrder.verify(messageRepository).findAllByCondition(condition);
 
             // 2. 조회된 Message ID 목록으로 첨부 파일을 한 번에 조회한다.
             inOrder.verify(messageFileService).findAllByMessageIds(messageIds);
@@ -535,6 +538,7 @@ class MessageServiceTest {
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
             UUID cursor = UUID.randomUUID();
+            MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
 
             // 첫 번째 메시지를 준비한다.
             // 서비스는 Message.getId()로 메시지 ID 목록을 만들기 때문에 id 값을 반드시 stub 해야 한다.
@@ -589,7 +593,7 @@ class MessageServiceTest {
             PageResponse<MessageDto> pageResponse = createPageResponse(messageDtos, null, pageable, false);
 
             // repository가 다음 페이지가 없는 메시지 Slice를 반환하는 상황을 만든다.
-            given(messageRepository.findAllByChannelId(channelId, pageable, cursor))
+            given(messageRepository.findAllByCondition(condition))
                     .willReturn(sliceMessage);
 
             // 서비스는 Slice에 담긴 메시지 ID 목록으로 첨부 파일을 한 번에 조회한다.
@@ -621,8 +625,8 @@ class MessageServiceTest {
 
             InOrder inOrder = inOrder(messageRepository, messageFileService, messageMapper, messageDtoPageResponseMapper);
 
-            // 1. 채널 ID, 페이지 조건, cursor로 메시지 Slice를 조회한다.
-            inOrder.verify(messageRepository).findAllByChannelId(channelId, pageable, cursor);
+            // 1. 채널 ID, 페이지 조건, cursor를 담은 condition으로 메시지 Slice를 조회한다.
+            inOrder.verify(messageRepository).findAllByCondition(condition);
 
             // 2. 조회된 메시지 ID 목록으로 첨부 파일을 한 번에 조회한다.
             inOrder.verify(messageFileService).findAllByMessageIds(messageIds);
@@ -661,6 +665,7 @@ class MessageServiceTest {
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
             UUID cursor = UUID.randomUUID();
+            MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
 
             // repository가 빈 Slice를 반환하는 상황을 만든다.
             // 조회된 메시지가 없으므로 hasNext도 false이다.
@@ -673,7 +678,7 @@ class MessageServiceTest {
             PageResponse<MessageDto> pageResponse = createPageResponse(messageDtos, null, pageable, false);
 
             // 채널별 메시지 조회 결과로 빈 Slice를 반환하도록 설정한다.
-            given(messageRepository.findAllByChannelId(channelId, pageable, cursor))
+            given(messageRepository.findAllByCondition(condition))
                     .willReturn(messageSlice);
 
             // 빈 Slice에서는 nextCursor가 계산될 수 없으므로 PageResponseMapper에는 null이 전달되어야 한다.
@@ -693,8 +698,8 @@ class MessageServiceTest {
 
             InOrder inOrder = inOrder(messageRepository, messageDtoPageResponseMapper);
 
-            // 1. 채널 ID, 페이지 조건, cursor로 메시지 Slice를 조회한다.
-            inOrder.verify(messageRepository).findAllByChannelId(channelId, pageable, cursor);
+            // 1. 채널 ID, 페이지 조건, cursor를 담은 condition으로 메시지 Slice를 조회한다.
+            inOrder.verify(messageRepository).findAllByCondition(condition);
 
             // 2. 빈 DTO Slice와 null nextCursor를 PageResponseMapper에 넘긴다.
             @SuppressWarnings("unchecked")
@@ -728,6 +733,7 @@ class MessageServiceTest {
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
             UUID cursor = UUID.randomUUID();
+            MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
 
             // 이 테스트의 핵심 시나리오는 "목록 조회 결과 전체에는 첨부 파일이 존재하지만,
             // 일부 메시지에는 매칭되는 첨부 파일이 없는 경우"이다.
@@ -791,7 +797,7 @@ class MessageServiceTest {
             PageResponse<MessageDto> pageResponse = createPageResponse(messageDtos, null, pageable, false);
 
             // repository가 다음 페이지가 없는 메시지 Slice를 반환하는 상황을 만든다.
-            given(messageRepository.findAllByChannelId(channelId, pageable, cursor))
+            given(messageRepository.findAllByCondition(condition))
                     .willReturn(sliceMessage);
 
             // 서비스는 Slice에 담긴 메시지 ID 목록으로 첨부 파일을 한 번에 조회한다.
@@ -824,8 +830,8 @@ class MessageServiceTest {
 
             InOrder inOrder = inOrder(messageRepository, messageFileService, messageMapper, messageDtoPageResponseMapper);
 
-            // 1. 채널 ID, 페이지 조건, cursor로 메시지 Slice를 조회한다.
-            inOrder.verify(messageRepository).findAllByChannelId(channelId, pageable, cursor);
+            // 1. 채널 ID, 페이지 조건, cursor를 담은 condition으로 메시지 Slice를 조회한다.
+            inOrder.verify(messageRepository).findAllByCondition(condition);
 
             // 2. 조회된 메시지 ID 목록으로 첨부 파일을 한 번에 조회한다.
             inOrder.verify(messageFileService).findAllByMessageIds(messageIds);
@@ -863,6 +869,33 @@ class MessageServiceTest {
             // 채널별 메시지 목록 조회는 사용자/채널 엔티티를 별도로 조회하지 않는다.
             // channelId는 repository 조회 조건으로만 사용되므로 UserReader, ChannelReader는 호출되면 안 된다.
             verifyNoInteractions(userReader, channelReader);
+        }
+
+        @Test
+        @DisplayName("채널별 메시지 목록 조회 실패 - channelId가 null이면 조회 조건 생성 실패")
+        void findAllByChannelId_throwsMessageInvalidPagingConditionException_whenChannelIdIsNull() {
+            // given
+            // BasicMessageService는 Repository에 넘기기 전에 MessagePagingCondition을 만든다.
+            // channelId는 메시지 목록 조회의 필수 조건이므로 null이면 Repository 호출 전에 실패해야 한다.
+            UUID channelId = null;
+            Pageable pageable = PageRequest.of(0, 10);
+            UUID cursor = UUID.randomUUID();
+
+            // when / then
+            assertThatThrownBy(() -> messageService.findAllByChannelId(channelId, pageable, cursor))
+                    .isInstanceOfSatisfying(MessageInvalidPagingConditionException.class, exception -> {
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MESSAGE_INVALID_PAGING_CONDITION);
+                        assertThat(exception.getDetails()).containsEntry("parameter", "channelId");
+                    });
+
+            verifyNoInteractions(
+                    messageRepository,
+                    messageFileService,
+                    messageMapper,
+                    messageDtoPageResponseMapper,
+                    userReader,
+                    channelReader
+            );
         }
     }
 

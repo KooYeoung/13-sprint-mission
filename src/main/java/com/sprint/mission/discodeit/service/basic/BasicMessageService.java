@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageUpdateCommand;
+import com.sprint.mission.discodeit.dto.repository.MessagePagingCondition;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.entity.Channel;
@@ -62,7 +63,8 @@ public class BasicMessageService implements MessageService {
     @Override
     public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable, UUID cursor) {
 
-        Slice<Message> messageSlice = getMessageSliceDsl(channelId, pageable, cursor);
+        MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
+        Slice<Message> messageSlice = getMessageSliceDsl(condition);
 
         List<Message> content = messageSlice.getContent();
 
@@ -151,9 +153,9 @@ public class BasicMessageService implements MessageService {
                 .toList();
     }
 
-    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, UUID cursor) {
+    private Slice<Message> getMessageSliceDsl(MessagePagingCondition condition) {
 
-        return messageRepository.findAllByChannelId(channelId, pageable, cursor);
+        return messageRepository.findAllByCondition(condition);
     }
 
 }

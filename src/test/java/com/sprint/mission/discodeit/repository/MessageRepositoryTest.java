@@ -7,6 +7,7 @@ import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicComma
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
+import com.sprint.mission.discodeit.dto.repository.MessagePagingCondition;
 import com.sprint.mission.discodeit.entity.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -420,7 +420,7 @@ class MessageRepositoryTest {
     @DisplayName("채널별 메시지 Slice 조회 성공 - cursor가 없으면 최신순으로 첫 페이지 반환")
     void findAllByChannelId_returnsMessagesOrderedByCreatedAtDesc_whenCursorIsNull() throws InterruptedException {
         // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)다.
+        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByCondition(...)다.
         // cursor가 null이면 첫 페이지 조회이므로 createdAt 조건 없이 대상 채널의 메시지를 최신순으로 가져와야 한다.
         //
         // 검증해야 하는 계약은 세 가지다.
@@ -526,7 +526,9 @@ class MessageRepositoryTest {
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
         UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // 첫 페이지 메타데이터가 요청한 Pageable을 반영해야 한다.
@@ -554,7 +556,7 @@ class MessageRepositoryTest {
     @DisplayName("채널별 메시지 Slice 조회 성공 - cursor 메시지보다 오래된 메시지만 반환")
     void findAllByChannelId_appliesCursorExclusive_whenCursorExists() throws InterruptedException {
         // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 cursor 조건이다.
+        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByCondition(...)의 cursor 조건이다.
         // cursor가 있으면 Repository가 서브쿼리로 cursor 메시지의 createdAt을 조회한 뒤,
         // cursor 메시지와 같은 시각 또는 더 최신 메시지는 제외하고 cursor 메시지보다 오래된 메시지만 반환해야 한다.
         //
@@ -662,7 +664,9 @@ class MessageRepositoryTest {
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
         UUID cursor = savedMiddleMessageId;
         Pageable pageable = PageRequest.of(0, 2);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // Slice 메타데이터가 요청한 Pageable을 반영해야 한다.
@@ -740,7 +744,9 @@ class MessageRepositoryTest {
         // 같은 createdAt 그룹의 중간 id를 cursor로 넘긴다.
         // 다음 페이지 조건이 id < cursorId를 포함하면 정렬상 cursor 뒤에 있는 expectedNextId만 반환된다.
         Pageable pageable = PageRequest.of(0, 3);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         assertThat(allByChannelId.getContent()).hasSize(1);
@@ -794,7 +800,9 @@ class MessageRepositoryTest {
         // 다른 채널 메시지 id를 cursor로 넘긴다.
         UUID cursor = otherChannelCursorMessageId;
         Pageable pageable = PageRequest.of(0, 2);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // cursor 위치 서브쿼리가 channelId까지 확인하므로, 다른 채널 cursor는 대상 채널의 위치로 해석되지 않는다.
@@ -806,7 +814,7 @@ class MessageRepositoryTest {
     @DisplayName("채널별 메시지 Slice 조회 성공 - pageSize보다 결과가 많으면 hasNext true 반환")
     void findAllByChannelId_returnsSliceWithHasNextTrue_whenResultSizeExceedsPageSize() throws InterruptedException {
         // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 Slice hasNext 계산이다.
+        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByCondition(...)의 Slice hasNext 계산이다.
         // 현재 구현은 pageSize보다 1건 더 조회한다.
         //
         // 1. limit(pageSize + 1)로 실제 조회 대상이 다음 페이지를 가질 만큼 충분한지 확인한다.
@@ -887,7 +895,9 @@ class MessageRepositoryTest {
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
         UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // Slice 메타데이터가 요청한 Pageable을 반영해야 한다.
@@ -919,7 +929,7 @@ class MessageRepositoryTest {
     @DisplayName("채널별 메시지 Slice 조회 성공 - pageSize 이하이면 hasNext false 반환")
     void findAllByChannelId_returnsSliceWithHasNextFalse_whenResultSizeDoesNotExceedPageSize() throws InterruptedException {
         // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 hasNext=false 경계 조건이다.
+        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByCondition(...)의 hasNext=false 경계 조건이다.
         // 현재 구현은 pageSize보다 1건 더 조회한 뒤, 조회 결과 수가 pageSize보다 클 때만 hasNext를 true로 만든다.
         //
         // 따라서 "조회 대상 채널의 메시지 수 == pageSize"인 경계값을 검증해야 한다.
@@ -1008,7 +1018,9 @@ class MessageRepositoryTest {
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
         UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // Slice 메타데이터가 요청한 Pageable을 반영해야 한다.
@@ -1037,7 +1049,7 @@ class MessageRepositoryTest {
     @DisplayName("채널별 메시지 Slice 조회 성공 - 채널, 작성자, 프로필, 작성자 상태를 함께 조회")
     void findAllByChannelId_fetchesChannelAuthorProfileAndStatus_whenMessagesExist() {
         // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 fetch join 계약이다.
+        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByCondition(...)의 fetch join 계약이다.
         // 커스텀 Querydsl 구현은 다음 연관관계를 함께 조회하도록 선언되어 있다.
         //
         // 1. message.channel
@@ -1109,7 +1121,9 @@ class MessageRepositoryTest {
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
         UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 1);
-        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+        Slice<Message> allByChannelId = messageRepository.findAllByCondition(
+                messagePagingCondition(savedChannelId, pageable, cursor)
+        );
 
         // then
         // 조회 대상 채널의 메시지 1건만 반환되어야 한다.
@@ -1166,32 +1180,6 @@ class MessageRepositoryTest {
         assertThat(userStatus.getUserId()).isEqualTo(savedAuthorId);
         assertThat(Duration.between(authorFixture.userStatus().getLastActiveAt(), userStatus.getLastActiveAt()).abs())
                 .isLessThanOrEqualTo(Duration.ofNanos(1_000));
-    }
-
-    @Test
-    @DisplayName("채널별 메시지 Slice 조회 실패 - channelId가 null이면 데이터 접근 예외 발생")
-    void findAllByChannelId_throwsDataAccessException_whenChannelIdIsNull() {
-        // given
-        // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 입력 검증이다.
-        // 구현의 filterByChannelId(...)는 channelId가 null이면 IllegalArgumentException을 던진다.
-        // 다만 Repository Bean에는 Spring 예외 변환이 적용되므로,
-        // 테스트에서 관찰되는 최종 예외 타입은 InvalidDataAccessApiUsageException이다.
-        //
-        // 여기서는 DB row가 필요한 검증이 아니다.
-        // Pageable은 정상 값으로 넘기고 channelId만 null로 둬, 실패 원인이 channelId 검증임을 분명히 한다.
-        UUID channelId = null;
-        Pageable pageable = PageRequest.of(0, 2);
-        UUID cursor = null;
-
-        // when / then
-        // channelId가 null이면 Querydsl where 조건을 만들 수 없으므로 데이터 접근 예외가 발생해야 한다.
-        // 겉으로 드러나는 예외는 Spring이 변환한 InvalidDataAccessApiUsageException이고,
-        // root cause는 구현이 직접 던진 IllegalArgumentException이어야 한다.
-        assertThatThrownBy(() -> messageRepository.findAllByChannelId(channelId, pageable, cursor))
-                .isInstanceOf(InvalidDataAccessApiUsageException.class)
-                .hasMessageContaining("channelId must not be null")
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .hasRootCauseMessage("channelId must not be null");
     }
 
     @Test
@@ -1680,6 +1668,10 @@ class MessageRepositoryTest {
                         """, UUID.class)
                 .setParameter("channelId", channelId)
                 .getResultList();
+    }
+
+    private MessagePagingCondition messagePagingCondition(UUID channelId, Pageable pageable, UUID cursor) {
+        return new MessagePagingCondition(channelId, pageable, cursor);
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {

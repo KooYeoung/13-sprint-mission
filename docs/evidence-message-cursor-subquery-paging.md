@@ -243,10 +243,12 @@ API cursor
     UUID 문자열 유지
 
 Service
-    UUID cursor를 Repository에 그대로 전달
+    channelId, pageable, UUID cursor로 MessagePagingCondition 생성
+    MessagePagingCondition 생성 시 channelId와 pageable 필수값 검증
     실제 응답한 마지막 Message id를 nextCursor로 생성
 
 Repository
+    MessagePagingCondition을 받아 조회 조건으로 사용
     cursor UUID가 있으면 같은 channelId의 cursor 메시지 createdAt을 서브쿼리로 조회
     createdAt DESC, id DESC 정렬
     createdAt + id 복합 조건 적용
@@ -297,11 +299,29 @@ LIMIT :pageSizePlusOne
 
 ### Service
 
-[BasicMessageService.java](../src/main/java/com/sprint/mission/discodeit/service/basic/BasicMessageService.java)는 cursor를 Repository에 그대로 전달한다.
+[BasicMessageService.java](../src/main/java/com/sprint/mission/discodeit/service/basic/BasicMessageService.java)는 `channelId`, `pageable`, `cursor`로 Repository 조회 조건 객체를 만든다.
 
 ```java
-Slice<Message> messageSlice = getMessageSliceDsl(channelId, pageable, cursor);
+MessagePagingCondition condition = new MessagePagingCondition(channelId, pageable, cursor);
+Slice<Message> messageSlice = getMessageSliceDsl(condition);
 ```
+
+### Repository 조회 조건 객체
+
+[MessagePagingCondition.java](../src/main/java/com/sprint/mission/discodeit/dto/repository/MessagePagingCondition.java)는 Repository 조회에 필요한 값을 하나의 객체로 묶는다.
+
+```java
+public record MessagePagingCondition(
+        UUID channelId,
+        Pageable pageable,
+        UUID cursor
+) {
+}
+```
+
+`channelId`와 `pageable`은 조회에 반드시 필요하므로 객체 생성 시점에 null을 허용하지 않는다. `cursor`는 첫 페이지 조회에서 필요하지 않으므로 null을 허용한다.
+
+필수값이 없으면 메시지 도메인 커스텀 예외인 `MessageInvalidPagingConditionException`을 발생시킨다. 따라서 Repository 구현은 요청 계층 성격의 예외에 의존하지 않고, 유효한 조회 조건 객체를 전제로 쿼리 생성만 담당한다.
 
 `nextCursor`는 추가로 조회한 메시지가 아니라 실제 응답한 마지막 메시지의 ID다.
 
@@ -314,7 +334,7 @@ if (messageSlice.hasNext() && !content.isEmpty()) {
 
 ### Repository
 
-[MessageRepositoryCustomImpl.java](../src/main/java/com/sprint/mission/discodeit/repository/impl/MessageRepositoryCustomImpl.java)는 cursor가 없으면 첫 페이지를 조회한다.
+[MessageRepositoryCustomImpl.java](../src/main/java/com/sprint/mission/discodeit/repository/impl/MessageRepositoryCustomImpl.java)는 `MessagePagingCondition`을 받아 cursor가 없으면 첫 페이지를 조회한다.
 
 ```java
 if (cursor == null) return null;
@@ -329,7 +349,7 @@ var cursorCreatedAt = JPAExpressions
         .from(cursorMessage)
         .where(
                 cursorMessage.id.eq(cursor),
-                cursorMessage.channel.id.eq(channelId)
+                cursorMessage.channel.id.eq(condition.channelId())
         );
 ```
 
@@ -446,8 +466,13 @@ MessageControllerTest
     cursor query parameter가 UUID로 바인딩되는지 검증
 
 MessageServiceTest
-    UUID cursor를 Repository에 전달하는지 검증
+    MessagePagingCondition을 생성해 Repository에 전달하는지 검증
     hasNext=true이면 마지막 응답 Message id 문자열을 nextCursor로 넘기는지 검증
+
+MessagePagingConditionTest
+    cursor는 null을 허용하는지 검증
+    channelId와 pageable은 null을 허용하지 않는지 검증
+    필수값 누락 시 MessageInvalidPagingConditionException이 발생하는지 검증
 
 MessageRepositoryTest
     cursor가 null이면 첫 페이지를 createdAt DESC, id DESC로 조회하는지 검증
@@ -473,7 +498,7 @@ MessageRepositoryTest
 실행 명령은 다음과 같다.
 
 ```powershell
-.\gradlew.bat --no-daemon test --tests "com.sprint.mission.discodeit.repository.MessageRepositoryTest" --tests "com.sprint.mission.discodeit.service.MessageServiceTest" --tests "com.sprint.mission.discodeit.controller.MessageControllerTest"
+.\gradlew.bat --no-daemon test --tests "com.sprint.mission.discodeit.dto.repository.MessagePagingConditionTest" --tests "com.sprint.mission.discodeit.repository.MessageRepositoryTest" --tests "com.sprint.mission.discodeit.service.MessageServiceTest" --tests "com.sprint.mission.discodeit.controller.MessageControllerTest"
 ```
 
 전체 테스트도 실행했다.
@@ -506,4 +531,4 @@ createdAt + UUID 복합 기준을 선택했다.
 내부 데이터베이스 페이징 경계는 createdAt + UUID 복합 기준이다.
 ```
 
-현재 구현은 이 복합 기준을 Repository 서브쿼리에서 해석한다. 이 방식은 Service의 cursor 해석 로직을 단순하게 유지하고 Repository 호출 한 번으로 처리할 수 있다. 대신 잘못된 cursor를 명확한 예외로 구분하기 어렵고 Querydsl 조건이 복잡해지는 trade-off가 있다.
+현재 구현은 이 복합 기준을 Repository 서브쿼리에서 해석한다. Service는 `MessagePagingCondition`을 생성해 필수 조회 조건을 검증하고, Repository는 유효한 condition을 받아 Querydsl 조회와 정렬만 담당한다. 이 방식은 Service의 cursor 해석 로직을 단순하게 유지하고 Repository 호출 한 번으로 처리할 수 있다. 대신 잘못된 cursor를 명확한 예외로 구분하기 어렵고 Querydsl 조건이 복잡해지는 trade-off가 있다.
