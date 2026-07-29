@@ -38,7 +38,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -437,7 +436,7 @@ class MessageServiceTest {
             // cursor는 메시지 목록 조회 기준값으로 repository에 그대로 전달되어야 한다.
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
-            Instant cursor = Instant.now();
+            UUID cursor = UUID.randomUUID();
 
             // 목록 조회 결과로 반환될 Message를 준비한다.
             // 서비스는 Message.getId()로 첨부 파일을 한 번에 조회하고, 다시 Message별 첨부 파일 목록을 매칭한다.
@@ -457,12 +456,13 @@ class MessageServiceTest {
             given(messageFile.getMessageId()).willReturn(messageId);
             List<MessageFile> messageFiles = List.of(messageFile);
 
-            // nextCursor는 다음 페이지가 있을 때 마지막 DTO의 createdAt 값으로 계산된다.
+            // nextCursor는 다음 페이지가 있을 때 응답된 마지막 메시지 ID 문자열로 계산된다.
             // DTO는 값 객체이므로 mock 대신 실제 record로 만든다.
-            OffsetDateTime nextCursor = OffsetDateTime.now();
+            OffsetDateTime messageCreatedAt = OffsetDateTime.now();
+            String nextCursor = messageId.toString();
             MessageDto messageDto = createMessageDto(
                     messageId,
-                    nextCursor,
+                    messageCreatedAt,
                     "messageContent",
                     channelId,
                     UUID.randomUUID(),
@@ -509,7 +509,7 @@ class MessageServiceTest {
             inOrder.verify(messageMapper).toDto(message, messageFiles);
 
             // 4. DTO Slice와 계산된 nextCursor를 PageResponseMapper에 넘긴다.
-            // nextCursor 계산은 DTO의 실제 createdAt 값을 통해 검증한다.
+            // nextCursor 계산은 응답된 마지막 Message id 값을 통해 검증한다.
             @SuppressWarnings("unchecked")
             ArgumentCaptor<Slice<MessageDto>> sliceCaptor = ArgumentCaptor.forClass(Slice.class);
             inOrder.verify(messageDtoPageResponseMapper).fromSlice(sliceCaptor.capture(), eq(nextCursor));
@@ -534,7 +534,7 @@ class MessageServiceTest {
             // cursor는 repository의 메시지 목록 조회 조건으로 그대로 전달되어야 한다.
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
-            Instant cursor = Instant.now();
+            UUID cursor = UUID.randomUUID();
 
             // 첫 번째 메시지를 준비한다.
             // 서비스는 Message.getId()로 메시지 ID 목록을 만들기 때문에 id 값을 반드시 stub 해야 한다.
@@ -660,7 +660,7 @@ class MessageServiceTest {
             // cursor는 repository의 메시지 목록 조회 조건으로 그대로 전달되어야 한다.
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
-            Instant cursor = Instant.now();
+            UUID cursor = UUID.randomUUID();
 
             // repository가 빈 Slice를 반환하는 상황을 만든다.
             // 조회된 메시지가 없으므로 hasNext도 false이다.
@@ -727,7 +727,7 @@ class MessageServiceTest {
             // cursor는 repository의 메시지 목록 조회 조건으로 그대로 전달되어야 한다.
             UUID channelId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 10);
-            Instant cursor = Instant.now();
+            UUID cursor = UUID.randomUUID();
 
             // 이 테스트의 핵심 시나리오는 "목록 조회 결과 전체에는 첨부 파일이 존재하지만,
             // 일부 메시지에는 매칭되는 첨부 파일이 없는 경우"이다.
@@ -1220,7 +1220,7 @@ class MessageServiceTest {
                 binaryContentDtos
         );
     }
-    private PageResponse<MessageDto> createPageResponse(MessageDto messageDto, OffsetDateTime nextCursor, Pageable pageable, boolean hasNext) {
+    private PageResponse<MessageDto> createPageResponse(MessageDto messageDto, Object nextCursor, Pageable pageable, boolean hasNext) {
         return new PageResponse<>(
                 List.of(messageDto),
                 nextCursor,
@@ -1229,7 +1229,7 @@ class MessageServiceTest {
         );
     }
 
-    private PageResponse<MessageDto> createPageResponse(List<MessageDto> messageDtos, OffsetDateTime nextCursor, Pageable pageable, boolean hasNext) {
+    private PageResponse<MessageDto> createPageResponse(List<MessageDto> messageDtos, Object nextCursor, Pageable pageable, boolean hasNext) {
         return new PageResponse<>(
                 messageDtos,
                 nextCursor,

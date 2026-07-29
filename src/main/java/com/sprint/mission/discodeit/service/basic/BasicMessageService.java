@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,7 +60,7 @@ public class BasicMessageService implements MessageService {
 
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable, Instant cursor) {
+    public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Pageable pageable, UUID cursor) {
 
         Slice<Message> messageSlice = getMessageSliceDsl(channelId, pageable, cursor);
 
@@ -79,9 +78,8 @@ public class BasicMessageService implements MessageService {
         );
 
         Object nextCursor = null;
-        List<MessageDto> dtoSliceContent = dtoSlice.getContent();
-        if(dtoSlice.hasNext() && !dtoSliceContent.isEmpty()){
-            nextCursor = dtoSliceContent.get(content.size() - 1).createdAt();
+        if (messageSlice.hasNext() && !content.isEmpty()) {
+            nextCursor = content.get(content.size() - 1).getId().toString();
         }
 
         return messageDtoPageResponseMapper.fromSlice(dtoSlice, nextCursor);
@@ -153,7 +151,7 @@ public class BasicMessageService implements MessageService {
                 .toList();
     }
 
-    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, Instant cursor) {
+    private Slice<Message> getMessageSliceDsl(UUID channelId, Pageable pageable, UUID cursor) {
 
         return messageRepository.findAllByChannelId(channelId, pageable, cursor);
     }

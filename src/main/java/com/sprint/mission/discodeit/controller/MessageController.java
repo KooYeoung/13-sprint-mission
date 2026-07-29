@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,7 +46,7 @@ public class MessageController implements MessageApi {
                     direction = Sort.Direction.DESC
             )
             Pageable pageable,
-            @RequestParam(required = false) Instant cursor
+            @RequestParam(required = false) UUID cursor
     ) {
 
         log.info("cursor : {}", cursor);

@@ -26,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -196,11 +195,11 @@ class MessageControllerTest {
     void listByChannelId_returnsOkAndPageResponse_whenQueryParametersAreValid() throws Exception {
         // given
         // MessageController.listByChannelId(...)는 channelId query parameter, Pageable, cursor를 받는다.
-        // Pageable은 page/size/sort query parameter로 바인딩되고, cursor는 ISO-8601 Instant로 바인딩된다.
+        // Pageable은 page/size/sort query parameter로 바인딩되고, cursor는 UUID 문자열로 바인딩된다.
         UUID channelId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();
-        Instant cursor = Instant.parse("2026-07-28T01:30:30Z");
-        String nextCursor = "2026-07-28T01:15:30Z";
+        UUID cursor = UUID.randomUUID();
+        String nextCursor = UUID.randomUUID().toString();
 
         MessageDto message = getMessageDto(
                 UUID.randomUUID(),
@@ -218,7 +217,7 @@ class MessageControllerTest {
                 true
         );
 
-        given(messageService.findAllByChannelId(any(UUID.class), any(Pageable.class), any(Instant.class)))
+        given(messageService.findAllByChannelId(any(UUID.class), any(Pageable.class), any(UUID.class)))
                 .willReturn(response);
 
         // when
@@ -246,10 +245,10 @@ class MessageControllerTest {
                 .andExpect(jsonPath("$.size").value(response.size()))
                 .andExpect(jsonPath("$.hasNext").value(response.hasNext()));
 
-        // query parameter가 각각 UUID, Pageable, Instant로 바인딩되어 Service에 전달됐는지 확인한다.
+        // query parameter가 각각 UUID, Pageable, UUID로 바인딩되어 Service에 전달됐는지 확인한다.
         ArgumentCaptor<UUID> channelIdCaptor = ArgumentCaptor.forClass(UUID.class);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        ArgumentCaptor<Instant> cursorCaptor = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<UUID> cursorCaptor = ArgumentCaptor.forClass(UUID.class);
         verify(messageService).findAllByChannelId(
                 channelIdCaptor.capture(),
                 pageableCaptor.capture(),

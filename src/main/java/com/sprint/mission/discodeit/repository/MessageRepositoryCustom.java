@@ -4,10 +4,9 @@ import com.sprint.mission.discodeit.entity.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
-import java.time.Instant;
 import java.util.UUID;
 
 public interface MessageRepositoryCustom {
 
-    Slice<Message> findAllByChannelId(UUID channelId, Pageable pageable, Instant cursor);
+    Slice<Message> findAllByChannelId(UUID channelId, Pageable pageable, UUID cursor);
 }

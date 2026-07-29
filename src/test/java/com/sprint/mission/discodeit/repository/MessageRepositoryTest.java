@@ -22,6 +22,7 @@ import org.springframework.data.domain.Slice;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -523,7 +524,7 @@ class MessageRepositoryTest {
         // when
         // cursor를 null로 넘겨 첫 페이지를 조회한다.
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
-        Instant cursor = null;
+        UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
         Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
 
@@ -550,12 +551,12 @@ class MessageRepositoryTest {
     }
 
     @Test
-    @DisplayName("채널별 메시지 Slice 조회 성공 - cursor보다 오래된 메시지만 반환")
+    @DisplayName("채널별 메시지 Slice 조회 성공 - cursor 메시지보다 오래된 메시지만 반환")
     void findAllByChannelId_appliesCursorExclusive_whenCursorExists() throws InterruptedException {
         // given
         // 이 테스트의 대상은 MessageRepositoryCustomImpl.findAllByChannelId(...)의 cursor 조건이다.
-        // cursor가 있으면 where 절에 message.createdAt.lt(cursor)가 적용되어,
-        // cursor 시각과 같은 메시지는 제외하고 cursor보다 오래된 메시지만 반환해야 한다.
+        // cursor가 있으면 Repository가 서브쿼리로 cursor 메시지의 createdAt을 조회한 뒤,
+        // cursor 메시지와 같은 시각 또는 더 최신 메시지는 제외하고 cursor 메시지보다 오래된 메시지만 반환해야 한다.
         //
         // 검증해야 하는 계약은 세 가지다.
         // 1. cursor보다 최신인 메시지는 제외한다.
@@ -597,8 +598,8 @@ class MessageRepositoryTest {
 
         Thread.sleep(100);
 
-        // 대상 채널의 중간 메시지다. 이 메시지의 createdAt을 cursor로 사용한다.
-        // 구현이 lt(cursor)가 아니라 lte(cursor)를 사용하면 이 메시지가 결과에 포함되어 테스트가 실패해야 한다.
+        // 대상 채널의 중간 메시지다. 이 메시지의 id를 cursor로 사용한다.
+        // 구현이 cursor 메시지 자신을 제외하지 못하면 이 메시지가 결과에 포함되어 테스트가 실패해야 한다.
         MessageFixture middleMessageFixture = saveMessageFixture(authorFixture.user(), savedChannel, "middleMessageContent");
         Message savedMiddleMessage = middleMessageFixture.message();
 
@@ -653,25 +654,13 @@ class MessageRepositoryTest {
         assertThat(messageRepository.count()).isEqualTo(4);
 
         // 저장 직후의 Message가 1차 캐시에 남아 있으면 정렬 쿼리 결과와 캐시 상태를 혼동할 수 있다.
-        // 먼저 영속성 컨텍스트를 비워 cursor도 DB에 저장된 timestamp 값을 기준으로 다시 읽는다.
-        //
-        // savedMiddleMessage.getCreatedAt()은 JPA Auditing이 메모리에 넣은 값이다.
-        // DB timestamp 정밀도 때문에 저장/조회 과정에서 나노초 값이 달라질 수 있으므로,
-        // 실제 목록 API가 이전 페이지 응답에서 받은 cursor처럼 DB에서 재조회한 createdAt을 사용한다.
-        em.clear();
-        Instant cursor = messageRepository.findById(savedMiddleMessageId)
-                .orElseThrow(AssertionError::new)
-                .getCreatedAt();
-        assertThat(cursor).isNotNull();
-
-        // cursor를 읽기 위해 findById(...)가 중간 메시지를 영속성 컨텍스트에 올렸으므로 한 번 더 비운다.
-        // 그래야 아래 when 절의 Slice 조회가 1차 캐시가 아니라 실제 Querydsl fetch join, where, order by, limit 결과를 기준으로 검증된다.
         em.clear();
 
         // when
-        // 중간 메시지의 createdAt을 cursor로 넘긴다.
-        // Querydsl 조건은 message.createdAt.lt(cursor)이므로, 중간 메시지 자신과 그 이후 메시지는 제외되어야 한다.
+        // 중간 메시지의 id를 cursor로 넘긴다.
+        // Querydsl 조건은 cursor 메시지의 createdAt을 서브쿼리로 찾은 뒤 createdAt/id 복합 조건을 적용한다.
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
+        UUID cursor = savedMiddleMessageId;
         Pageable pageable = PageRequest.of(0, 2);
         Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
 
@@ -697,6 +686,120 @@ class MessageRepositoryTest {
                 .containsExactly(oldestMessageFixture.command().content());
         assertThat(allByChannelId.getContent())
                 .allSatisfy(message -> assertThat(message.getChannelId()).isEqualTo(savedChannelId));
+    }
+
+    @Test
+    @DisplayName("채널별 메시지 Slice 조회 성공 - 같은 createdAt에서는 cursor id보다 작은 메시지만 반환")
+    void findAllByChannelId_appliesIdTieBreaker_whenMessagesHaveSameCreatedAt() {
+        // given
+        // 이 테스트의 대상은 cursor 메시지와 같은 createdAt을 가진 메시지들이 있을 때의 보조 정렬/조건이다.
+        // createdAt만 cursor 조건으로 사용하면 같은 시각의 나머지 메시지가 누락될 수 있으므로,
+        // Repository는 createdAt DESC, id DESC 정렬과 함께 id < cursorId 조건을 적용해야 한다.
+        AuthorFixture authorFixture = saveAuthorFixture("sameTimeUser", "same-time@gmail.com");
+        ChannelFixture channelFixture = savePublicChannelFixture(
+                "sameTimeChannel",
+                "sameTimeChannelDescription"
+        );
+        Channel savedChannel = channelFixture.channel();
+
+        Message firstMessage = saveMessage(authorFixture.user(), savedChannel, "sameTimeFirstMessage");
+        Message secondMessage = saveMessage(authorFixture.user(), savedChannel, "sameTimeSecondMessage");
+        Message thirdMessage = saveMessage(authorFixture.user(), savedChannel, "sameTimeThirdMessage");
+
+        UUID savedChannelId = savedChannel.getId();
+        UUID firstMessageId = firstMessage.getId();
+        UUID secondMessageId = secondMessage.getId();
+        UUID thirdMessageId = thirdMessage.getId();
+
+        assertThat(savedChannelId).isNotNull();
+        assertThat(firstMessageId).isNotNull();
+        assertThat(secondMessageId).isNotNull();
+        assertThat(thirdMessageId).isNotNull();
+        assertThat(firstMessageId)
+                .isNotEqualTo(secondMessageId)
+                .isNotEqualTo(thirdMessageId);
+        assertThat(secondMessageId).isNotEqualTo(thirdMessageId);
+
+        Instant sameCreatedAt = Instant.parse("2026-07-28T00:00:00Z");
+        updateMessageCreatedAt(firstMessageId, sameCreatedAt);
+        updateMessageCreatedAt(secondMessageId, sameCreatedAt);
+        updateMessageCreatedAt(thirdMessageId, sameCreatedAt);
+        em.flush();
+        em.clear();
+
+        List<UUID> orderedIds = findMessageIdsByChannelIdOrderByCreatedAtDescIdDesc(savedChannelId);
+        assertThat(orderedIds)
+                .hasSize(3)
+                .containsExactlyInAnyOrder(firstMessageId, secondMessageId, thirdMessageId);
+
+        UUID firstOrderedId = orderedIds.get(0);
+        UUID cursor = orderedIds.get(1);
+        UUID expectedNextId = orderedIds.get(2);
+
+        // when
+        // 같은 createdAt 그룹의 중간 id를 cursor로 넘긴다.
+        // 다음 페이지 조건이 id < cursorId를 포함하면 정렬상 cursor 뒤에 있는 expectedNextId만 반환된다.
+        Pageable pageable = PageRequest.of(0, 3);
+        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+
+        // then
+        assertThat(allByChannelId.getContent()).hasSize(1);
+        assertThat(allByChannelId.hasNext()).isFalse();
+        assertThat(allByChannelId.getContent())
+                .extracting(Message::getId)
+                .containsExactly(expectedNextId)
+                .doesNotContain(firstOrderedId, cursor);
+        assertThat(allByChannelId.getContent())
+                .allSatisfy(message -> {
+                    assertThat(message.getChannelId()).isEqualTo(savedChannelId);
+                    assertThat(message.getCreatedAt()).isEqualTo(sameCreatedAt);
+                });
+    }
+
+    @Test
+    @DisplayName("채널별 메시지 Slice 조회 성공 - 다른 채널 메시지 id는 cursor 위치로 사용하지 않음")
+    void findAllByChannelId_ignoresCursor_whenCursorBelongsToOtherChannel() throws InterruptedException {
+        // given
+        // 서브쿼리가 cursor id만 확인하고 channelId를 확인하지 않으면,
+        // 다른 채널의 메시지 UUID를 cursor로 넘겼을 때 대상 채널 목록이 잘못 잘릴 수 있다.
+        // 따라서 cursor 위치 조회 서브쿼리는 cursorMessage.id와 cursorMessage.channel.id를 함께 조건으로 사용해야 한다.
+        AuthorFixture authorFixture = saveAuthorFixture("otherCursorUser", "other-cursor@gmail.com");
+        Channel savedChannel = savePublicChannel("cursorTargetChannel");
+        Channel savedOtherChannel = savePublicChannel("cursorOtherChannel");
+
+        Message targetMessage = saveMessage(authorFixture.user(), savedChannel, "targetChannelMessage");
+
+        Thread.sleep(100);
+
+        Message otherChannelCursorMessage = saveMessage(authorFixture.user(), savedOtherChannel, "otherChannelCursorMessage");
+
+        UUID savedChannelId = savedChannel.getId();
+        UUID savedOtherChannelId = savedOtherChannel.getId();
+        UUID targetMessageId = targetMessage.getId();
+        UUID otherChannelCursorMessageId = otherChannelCursorMessage.getId();
+
+        assertThat(savedChannelId).isNotNull();
+        assertThat(savedOtherChannelId).isNotNull();
+        assertThat(savedOtherChannelId).isNotEqualTo(savedChannelId);
+        assertThat(targetMessageId).isNotNull();
+        assertThat(otherChannelCursorMessageId).isNotNull();
+        assertThat(targetMessageId).isNotEqualTo(otherChannelCursorMessageId);
+        assertThat(targetMessage.getChannelId()).isEqualTo(savedChannelId);
+        assertThat(otherChannelCursorMessage.getChannelId()).isEqualTo(savedOtherChannelId);
+        assertThat(otherChannelCursorMessage.getCreatedAt()).isAfter(targetMessage.getCreatedAt());
+
+        em.clear();
+
+        // when
+        // 다른 채널 메시지 id를 cursor로 넘긴다.
+        UUID cursor = otherChannelCursorMessageId;
+        Pageable pageable = PageRequest.of(0, 2);
+        Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
+
+        // then
+        // cursor 위치 서브쿼리가 channelId까지 확인하므로, 다른 채널 cursor는 대상 채널의 위치로 해석되지 않는다.
+        assertThat(allByChannelId.getContent()).isEmpty();
+        assertThat(allByChannelId.hasNext()).isFalse();
     }
 
     @Test
@@ -782,7 +885,7 @@ class MessageRepositoryTest {
         // when
         // cursor를 null로 넘겨 첫 페이지를 조회한다.
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
-        Instant cursor = null;
+        UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
         Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
 
@@ -903,7 +1006,7 @@ class MessageRepositoryTest {
         // when
         // cursor를 null로 넘겨 첫 페이지를 조회한다.
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
-        Instant cursor = null;
+        UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 2);
         Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
 
@@ -1004,7 +1107,7 @@ class MessageRepositoryTest {
         // when
         // 대상 채널 id로 메시지 목록을 조회한다.
         // PageRequest의 sort는 일부러 지정하지 않는다. 현재 커스텀 Repository 구현이 직접 createdAt desc를 적용하기 때문이다.
-        Instant cursor = null;
+        UUID cursor = null;
         Pageable pageable = PageRequest.of(0, 1);
         Slice<Message> allByChannelId = messageRepository.findAllByChannelId(savedChannelId, pageable, cursor);
 
@@ -1078,7 +1181,7 @@ class MessageRepositoryTest {
         // Pageable은 정상 값으로 넘기고 channelId만 null로 둬, 실패 원인이 channelId 검증임을 분명히 한다.
         UUID channelId = null;
         Pageable pageable = PageRequest.of(0, 2);
-        Instant cursor = null;
+        UUID cursor = null;
 
         // when / then
         // channelId가 null이면 Querydsl where 조건을 만들 수 없으므로 데이터 접근 예외가 발생해야 한다.
@@ -1553,6 +1656,30 @@ class MessageRepositoryTest {
         Message savedMessage = messageRepository.saveAndFlush(new Message(author, channel, command));
 
         return new MessageFixture(savedMessage, command);
+    }
+
+    private void updateMessageCreatedAt(UUID messageId, Instant createdAt) {
+        int updatedRows = em.createQuery("""
+                        update Message m
+                        set m.createdAt = :createdAt
+                        where m.id = :messageId
+                        """)
+                .setParameter("createdAt", createdAt)
+                .setParameter("messageId", messageId)
+                .executeUpdate();
+
+        assertThat(updatedRows).isEqualTo(1);
+    }
+
+    private List<UUID> findMessageIdsByChannelIdOrderByCreatedAtDescIdDesc(UUID channelId) {
+        return em.createQuery("""
+                        select m.id
+                        from Message m
+                        where m.channel.id = :channelId
+                        order by m.createdAt desc, m.id desc
+                        """, UUID.class)
+                .setParameter("channelId", channelId)
+                .getResultList();
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
