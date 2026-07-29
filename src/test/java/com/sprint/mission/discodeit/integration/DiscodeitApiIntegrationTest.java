@@ -2,12 +2,15 @@ package com.sprint.mission.discodeit.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sprint.mission.discodeit.dto.request.channel.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PrivateChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PublicChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
+import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
+import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
@@ -42,6 +45,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -384,6 +388,172 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(jsonPath("$[0].type").value(ChannelType.PRIVATE.name()));
     }
 
+    @Test
+    @DisplayName("사용자 목록, 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
+    void userListUpdateAndDelete_flowPersistsUpdatesAndRemovesUser() throws Exception {
+        // given
+        // 사용자 관련 주요 API 중 기존 생성 흐름에서 다루지 않은 목록 조회, 수정, 삭제를 한 흐름에서 검증한다.
+        // 모든 호출은 실제 Controller, Service, Repository, DB를 거친다.
+        String suffix = uniqueSuffix();
+        UUID firstUserId = createUser("userListA-" + suffix, "user-list-a-" + suffix + "@gmail.com");
+        UUID secondUserId = createUser("userListB-" + suffix, "user-list-b-" + suffix + "@gmail.com");
+
+        // when
+        // 사용자 목록 API를 호출한다.
+        MvcResult listResult = mockMvc.perform(get("/api/users")
+                        .accept(MediaType.APPLICATION_JSON))
+
+                // then
+                // 방금 생성한 두 사용자가 실제 목록 응답에 포함되어야 한다.
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andReturn();
+
+        JsonNode listBody = readBody(listResult);
+        assertThat(listBody.findValuesAsText("id"))
+                .contains(firstUserId.toString(), secondUserId.toString());
+
+        // when
+        // 첫 번째 사용자의 username, password, email, profile을 multipart PATCH로 수정한다.
+        UserUpdateRequest updateRequest = new UserUpdateRequest(
+                "updatedUser-" + suffix,
+                "updatedPassword",
+                "updated-user-" + suffix + "@gmail.com"
+        );
+        MockMultipartFile updateRequestPart = jsonPart("userUpdateRequest", updateRequest);
+        MockMultipartFile profilePart = filePart(
+                "profile",
+                "updated-profile-" + suffix + ".png",
+                MediaType.IMAGE_PNG_VALUE,
+                "updated-profile"
+        );
+
+        MvcResult updateResult = mockMvc.perform(multipart("/api/users/{userId}", firstUserId)
+                        .file(updateRequestPart)
+                        .file(profilePart)
+                        .with(request -> {
+                            request.setMethod("PATCH");
+                            return request;
+                        })
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(firstUserId.toString()))
+                .andExpect(jsonPath("$.username").value(updateRequest.newUsername()))
+                .andExpect(jsonPath("$.email").value(updateRequest.newEmail()))
+                .andExpect(jsonPath("$.profile.id").exists())
+                .andExpect(jsonPath("$.profile.fileName").value(profilePart.getOriginalFilename()))
+                .andReturn();
+
+        UUID updatedProfileId = uuidAt(readBody(updateResult), "/profile/id");
+
+        flushAndClear();
+        User updatedUser = userRepository.findById(firstUserId).orElseThrow(AssertionError::new);
+        assertThat(updatedUser.getUsername()).isEqualTo(updateRequest.newUsername());
+        assertThat(updatedUser.getPassword()).isEqualTo(updateRequest.newPassword());
+        assertThat(updatedUser.getEmail()).isEqualTo(updateRequest.newEmail());
+        assertThat(updatedUser.getProfileId()).isEqualTo(updatedProfileId);
+        assertThat(binaryContentRepository.findById(updatedProfileId)).isPresent();
+
+        // when
+        // 수정한 사용자를 삭제한다.
+        mockMvc.perform(delete("/api/users/{userId}", firstUserId))
+                .andExpect(status().isNoContent());
+
+        // then
+        // User와 UserStatus가 실제 DB에서 제거되고, 대조군 사용자는 남아 있어야 한다.
+        flushAndClear();
+        assertThat(userRepository.findById(firstUserId)).isEmpty();
+        assertThat(userStatusRepository.findByUserId(firstUserId)).isEmpty();
+        assertThat(userRepository.findById(secondUserId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("채널 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
+    void channelUpdateAndDelete_flowPersistsUpdatesAndRemovesChannel() throws Exception {
+        // given
+        // 채널 생성은 기존 통합 테스트에서 검증하므로, 여기서는 PUBLIC 채널을 만든 뒤 수정과 삭제 흐름을 검증한다.
+        String suffix = uniqueSuffix();
+        UUID channelId = createPublicChannel(
+                "channel-update-" + suffix,
+                "channel update description"
+        );
+
+        // when
+        // PUBLIC 채널은 수정 가능하므로 이름과 설명을 변경한다.
+        ChannelUpdateRequest updateRequest = new ChannelUpdateRequest(
+                "updated-channel-" + suffix,
+                "updated channel description"
+        );
+        mockMvc.perform(patch("/api/channels/{channelId}", channelId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(channelId.toString()))
+                .andExpect(jsonPath("$.type").value(ChannelType.PUBLIC.name()))
+                .andExpect(jsonPath("$.name").value(updateRequest.newName()))
+                .andExpect(jsonPath("$.description").value(updateRequest.newDescription()));
+
+        flushAndClear();
+        Channel updatedChannel = channelRepository.findById(channelId).orElseThrow(AssertionError::new);
+        assertThat(updatedChannel.getName()).isEqualTo(updateRequest.newName());
+        assertThat(updatedChannel.getDescription()).isEqualTo(updateRequest.newDescription());
+
+        // when
+        // 수정한 채널을 삭제한다.
+        mockMvc.perform(delete("/api/channels/{channelId}", channelId))
+                .andExpect(status().isNoContent());
+
+        // then
+        // Channel row가 실제 DB에서 제거되어야 한다.
+        flushAndClear();
+        assertThat(channelRepository.findById(channelId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("메시지 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
+    void messageUpdateAndDelete_flowPersistsUpdatesAndRemovesMessage() throws Exception {
+        // given
+        // 메시지 생성과 목록 조회는 기존 통합 테스트에서 검증한다.
+        // 여기서는 생성된 메시지를 수정하고 삭제하는 API 흐름을 실제 DB와 함께 확인한다.
+        String suffix = uniqueSuffix();
+        UUID authorId = createUser("messageUpdateAuthor-" + suffix, "message-update-author-" + suffix + "@gmail.com");
+        UUID channelId = createPublicChannel(
+                "message-update-channel-" + suffix,
+                "message update channel description"
+        );
+        UUID messageId = createMessage("message before update", channelId, authorId);
+
+        // when
+        // 메시지 내용을 수정한다.
+        MessageUpdateRequest updateRequest = new MessageUpdateRequest("message after update");
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(messageId.toString()))
+                .andExpect(jsonPath("$.content").value(updateRequest.newContent()))
+                .andExpect(jsonPath("$.channelId").value(channelId.toString()))
+                .andExpect(jsonPath("$.author.id").value(authorId.toString()));
+
+        flushAndClear();
+        Message updatedMessage = messageRepository.findById(messageId).orElseThrow(AssertionError::new);
+        assertThat(updatedMessage.getContent()).isEqualTo(updateRequest.newContent());
+
+        // when
+        // 수정한 메시지를 삭제한다.
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId))
+                .andExpect(status().isNoContent());
+
+        // then
+        // Message row가 실제 DB에서 제거되고, 메시지 파일 연결도 남아 있지 않아야 한다.
+        flushAndClear();
+        assertThat(messageRepository.findById(messageId)).isEmpty();
+        assertThat(messageFileRepository.findAllByMessage_Id(messageId)).isEmpty();
+    }
+
     private UUID createUser(String username, String email) throws Exception {
         UserCreateRequest request = new UserCreateRequest(
                 username,
@@ -393,6 +563,34 @@ class DiscodeitApiIntegrationTest {
 
         MvcResult result = mockMvc.perform(multipart("/api/users")
                         .file(jsonPart("userCreateRequest", request))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andReturn();
+
+        return uuidAt(readBody(result), "/id");
+    }
+
+    private UUID createPublicChannel(String name, String description) throws Exception {
+        PublicChannelCreateRequest request = new PublicChannelCreateRequest(name, description);
+
+        MvcResult result = mockMvc.perform(post("/api/channels/public")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.type").value(ChannelType.PUBLIC.name()))
+                .andReturn();
+
+        return uuidAt(readBody(result), "/id");
+    }
+
+    private UUID createMessage(String content, UUID channelId, UUID authorId) throws Exception {
+        MessageCreateRequest request = new MessageCreateRequest(content, channelId, authorId);
+
+        MvcResult result = mockMvc.perform(multipart("/api/messages")
+                        .file(jsonPart("messageCreateRequest", request))
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
