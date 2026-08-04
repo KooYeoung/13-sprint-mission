@@ -57,3 +57,5 @@ uploads/
 ## log
 *.log
 *.log.gz
+
+.env
