@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.sprint.mission'
-version = '0.0.1-SNAPSHOT'
+version = '1.2-M8'
 
 java {
 	toolchain {
@@ -82,8 +82,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-
-	implementation 'de.codecentric:spring-boot-admin-starter-client'
 
 }
 
