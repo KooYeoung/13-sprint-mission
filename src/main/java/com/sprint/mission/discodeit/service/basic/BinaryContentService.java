@@ -9,6 +9,8 @@ import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
+import com.sprint.mission.discodeit.storage.BinaryContentUpload;
+import com.sprint.mission.discodeit.storage.DownloadResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -18,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,19 +46,12 @@ public class BinaryContentService {
                 file.getSize()
         ));
 
-        binaryContentStorage.put(binaryContent.getId(), getInputStreamFromFile(file));
+        binaryContentStorage.put(binaryContent.getId(), BinaryContentUpload.from(file));
 
         log.info("파일 업로드 완료. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);
     }
 
-    private InputStream getInputStreamFromFile(MultipartFile file) {
-        try {
-            return file.getInputStream();
-        } catch (IOException e) {
-            throw new FileReadFailedException(file.getOriginalFilename(), e);
-        }
-    }
 
     @Transactional(readOnly = true)
     public BinaryContentDto findById(UUID id) {
@@ -118,17 +112,9 @@ public class BinaryContentService {
     @LogAction(value = "파일 다운로드")
     public DownloadDto download(UUID binaryContentId) {
         BinaryContent binaryContent = getBinaryContentById(binaryContentId);
-        Resource resource = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
+        DownloadResult result = binaryContentStorage.download(binaryContentMapper.toDto(binaryContent));
 
-        return binaryContentMapper.toDownloadDto(binaryContent, resource);
-    }
-
-    private byte[] getBytes(MultipartFile file) {
-        try {
-            return file.getBytes();
-        } catch (IOException e) {
-            throw new FileReadFailedException(file.getOriginalFilename(), e);
-        }
+        return binaryContentMapper.toDownloadDto(binaryContent, result);
     }
 
     private @NonNull BinaryContent getBinaryContentById(UUID id) {

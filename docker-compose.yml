@@ -46,17 +46,21 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       SERVER_PORT: ${SERVER_PORT}
-      STORAGE_PATH: ${STORAGE_PATH}
+      STORAGE_LOCAL_ROOT_PATH: ${STORAGE_LOCAL_ROOT_PATH}
       STORAGE_TYPE: ${STORAGE_TYPE}
       JVM_OPTS: ${JVM_OPTS}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_PRESIGNED_URL_EXPIRATION: ${AWS_S3_PRESIGNED_URL_EXPIRATION}
+
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app-network
     volumes:
-      - binary-data:${STORAGE_PATH}
+      - binary-data:${STORAGE_LOCAL_ROOT_PATH}
 
 volumes:
   discodeit-postgres-data:

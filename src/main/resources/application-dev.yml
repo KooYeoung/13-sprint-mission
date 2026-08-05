@@ -2,10 +2,6 @@ server:
   port: 8080
 
 spring:
-  boot:
-    admin:
-      client:
-        url: http://localhost:9090
   docker:
     compose:
       # 애플리케이션 실행 시 Docker Compose 자동 실행
@@ -60,12 +56,6 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: off
-
-discodeit:
-  storage:
-    # 개발 파일을 로컬 디렉터리에 저장
-    type: local
-    path: ${STORAGE_PATH:./uploads}
 
 management:
   endpoints:

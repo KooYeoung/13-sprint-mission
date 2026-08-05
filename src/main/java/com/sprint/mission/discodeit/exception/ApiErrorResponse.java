@@ -23,7 +23,7 @@ public record ApiErrorResponse(
                 errorCode.getStatus().value(),
                 exception.getClass().getSimpleName(),
                 errorCode.getCode(),
-                errorCode.getMessage(),
+                exception.getMessage(),
                 exception.getDetails()
         );
     }

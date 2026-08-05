@@ -39,9 +39,3 @@ logging:
     org.hibernate.SQL: warn
     org.hibernate.orm.jdbc.batch: warn
     org.hibernate.orm.jdbc.bind: warn
-
-discodeit:
-  storage:
-    # 파일 저장 방식과 경로를 환경변수로 설정
-    type: ${STORAGE_TYPE}
-    path: ${STORAGE_PATH}
