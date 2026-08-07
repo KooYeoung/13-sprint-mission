@@ -13,8 +13,8 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  ECR_CLUSTER: ${{ secrets.ECR_CLUSTER }}
-  ECR_SERVICE: ${{ secrets.ECR_SERVICE }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
   ECS_TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
   CONTAINER_NAME: ${{ secrets.CONTAINER_NAME }}
 
