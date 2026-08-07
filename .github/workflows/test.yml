@@ -3,6 +3,7 @@ name: Test
 on:
   pull_request:
     branches:
+      - "main"
       - "정구영"
       - "정구영-sprint8"
   workflow_dispatch:
