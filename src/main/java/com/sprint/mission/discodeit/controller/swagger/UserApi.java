@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -65,7 +66,7 @@ public interface UserApi {
     })
     ResponseEntity<UserDto> create(
             @Parameter(hidden = true)
-            @RequestPart("userCreateRequest") UserCreateRequest userCreateRequest,
+            @Valid @RequestPart("userCreateRequest") UserCreateRequest userCreateRequest,
 
             @Parameter(hidden = true)
             @RequestPart(value = "profile", required = false) MultipartFile profile
@@ -117,7 +118,7 @@ public interface UserApi {
             UUID userId,
 
             @Parameter(hidden = true)
-            @RequestPart("userUpdateRequest") UserUpdateRequest userUpdateRequest,
+            @Valid @RequestPart("userUpdateRequest") UserUpdateRequest userUpdateRequest,
 
             @Parameter(hidden = true)
             @RequestPart(value = "profile", required = false) MultipartFile profile
@@ -158,6 +159,6 @@ public interface UserApi {
             @Parameter(description = "상태를 변경할 User ID", required = true)
             UUID userId,
 
-            @RequestBody UserStatusUpdateRequest request
+            @Valid @RequestBody UserStatusUpdateRequest request
     );
 }

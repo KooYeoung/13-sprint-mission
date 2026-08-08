@@ -1,10 +1,13 @@
 package com.sprint.mission.discodeit.exception.userStatus;
 
-import com.sprint.mission.discodeit.exception.CustomBadRequestException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 
-public class UserStatusBadRequestException extends CustomBadRequestException {
+import java.util.Map;
+import java.util.UUID;
 
-    public UserStatusBadRequestException(String message) {
-        super(message);
+public class UserStatusBadRequestException extends UserStatusException {
+
+    public UserStatusBadRequestException(ErrorCode errorCode, UUID userId) {
+        super(errorCode, Map.of("userId", userId));
     }
 }

@@ -1,20 +1,23 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
-import com.sprint.mission.discodeit.exception.CustomInternalServerException;
-import com.sprint.mission.discodeit.exception.file.FileError;
+import com.sprint.mission.discodeit.exception.storage.FileDirectoryCreateFailedException;
+import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
+import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
+import com.sprint.mission.discodeit.exception.storage.FileSaveFailedException;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.PathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +33,7 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     private final Path root;
     private final FileTransactionManager transactionManager;
 
-    public LocalBinaryContentStorage(@Value("${discodeit.storage.local.root-path}") String rootPath, FileTransactionManager transactionManager) {
+    public LocalBinaryContentStorage(@Value("${discodeit.storage.path}") String rootPath, FileTransactionManager transactionManager) {
         this.root = Paths.get(rootPath);
         this.transactionManager = transactionManager;
     }
@@ -40,26 +43,33 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.DIRECTORY.getMessage(), e);
+            throw new FileDirectoryCreateFailedException(root, e);
         }
     }
 
     @Override
-    public UUID put(UUID fileId, byte[] bytes) {
+    public UUID put(UUID fileId, InputStream inputStream) {
         Path savePath = resolvePath(fileId);
+        boolean fileCreated = false;
         try {
-            Files.write(
-                    savePath,
-                    bytes,
-                    StandardOpenOption.CREATE_NEW
-            );
+
+            try (OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                fileCreated = true;
+                inputStream.transferTo(os);
+            }
 
             transactionManager.deleteOnRollback(savePath);
 
             return fileId;
-
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.SAVE.getMessage(), e);
+            if (fileCreated) {
+                try {
+                    Files.deleteIfExists(savePath);
+                } catch (IOException deleteException) {
+                    e.addSuppressed(deleteException);
+                }
+            }
+            throw new FileSaveFailedException(savePath, e);
         }
     }
 
@@ -73,9 +83,9 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
         try {
             return Files.newInputStream(savedPath, StandardOpenOption.READ);
         } catch (NoSuchFileException e) {
-            throw new CustomInternalServerException(FileError.NOT_FOUND.getMessage(), e);
+            throw new FileNotFoundException(fileId, e);
         } catch (IOException e) {
-            throw new CustomInternalServerException(FileError.READ.getMessage(), e);
+            throw new FileReadFailedException(fileId, savedPath, e);
         }
     }
 
@@ -83,12 +93,11 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     public void delete(UUID fileId) {
         Path savedPath = resolvePath(fileId);
         transactionManager.deleteAfterCommit(savedPath);
-
     }
 
     @Override
     public Resource download(BinaryContentDto binaryContentDto) {
-        return new InputStreamResource(get(binaryContentDto.id()));
+        return new PathResource(resolvePath(binaryContentDto.id()));
     }
 
     @Override

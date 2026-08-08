@@ -1,9 +1,12 @@
 package com.sprint.mission.discodeit.exception.readStatus;
 
-import com.sprint.mission.discodeit.exception.CustomNotFoundException;
+import com.sprint.mission.discodeit.exception.ErrorCode;
 
-public class ReadStatusNotFoundException extends CustomNotFoundException {
-    public ReadStatusNotFoundException() {
-        super(ReadStatusError.NOT_FOUND.getMessage());
+import java.util.Map;
+import java.util.UUID;
+
+public class ReadStatusNotFoundException extends ReadStatusException {
+    public ReadStatusNotFoundException(UUID readStatusId) {
+        super(ErrorCode.READ_STATUS_NOT_FOUND, Map.of("readStatusId", readStatusId));
     }
 }

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BinaryContentStorage {
-    UUID put(UUID fileId, byte[] bytes);
+    UUID put(UUID fileId, InputStream bytes);
 
     InputStream get(UUID fileId);
 

@@ -1,20 +1,25 @@
 package com.sprint.mission.discodeit.entity;
 
-import com.sprint.mission.discodeit.exception.channel.InvalidChannelTypeException;
+import com.sprint.mission.discodeit.exception.channel.ChannelTypeInvalidException;
+import com.sprint.mission.discodeit.exception.channel.ChannelTypeRequiredException;
+
+import java.util.Locale;
 
 public enum ChannelType {
     PUBLIC, PRIVATE;
 
     public static ChannelType getChannelType(String type) {
-        if (type == null || type.isBlank()) throw new InvalidChannelTypeException("타입이 존재하지 않습니다.");
+        if (type == null || type.isBlank()) {
+            throw new ChannelTypeRequiredException();
+        }
 
-        String normalizedType = type.trim().toUpperCase();
+        String normalizedType = type.trim().toUpperCase(Locale.ROOT);
 
 
         try {
             return ChannelType.valueOf(normalizedType);
         } catch (IllegalArgumentException e) {
-            throw new InvalidChannelTypeException("지원하지 않는 타입입니다.");
+            throw new ChannelTypeInvalidException(type, e);
         }
 
     }

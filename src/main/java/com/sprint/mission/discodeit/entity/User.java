@@ -32,7 +32,7 @@ public class User extends UpdatableEntity {
     @JoinColumn(name = "profile_id")
     private BinaryContent profile;
 
-    @OneToOne(fetch = FetchType.LAZY, mappedBy = "user", cascade = CascadeType.REMOVE)
+    @OneToOne(fetch = FetchType.LAZY, mappedBy = "user")
     private UserStatus userStatus;
 
     public User(UserCreateCommand command, BinaryContent profile) {
@@ -81,5 +81,9 @@ public class User extends UpdatableEntity {
     public UUID getStatusId() {
         if (userStatus == null) return null;
         return userStatus.getId();
+    }
+
+    public void detachUserStatus() {
+        this.userStatus = null;
     }
 }

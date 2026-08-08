@@ -3,7 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
-import com.sprint.mission.discodeit.exception.CustomInternalServerException;
+import com.sprint.mission.discodeit.exception.message.MessageFileSaveFailedException;
 import com.sprint.mission.discodeit.repository.MessageFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,6 @@ public class MessageFileService {
     private final BinaryContentService binaryContentService;
 
     public List<MessageFile> save(Message message, List<MultipartFile> files) {
-
         if (files == null || files.isEmpty()) return List.of();
 
         List<UUID> fileIds = new ArrayList<>();
@@ -39,8 +38,9 @@ public class MessageFileService {
         if (fileIds.isEmpty()) return List.of();
 
         int insertedCount = messageFileRepository.bulkInsert(fileIds, message.getId());
-
-        if (insertedCount != fileIds.size()) throw new CustomInternalServerException("메시지 파일 저장에 실패했습니다.");
+        if (insertedCount != fileIds.size()) {
+            throw new MessageFileSaveFailedException(message.getId(), fileIds.size(), insertedCount);
+        }
 
         return messageFileRepository.findAllByMessage_Id(message.getId());
     }
@@ -78,7 +78,7 @@ public class MessageFileService {
 
     @Transactional(readOnly = true)
     public List<MessageFile> findAllByMessageIds(List<UUID> messageIds) {
-        return messageFileRepository.findAllByMessage_IdIn(messageIds);
+        return messageFileRepository.findAllByMessageIdIn(messageIds);
     }
 
     private @NonNull List<BinaryContent> convertToBinaryContents(List<MessageFile> messageFiles) {

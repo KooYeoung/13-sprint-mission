@@ -21,4 +21,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @EntityGraph(attributePaths = {"userStatus", "profile"})
     Optional<User> findByUsernameAndPassword(String username, String password);
+
+
 }

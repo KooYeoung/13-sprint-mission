@@ -19,7 +19,8 @@ public interface MessageFileRepository extends JpaRepository<MessageFile, UUID> 
     List<MessageFile> findAllByMessage_Id(UUID messageId);
 
     @EntityGraph(attributePaths = {"binaryContent", "message"})
-    List<MessageFile> findAllByMessage_IdIn(List<UUID> messageIds);
+    @Query("SELECT mf FROM MessageFile mf WHERE mf.message.id IN :messageIds")
+    List<MessageFile> findAllByMessageIdIn(@Param("messageIds") List<UUID> messageIds);
 
     @EntityGraph(attributePaths = {"binaryContent"})
     @Query("""
