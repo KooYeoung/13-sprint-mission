@@ -5,6 +5,7 @@ on:
     branches:
       - "정구영"
       - "정구영-sprint8"
+      - "release"
 
 permissions:
   id-token: write
@@ -95,6 +96,16 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.build-image.outputs.image }}
 
+      - name: 기존 ECS 서비스 중단
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --desired-count 0
+
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
 
       # ECS 서비스에 새 작업 정의 배포 + 안정화될 때까지 대기(무중단 롤링).
       - name: ECS 배포
@@ -104,3 +115,14 @@ jobs:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true   # 새 태스크가 안정될때까지 기다림(성공 확인)
+
+      - name: 새 ECS 태스크 시작
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --desired-count 1
+
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"

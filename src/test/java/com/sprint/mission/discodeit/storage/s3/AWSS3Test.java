@@ -23,17 +23,23 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AWSS3Test {
 
-    private static final String BUCKET = envOrDefault("AWS_S3_BUCKET", "discodeit-test-bucket");
-    private static final String REGION = envOrDefault("AWS_S3_REGION", "ap-northeast-2");
-    private static final int PRESIGNED_URL_EXPIRATION = intEnvOrDefault("AWS_S3_PRESIGNED_URL_EXPIRATION", 600);
+    private static final Properties ENV_PROPERTIES = loadEnvProperties();
+    private static final String BUCKET = propertyOrEnvOrDefault("AWS_S3_BUCKET", "discodeit-test-bucket");
+    private static final String REGION = propertyOrEnvOrDefault("AWS_S3_REGION", "ap-northeast-2");
+    private static final int PRESIGNED_URL_EXPIRATION = intPropertyOrEnvOrDefault("AWS_S3_PRESIGNED_URL_EXPIRATION", 600);
 
     static S3MockContainer s3Mock;
     static S3Client s3Client;
@@ -169,13 +175,34 @@ class AWSS3Test {
         return prefix + "-" + UUID.randomUUID();
     }
 
-    private static String envOrDefault(String key, String defaultValue) {
-        String value = System.getenv(key);
-        return value == null || value.isBlank() ? defaultValue : value;
+    private static Properties loadEnvProperties() {
+        Properties properties = new Properties();
+        Path envPath = Path.of(".env");
+
+        if (Files.notExists(envPath)) {
+            return properties;
+        }
+
+        try (InputStream inputStream = Files.newInputStream(envPath)) {
+            properties.load(inputStream);
+            return properties;
+        } catch (IOException e) {
+            throw new IllegalStateException(".env 파일을 읽을 수 없습니다.", e);
+        }
     }
 
-    private static int intEnvOrDefault(String key, int defaultValue) {
-        String value = System.getenv(key);
-        return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
+    private static String propertyOrEnvOrDefault(String key, String defaultValue) {
+        String propertyValue = ENV_PROPERTIES.getProperty(key);
+        if (propertyValue != null && !propertyValue.isBlank()) {
+            return propertyValue.trim();
+        }
+
+        String envValue = System.getenv(key);
+        return envValue == null || envValue.isBlank() ? defaultValue : envValue;
+    }
+
+    private static int intPropertyOrEnvOrDefault(String key, int defaultValue) {
+        String value = propertyOrEnvOrDefault(key, String.valueOf(defaultValue));
+        return Integer.parseInt(value);
     }
 }
