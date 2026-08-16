@@ -4,7 +4,9 @@ import com.sprint.mission.discodeit.utils.RequestTimeZoneUtils;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -33,7 +35,7 @@ public record ApiErrorResponse(
             String exceptionType,
             String code,
             String message,
-            Map<String, Object> details
+            Map<String, ?> details
     ) {
         return new ApiErrorResponse(
                 status,
@@ -45,7 +47,7 @@ public record ApiErrorResponse(
         );
     }
 
-    private static Map<String, Object> copyDetails(Map<String, Object> details) {
+    private static Map<String, Object> copyDetails(Map<String, ?> details) {
         if (details == null || details.isEmpty()) {
             return Map.of();
         }
@@ -56,11 +58,21 @@ public record ApiErrorResponse(
             if (key != null) {
                 normalized.put(
                         key,
-                        Objects.requireNonNullElse(value, "상세 정보가 없습니다.")
+                        normalizeDetailValue(value)
                 );
             }
         });
 
         return Map.copyOf(normalized);
+    }
+
+    private static Object normalizeDetailValue(Object value) {
+        Object normalizedValue = Objects.requireNonNullElse(value, "상세 정보가 없습니다.");
+
+        if (normalizedValue instanceof Collection<?> collection) {
+            return List.copyOf(collection);
+        }
+
+        return normalizedValue;
     }
 }

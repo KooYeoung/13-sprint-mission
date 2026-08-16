@@ -150,16 +150,19 @@ class UserControllerTest {
 
                 // then
                 // @Valid 검증이 Controller 본문 실행 전에 실패하므로 400 Bad Request가 반환되어야 한다.
-                // GlobalExceptionHandler는 field name을 details의 key로 내려주므로 실패 필드별 메시지를 확인한다.
+                // GlobalExceptionHandler는 field name을 details의 key로 내려주므로 실패 필드별 메시지 배열을 확인한다.
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.username").value(ValidationMessage.USER_NAME))
-                .andExpect(jsonPath("$.details.password").value(ValidationMessage.USER_PASSWORD))
-                .andExpect(jsonPath("$.details.email").value(ValidationMessage.USER_EMAIL))
+                .andExpect(jsonPath("$.details.username").isArray())
+                .andExpect(jsonPath("$.details.username[0]").value(ValidationMessage.USER_NAME))
+                .andExpect(jsonPath("$.details.password").isArray())
+                .andExpect(jsonPath("$.details.password[0]").value(ValidationMessage.USER_PASSWORD))
+                .andExpect(jsonPath("$.details.email").isArray())
+                .andExpect(jsonPath("$.details.email[0]").value(ValidationMessage.USER_EMAIL))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation 실패 요청은 UserController.create(...) 본문까지 도달하지 않아야 한다.

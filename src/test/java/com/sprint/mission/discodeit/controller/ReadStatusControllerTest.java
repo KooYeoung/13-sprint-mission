@@ -133,7 +133,7 @@ class ReadStatusControllerTest {
 
                 // then
                 // Bean Validation 실패로 400 Bad Request가 반환되는지 확인한다.
-                // GlobalExceptionHandler는 실패 필드명을 details의 key로 내려주므로,
+                // GlobalExceptionHandler는 실패 필드명을 details의 key로 내려주고 메시지를 배열로 담으므로,
                 // 각 필드가 의도한 validation message를 갖는지 함께 검증한다.
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -141,9 +141,12 @@ class ReadStatusControllerTest {
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.userId").value(ValidationMessage.USER_ID_MESSAGE))
-                .andExpect(jsonPath("$.details.channelId").value(ValidationMessage.CHANNEL_ID_MESSAGE))
-                .andExpect(jsonPath("$.details.lastReadAt").value(ValidationMessage.TIME_MESSAGE))
+                .andExpect(jsonPath("$.details.userId").isArray())
+                .andExpect(jsonPath("$.details.userId[0]").value(ValidationMessage.USER_ID_MESSAGE))
+                .andExpect(jsonPath("$.details.channelId").isArray())
+                .andExpect(jsonPath("$.details.channelId[0]").value(ValidationMessage.CHANNEL_ID_MESSAGE))
+                .andExpect(jsonPath("$.details.lastReadAt").isArray())
+                .andExpect(jsonPath("$.details.lastReadAt[0]").value(ValidationMessage.TIME_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation 실패 요청은 ReadStatusController.save(...) 본문까지 도달하지 않아야 한다.

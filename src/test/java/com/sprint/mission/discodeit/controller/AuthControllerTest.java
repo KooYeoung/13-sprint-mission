@@ -131,15 +131,17 @@ class AuthControllerTest {
         // then
         // Bean Validation 실패로 400 Bad Request가 반환되는지 확인한다.
         // GlobalExceptionHandler가 내려주는 validation error body 구조도 함께 확인한다.
-        // details에는 field name을 key로, ValidationMessage 값을 value로 담는다.
+        // details에는 field name을 key로, ValidationMessage 값을 배열 value로 담는다.
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.username").value(ValidationMessage.USER_NAME))
-                .andExpect(jsonPath("$.details.password").value(ValidationMessage.USER_PASSWORD))
+                .andExpect(jsonPath("$.details.username").isArray())
+                .andExpect(jsonPath("$.details.username[0]").value(ValidationMessage.USER_NAME))
+                .andExpect(jsonPath("$.details.password").isArray())
+                .andExpect(jsonPath("$.details.password[0]").value(ValidationMessage.USER_PASSWORD))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation이 실패한 요청은 AuthController.login(...) 본문까지 도달하지 않아야 한다.
