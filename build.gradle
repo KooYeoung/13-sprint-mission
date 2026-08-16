@@ -1,0 +1,125 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.14'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+}
+
+group = 'com.sprint.mission'
+version = '1.2-M8'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+def springBootVersion =
+		org.springframework.boot.gradle.plugin.SpringBootPlugin
+				.BOM_COORDINATES
+				.tokenize(':')
+				.last()
+
+springBoot {
+	buildInfo {
+		properties {
+			additional = [
+					springBootVersion: springBootVersion
+			]
+		}
+	}
+}
+
+ext {
+	set('springBootAdminVersion', "3.5.7")
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "de.codecentric:spring-boot-admin-dependencies:${springBootAdminVersion}"
+	}
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.16'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	runtimeOnly 'org.postgresql:postgresql'
+	testCompileOnly 'org.projectlombok:lombok'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// local/test 환경에서 사용하고, prod 환경에서는 decorator.datasource.enabled=false 로 비활성화 권장
+	implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
+
+	//mapStruct
+	implementation 'org.mapstruct:mapstruct:1.6.3'
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+	// Lombok을 같이 쓰고 있다면 필요
+	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+	// Querydsl
+	implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+	annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+	annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
+	testRuntimeOnly 'com.h2database:h2'
+
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	implementation platform('software.amazon.awssdk:bom:2.46.7')
+	implementation 'software.amazon.awssdk:s3'
+
+	// Adobe S3Mock - 로컬에서 진짜 S3 API 를 흉내내는 컨테이너.
+	//   계정/토큰 불필요(LocalStack 은 2026-03 부터 토큰 필요) → S3 연동을 격리·재현 가능하게 테스트.
+	testImplementation 'com.adobe.testing:s3mock-testcontainers:4.11.0'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+
+// Querydsl Q클래스 생성 위치
+def generated = layout.buildDirectory.dir("generated/sources/annotationProcessor/java/main")
+
+sourceSets {
+	main {
+		java {
+			srcDir generated
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.annotationProcessorGeneratedSourcesDirectory = generated.get().asFile
+}
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.named('build') {
+	finalizedBy tasks.named('jacocoTestReport')
+}

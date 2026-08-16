@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# 리뷰 댓글 언어
+language: "ko-KR"
+
+reviews:
+  # quiet: 중요 문제 위주
+  # chill: 균형 잡힌 리뷰
+  # assertive: 더 적극적이고 세부적인 리뷰
+  profile: "assertive"
+
+  # 리뷰 생략 등의 상태 메시지 표시
+  review_status: true
+
+  # CodeRabbit이 Request changes/Approve 흐름에 참여할지 여부
+  request_changes_workflow: false
+
+  auto_review:
+    # PR 자동 리뷰 활성화
+    enabled: true
+
+    # 새로운 커밋이 Push될 때 다시 리뷰
+    auto_incremental_review: true
+
+    # Draft PR은 자동 리뷰하지 않음
+    drafts: false
+
+    # 기본 브랜치 외에 자동 리뷰할 대상 브랜치
+    base_branches:
+      - ".*"
