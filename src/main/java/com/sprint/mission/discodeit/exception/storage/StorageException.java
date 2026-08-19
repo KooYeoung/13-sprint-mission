@@ -20,6 +20,11 @@ public abstract class StorageException extends DiscodeitException {
         this.path = path;
     }
 
+    protected StorageException(ErrorCode errorCode, String message, Map<String, Object> details, Path path, Throwable cause) {
+        super(errorCode, message, details, cause);
+        this.path = path;
+    }
+
     public Path getPath() {
         return path;
     }

@@ -138,7 +138,8 @@ class ChannelControllerTest {
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.name").value(ValidationMessage.CHANNEL_NAME_MESSAGE))
+                .andExpect(jsonPath("$.details.name").isArray())
+                .andExpect(jsonPath("$.details.name[0]").value(ValidationMessage.CHANNEL_NAME_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation 실패 요청은 ChannelService까지 전달되면 안 된다.
@@ -231,7 +232,8 @@ class ChannelControllerTest {
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.participantIds").value(ValidationMessage.USER_ID_UNIQUE_MESSAGE))
+                .andExpect(jsonPath("$.details.participantIds").isArray())
+                .andExpect(jsonPath("$.details.participantIds[0]").value(ValidationMessage.USER_ID_UNIQUE_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation 실패 요청은 ChannelService까지 전달되면 안 된다.

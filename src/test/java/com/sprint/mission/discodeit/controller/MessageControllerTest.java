@@ -181,9 +181,12 @@ class MessageControllerTest {
                 .andExpect(jsonPath("$.exceptionType").value("MethodArgumentNotValidException"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("요청 데이터가 올바르지 않습니다."))
-                .andExpect(jsonPath("$.details.content").value(ValidationMessage.MESSAGE_CONTENT))
-                .andExpect(jsonPath("$.details.channelId").value(ValidationMessage.CHANNEL_ID_MESSAGE))
-                .andExpect(jsonPath("$.details.authorId").value(ValidationMessage.USER_ID_MESSAGE))
+                .andExpect(jsonPath("$.details.content").isArray())
+                .andExpect(jsonPath("$.details.content[0]").value(ValidationMessage.MESSAGE_CONTENT))
+                .andExpect(jsonPath("$.details.channelId").isArray())
+                .andExpect(jsonPath("$.details.channelId[0]").value(ValidationMessage.CHANNEL_ID_MESSAGE))
+                .andExpect(jsonPath("$.details.authorId").isArray())
+                .andExpect(jsonPath("$.details.authorId[0]").value(ValidationMessage.USER_ID_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").exists());
 
         // validation 실패 요청은 MessageService까지 전달되면 안 된다.

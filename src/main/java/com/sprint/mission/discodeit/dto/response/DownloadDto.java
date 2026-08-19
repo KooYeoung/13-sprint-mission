@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.dto.response;
 
 import com.sprint.mission.discodeit.aspect.LoggableResult;
+import com.sprint.mission.discodeit.storage.DownloadResult;
 import org.springframework.core.io.Resource;
 
 import java.util.LinkedHashMap;
@@ -8,7 +9,7 @@ import java.util.Map;
 
 public record DownloadDto (
         BinaryContentDto binaryContent,
-        Resource resource
+        DownloadResult result
 ) implements LoggableResult {
 
 

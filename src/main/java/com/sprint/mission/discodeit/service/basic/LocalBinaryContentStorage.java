@@ -6,13 +6,15 @@ import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
 import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.exception.storage.FileSaveFailedException;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
+import com.sprint.mission.discodeit.storage.BinaryContentUpload;
+import com.sprint.mission.discodeit.storage.DownloadResult;
+import com.sprint.mission.discodeit.storage.ResourceDownloadResult;
+import com.sprint.mission.discodeit.storage.type.LocalProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.PathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -26,15 +28,16 @@ import java.util.UUID;
 @Slf4j
 @ConditionalOnProperty(
         name = "discodeit.storage.type",
-        havingValue = "local"
+        havingValue = "local",
+        matchIfMissing = true
 )
 public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     private final Path root;
-    private final FileTransactionManager transactionManager;
+    private final StorageTransactionManager transactionManager;
 
-    public LocalBinaryContentStorage(@Value("${discodeit.storage.path}") String rootPath, FileTransactionManager transactionManager) {
-        this.root = Paths.get(rootPath);
+    public LocalBinaryContentStorage(LocalProperties local, StorageTransactionManager transactionManager) {
+        this.root = Paths.get(local.rootPath());
         this.transactionManager = transactionManager;
     }
 
@@ -48,17 +51,24 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     }
 
     @Override
-    public UUID put(UUID fileId, InputStream inputStream) {
+    public UUID put(UUID fileId, BinaryContentUpload upload) {
+
         Path savePath = resolvePath(fileId);
         boolean fileCreated = false;
         try {
 
-            try (OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+            try (
+                    OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+                    InputStream is = upload.inputStream()
+            ) {
                 fileCreated = true;
-                inputStream.transferTo(os);
+                is.transferTo(os);
             }
 
-            transactionManager.deleteOnRollback(savePath);
+            transactionManager.afterRollback(
+                    "로컬 파일 업로드 롤백 정리. path=" + savePath,
+                    () -> Files.deleteIfExists(savePath)
+            );
 
             return fileId;
         } catch (IOException e) {
@@ -92,12 +102,16 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     @Override
     public void delete(UUID fileId) {
         Path savedPath = resolvePath(fileId);
-        transactionManager.deleteAfterCommit(savedPath);
+
+        transactionManager.afterCommit(
+                "로컬 파일 커밋 후 삭제. path=" + savedPath,
+                () -> Files.deleteIfExists(savedPath)
+        );
     }
 
     @Override
-    public Resource download(BinaryContentDto binaryContentDto) {
-        return new PathResource(resolvePath(binaryContentDto.id()));
+    public DownloadResult download(BinaryContentDto binaryContentDto) {
+        return new ResourceDownloadResult(new PathResource(resolvePath(binaryContentDto.id())));
     }
 
     @Override

@@ -67,9 +67,14 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: off
-
 discodeit:
   storage:
-    # 테스트 파일은 build 하위의 별도 경로에 저장
-    type: local
-    path: ./build/test-uploads
+    # 파일 저장 방식과 경로를 환경변수로 설정
+    type: ${STORAGE_TYPE:local}
+    local:
+      root-path: ${STORAGE_LOCAL_ROOT_PATH:./build/test-uploads}
+    s3:
+      region: ${AWS_S3_REGION}
+      bucket: ${AWS_S3_BUCKET}
+      endpoint: ${AWS_S3_ENDPOINT:}
+      presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:600} # (기본값: 10분)

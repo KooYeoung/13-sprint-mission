@@ -3,10 +3,6 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
-  boot:
-    admin:
-      client:
-        url: ${SPRING_BOOT_ADMIN_CLIENT_URL}
   docker:
     compose:
       # 운영 환경에서는 Docker Compose 자동 실행 비활성화
@@ -43,9 +39,3 @@ logging:
     org.hibernate.SQL: warn
     org.hibernate.orm.jdbc.batch: warn
     org.hibernate.orm.jdbc.bind: warn
-
-discodeit:
-  storage:
-    # 파일 저장 방식과 경로를 환경변수로 설정
-    type: ${STORAGE_TYPE}
-    path: ${STORAGE_PATH}

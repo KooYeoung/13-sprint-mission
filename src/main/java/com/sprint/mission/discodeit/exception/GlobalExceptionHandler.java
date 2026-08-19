@@ -4,13 +4,18 @@ import com.sprint.mission.discodeit.exception.storage.StorageException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.nio.file.Path;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestControllerAdvice
 @Slf4j
@@ -36,11 +41,23 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        Map<String, Object> fieldsMap = new HashMap<>();
 
-        e.getBindingResult()
-                .getFieldErrors()
-                .forEach(field -> fieldsMap.put(field.getField(), field.getDefaultMessage()));
+        Map<String, List<String>> fieldsMap = Stream.concat(
+                        e.getBindingResult().getGlobalErrors().stream(),
+                        e.getBindingResult().getFieldErrors().stream()
+                )
+                .collect(
+                        Collectors.collectingAndThen(
+                                Collectors.groupingBy(
+                                        this::getFieldNameOrObjectName,
+                                        Collectors.mapping(
+                                                this::getErrorMessage,
+                                                Collectors.collectingAndThen(Collectors.toList(), List::copyOf)
+                                        )
+                                ),
+                                Map::copyOf
+                        )
+                );
 
         log.warn("validation errors={}", fieldsMap);
 
@@ -55,6 +72,18 @@ public class GlobalExceptionHandler {
                         errorCode.getMessage(),
                         fieldsMap
                 ));
+    }
+
+    private String getFieldNameOrObjectName(ObjectError error) {
+        if (error instanceof FieldError fieldError) {
+            return fieldError.getField();
+        }
+
+        return error.getObjectName();
+    }
+
+    private String getErrorMessage(ObjectError error) {
+        return StringUtils.hasText(error.getDefaultMessage()) ? error.getDefaultMessage() : "상세 내용이 없습니다.";
     }
 
     @ExceptionHandler(Exception.class)

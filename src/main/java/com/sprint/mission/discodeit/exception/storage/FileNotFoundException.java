@@ -14,4 +14,8 @@ public class FileNotFoundException extends StorageException {
     public FileNotFoundException(UUID fileId, Throwable cause) {
         super(ErrorCode.FILE_NOT_FOUND, Map.of("fileId", fileId), null, cause);
     }
+
+    public FileNotFoundException(UUID fileId, String message, Throwable cause) {
+        super(ErrorCode.FILE_NOT_FOUND, message, Map.of("fileId", fileId), null, cause);
+    }
 }

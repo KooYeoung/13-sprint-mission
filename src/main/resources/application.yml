@@ -70,6 +70,17 @@ management:
     env:
       # info.* 설정을 /actuator/info 응답에 포함
       enabled: true
+discodeit:
+  storage:
+    # 파일 저장 방식과 경로를 환경변수로 설정
+    type: ${STORAGE_TYPE:local}
+    local:
+      root-path: ${STORAGE_LOCAL_ROOT_PATH:.discodeit/storage}
+    s3:
+      region: ${AWS_S3_REGION}
+      bucket: ${AWS_S3_BUCKET}
+      endpoint: ${AWS_S3_ENDPOINT:}
+      presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:600} # (기본값: 10분)
 
 info:
   application:
@@ -86,7 +97,7 @@ info:
 
   storage:
     type: ${discodeit.storage.type}
-    path: ${discodeit.storage.path}
+    path: ${discodeit.storage.local.root-path}
 
   multipart:
     max-file-size: ${spring.servlet.multipart.max-file-size}

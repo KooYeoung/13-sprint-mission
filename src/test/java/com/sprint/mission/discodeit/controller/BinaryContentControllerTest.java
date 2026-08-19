@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.service.basic.BinaryContentService;
+import com.sprint.mission.discodeit.storage.ResourceDownloadResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -147,7 +148,7 @@ class BinaryContentControllerTest {
                 (long) bytes.length,
                 MediaType.TEXT_PLAIN_VALUE
         );
-        DownloadDto download = new DownloadDto(binaryContent, new ByteArrayResource(bytes));
+        DownloadDto download = new DownloadDto(binaryContent, new ResourceDownloadResult(new ByteArrayResource(bytes)));
 
         given(binaryContentService.download(any(UUID.class))).willReturn(download);
 
@@ -185,7 +186,7 @@ class BinaryContentControllerTest {
                 (long) bytes.length,
                 null
         );
-        DownloadDto download = new DownloadDto(binaryContent, new ByteArrayResource(bytes));
+        DownloadDto download = new DownloadDto(binaryContent, new ResourceDownloadResult(new ByteArrayResource(bytes)));
 
         given(binaryContentService.download(any(UUID.class))).willReturn(download);
 
