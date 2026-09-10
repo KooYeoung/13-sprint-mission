@@ -11,7 +11,6 @@ import com.sprint.mission.discodeit.service.basic.UserStatusService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,7 +33,7 @@ public class UserController implements UserApi {
             @RequestPart(required = false) MultipartFile profile
     ) {
         UserDto userDto = userService.create(userCreateRequest.toCommand(), profile);
-        return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
+        return ResponseEntity.ok(userDto);
     }
 
     @GetMapping

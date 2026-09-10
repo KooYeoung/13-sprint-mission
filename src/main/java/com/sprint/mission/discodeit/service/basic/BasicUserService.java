@@ -17,8 +17,10 @@ import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
@@ -36,6 +38,7 @@ public class BasicUserService implements UserService {
     private final ReadStatusService readStatusService;
     private final MessageService messageService;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @LogAction(value = "사용자 생성")
     @Override
@@ -44,7 +47,7 @@ public class BasicUserService implements UserService {
 
         BinaryContent profile = binaryContentService.create(file).orElse(null);
 
-        User savedUser = userRepository.save(new User(command, profile));
+        User savedUser = userRepository.save(new User(withEncodedPassword(command), profile));
 
         UserStatusDto userStatusDto = userStatusService.create(savedUser, new UserStatusCreateCommand(Instant.now()));
 
@@ -78,7 +81,7 @@ public class BasicUserService implements UserService {
         BinaryContent oldImage = user.getProfile();
         BinaryContent newImage = binaryContentService.create(file).orElse(oldImage);
 
-        user.updateInfo(command, newImage);
+        user.updateInfo(withEncodedPassword(command), newImage);
 
         User updatedUser = userRepository.save(user);
 
@@ -137,4 +140,23 @@ public class BasicUserService implements UserService {
         }
     }
 
+    private UserCreateCommand withEncodedPassword(UserCreateCommand command) {
+        return new UserCreateCommand(
+                command.username(),
+                passwordEncoder.encode(command.password()),
+                command.email()
+        );
+    }
+
+    private UserUpdateCommand withEncodedPassword(UserUpdateCommand command) {
+        if (!StringUtils.hasText(command.password())) {
+            return command;
+        }
+
+        return new UserUpdateCommand(
+                command.username(),
+                passwordEncoder.encode(command.password()),
+                command.email()
+        );
+    }
 }

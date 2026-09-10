@@ -5,6 +5,7 @@ import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class UserReader {
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public boolean isUserExist(UUID userId) {
         return userRepository.existsById(userId);
@@ -26,7 +28,13 @@ public class UserReader {
     }
 
     public User getUserByCredentials(String username, String password) {
-        return userRepository.findByUsernameAndPassword(username, password)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(UserLoginFailedException::new);
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new UserLoginFailedException();
+        }
+
+        return user;
     }
 }
