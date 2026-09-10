@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -174,6 +175,41 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         UserStatus updatedStatus = userStatusRepository.findByUserId(userId).orElseThrow(AssertionError::new);
         assertThat(updatedStatus.getLastActiveAt()).isEqualTo(updatedLastActiveAt);
+    }
+
+    @Test
+    @DisplayName("현재 사용자 조회 성공 - 로그인 세션으로 동일한 사용자 정보 반환")
+    void getMe_returnsCurrentUser_whenSessionIsAuthenticated() throws Exception {
+        // given
+        // 실제 사용자 생성 및 폼 로그인을 통해 SecurityContext가 저장된 HTTP 세션을 준비한다.
+        String suffix = uniqueSuffix();
+        String username = "sessionUser-" + suffix;
+        String email = "session-user-" + suffix + "@gmail.com";
+        UUID userId = createUser(username, email);
+
+        // 실제로 분리된 HTTP 요청처럼 로그인에서 사용자와 상태를 DB로부터 다시 조회하도록 한다.
+        flushAndClear();
+
+        MvcResult loginResult = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        // when & then
+        // 브라우저가 JSESSIONID 쿠키를 자동으로 전달하는 동작을 동일한 MockHttpSession 재사용으로 검증한다.
+        mockMvc.perform(get("/api/auth/me")
+                        .session(session)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(authenticated().withUsername(username))
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.online").value(true));
     }
 
     @Test
