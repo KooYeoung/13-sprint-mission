@@ -285,12 +285,12 @@ class UserRepositoryTest {
     }
 
     @Test
-    @DisplayName("사용자 인증 조회 성공 - 사용자명과 비밀번호가 일치하면 UserStatus와 프로필을 함께 조회")
-    void findByUsernameAndPassword_fetchesUserStatusAndProfile_whenCredentialsMatch() {
+    @DisplayName("사용자명 조회 성공 - UserStatus와 프로필을 함께 조회")
+    void findByUsername_fetchesUserStatusAndProfile_whenUsernameMatches() {
         // given
-        // UserRepository.findByUsernameAndPassword(...)에는
+        // UserRepository.findByUsername(...)에는
         // @EntityGraph(attributePaths = {"userStatus", "profile"})가 선언되어 있다.
-        // 따라서 이 테스트는 사용자명과 비밀번호가 모두 일치하는 User를 찾는지뿐 아니라,
+        // 따라서 이 테스트는 사용자명이 일치하는 User를 찾는지뿐 아니라,
         // 인증 조회 결과에 UserStatus와 profile(BinaryContent)이 함께 로딩되는지도 검증한다.
         UserCreateCommand command = userCreateCommand();
 
@@ -306,14 +306,14 @@ class UserRepositoryTest {
         assertThat(savedUserStatusId).isNotNull();
         assertThat(savedProfileId).isNotNull();
 
-        // 영속성 컨텍스트를 비워야 findByUsernameAndPassword(...)가
+        // 영속성 컨텍스트를 비워야 findByUsername(...)가
         // 1차 캐시에 남아 있는 savedUser를 그대로 반환하지 않는다.
         // 이 clear() 덕분에 아래 조회는 실제 DB에서 다시 읽어 오는 흐름이 된다.
         em.clear();
 
         // when
-        // 저장한 사용자와 같은 username, password로 실제 Repository 인증 조회 메서드를 호출한다.
-        User foundUser = userRepository.findByUsernameAndPassword(command.username(), command.password())
+        // 저장한 사용자와 같은 username으로 실제 Repository 조회 메서드를 호출한다.
+        User foundUser = userRepository.findByUsername(command.username())
                 .orElseThrow(AssertionError::new);
 
         // then
@@ -324,7 +324,7 @@ class UserRepositoryTest {
         assertThat(persistenceUnitUtil.isLoaded(foundUser, "userStatus")).isTrue();
         assertThat(persistenceUnitUtil.isLoaded(foundUser, "profile")).isTrue();
 
-        // 조회 조건으로 사용한 username, password와 일치하는 사용자가 조회됐는지 확인한다.
+        // 조회 조건으로 사용한 username과 일치하는 사용자가 조회됐는지 확인한다.
         // id뿐 아니라 주요 필드도 함께 확인하면 잘못된 row가 반환되는 문제를 더 명확히 잡을 수 있다.
         assertThat(foundUser.getId()).isEqualTo(savedUserId);
         assertThat(foundUser.getUsername()).isEqualTo(command.username());
@@ -339,16 +339,16 @@ class UserRepositoryTest {
     }
 
     @Test
-    @DisplayName("사용자 인증 조회 성공 - 사용자명 또는 비밀번호가 일치하지 않으면 Optional.empty 반환")
-    void findByUsernameAndPassword_returnsEmpty_whenCredentialsDoNotMatch() {
+    @DisplayName("사용자명 조회 성공 - 사용자명이 일치하지 않으면 Optional.empty 반환")
+    void findByUsername_returnsEmpty_whenUsernameDoesNotMatch() {
         // given
-        // findByUsernameAndPassword(...)는 username과 password가 모두 일치할 때만 User를 반환해야 한다.
-        // 이 테스트는 users 테이블에 실제 사용자가 존재하더라도,
-        // username 또는 password 중 하나라도 다르면 Optional.empty가 반환되는지 검증한다.
+        // findByUsername(...)은 username이 일치할 때만 User를 반환해야 한다.
+        // 이 테스트는 users 테이블에 실제 사용자가 존재하더라도
+        // 다른 username으로 조회하면 Optional.empty가 반환되는지 검증한다.
         UserCreateCommand command = userCreateCommand();
 
-        // 결과가 empty인 실패 인증 조회에서는 UserStatus나 profile을 반환받을 수 없다.
-        // 따라서 이 테스트에서는 연관관계 로딩이 아니라 username/password 조건 적용이 관심사이므로
+        // 결과가 empty인 조회에서는 UserStatus나 profile을 반환받을 수 없다.
+        // 따라서 이 테스트에서는 연관관계 로딩이 아니라 username 조건 적용이 관심사이므로
         // 불필요한 BinaryContent, UserStatus를 만들지 않고 실제 User row만 저장한다.
         User savedUser = saveUser(command);
         UUID savedUserId = savedUser.getId();
@@ -362,21 +362,14 @@ class UserRepositoryTest {
         // 저장된 사용자와 명확히 다른 값을 조회 조건으로 사용한다.
         // 고정 prefix를 붙여 어떤 조건이 불일치하는지 테스트 코드에서 바로 드러나게 한다.
         String wrongUsername = "wrong-" + command.username();
-        String wrongPassword = "wrong-" + command.password();
-
         assertThat(wrongUsername).isNotEqualTo(command.username());
-        assertThat(wrongPassword).isNotEqualTo(command.password());
 
         // when
-        // username만 틀리고 password는 일치하는 경우와,
-        // username은 일치하지만 password만 틀린 경우를 각각 조회한다.
-        Optional<User> userWithWrongUsername = userRepository.findByUsernameAndPassword(wrongUsername, command.password());
-        Optional<User> userWithWrongPassword = userRepository.findByUsernameAndPassword(command.username(), wrongPassword);
+        Optional<User> userWithWrongUsername = userRepository.findByUsername(wrongUsername);
 
         // then
-        // 두 조건 중 하나라도 일치하지 않으면 인증 조건을 만족하지 못하므로 Optional.empty가 반환되어야 한다.
+        // username이 일치하지 않으면 Optional.empty가 반환되어야 한다.
         assertThat(userWithWrongUsername).isEmpty();
-        assertThat(userWithWrongPassword).isEmpty();
     }
 
     private UserCreateCommand userCreateCommand() {

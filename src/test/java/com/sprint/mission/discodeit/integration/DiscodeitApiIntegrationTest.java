@@ -34,6 +34,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -93,6 +94,9 @@ class DiscodeitApiIntegrationTest {
     @Autowired
     EntityManager em;
 
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
     @Test
     @DisplayName("사용자 생성, 로그인, 상태 수정 통합 성공 - 실제 DB에 사용자와 상태가 반영")
     void userCreateLoginAndStatusUpdate_flowPersistsUserAndStatus() throws Exception {
@@ -123,8 +127,8 @@ class DiscodeitApiIntegrationTest {
                         .accept(MediaType.APPLICATION_JSON))
 
                 // then
-                // HTTP 응답은 201 Created이며, 생성된 사용자와 프로필 메타데이터를 JSON으로 내려줘야 한다.
-                .andExpect(status().isCreated())
+                // HTTP 응답은 200 OK이며, 생성된 사용자와 프로필 메타데이터를 JSON으로 내려줘야 한다.
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.username").value(createRequest.username()))
@@ -147,6 +151,8 @@ class DiscodeitApiIntegrationTest {
         UserStatus savedStatus = userStatusRepository.findByUserId(userId).orElseThrow(AssertionError::new);
 
         assertThat(savedUser.getUsername()).isEqualTo(createRequest.username());
+        assertThat(savedUser.getPassword()).isNotEqualTo(createRequest.password());
+        assertThat(passwordEncoder.matches(createRequest.password(), savedUser.getPassword())).isTrue();
         assertThat(savedUser.getEmail()).isEqualTo(createRequest.email());
         assertThat(savedUser.getProfileId()).isEqualTo(profileId);
         assertThat(savedStatus.getUserId()).isEqualTo(userId);
@@ -459,7 +465,8 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         User updatedUser = userRepository.findById(firstUserId).orElseThrow(AssertionError::new);
         assertThat(updatedUser.getUsername()).isEqualTo(updateRequest.newUsername());
-        assertThat(updatedUser.getPassword()).isEqualTo(updateRequest.newPassword());
+        assertThat(updatedUser.getPassword()).isNotEqualTo(updateRequest.newPassword());
+        assertThat(passwordEncoder.matches(updateRequest.newPassword(), updatedUser.getPassword())).isTrue();
         assertThat(updatedUser.getEmail()).isEqualTo(updateRequest.newEmail());
         assertThat(updatedUser.getProfileId()).isEqualTo(updatedProfileId);
         assertThat(binaryContentRepository.findById(updatedProfileId)).isPresent();
@@ -579,7 +586,7 @@ class DiscodeitApiIntegrationTest {
                         .file(jsonPart("userCreateRequest", request))
                         .with(csrf())
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
                 .andReturn();
 

@@ -28,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -49,6 +50,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
+    private static final String ENCODED_PASSWORD = "$2a$10$encoded-password-for-test";
+
     @InjectMocks
     BasicUserService userService;
 
@@ -69,6 +72,9 @@ class UserServiceTest {
 
     @Mock
     UserMapper userMapper;
+
+    @Mock
+    PasswordEncoder passwordEncoder;
 
     @Nested
     @DisplayName("사용자 생성")
@@ -97,6 +103,7 @@ class UserServiceTest {
             // boolean mock 기본값 false에 기대면 테스트 의도가 흐려지므로 성공 조건을 직접 stub 한다.
             given(userRepository.existsByEmail(command.email())).willReturn(false);
             given(userRepository.existsByUsername(command.username())).willReturn(false);
+            given(passwordEncoder.encode(command.password())).willReturn(ENCODED_PASSWORD);
 
             // 이 테스트는 프로필 파일이 없는 기본 생성 케이스다.
             // BinaryContentService는 파일 저장소와 연결되는 협력 객체이므로 mock으로 두고 Optional.empty()를 반환하게 한다.
@@ -133,13 +140,15 @@ class UserServiceTest {
             User savedUser = userCaptor.getValue();
             assertThat(savedUser.getId()).isEqualTo(userId);
             assertThat(savedUser.getUsername()).isEqualTo(command.username());
-            assertThat(savedUser.getPassword()).isEqualTo(command.password());
+            assertThat(savedUser.getPassword()).isEqualTo(ENCODED_PASSWORD);
+            assertThat(savedUser.getPassword()).isNotEqualTo(command.password());
             assertThat(savedUser.getEmail()).isEqualTo(command.email());
             assertThat(savedUser.getProfile()).isNull();
 
             // 사용자 생성 성공 흐름의 핵심 협력 호출을 확인한다.
             verify(userRepository).existsByEmail(command.email());
             verify(userRepository).existsByUsername(command.username());
+            verify(passwordEncoder).encode(command.password());
             verify(binaryContentService).create(null);
 
             // UserStatus 생성 command는 서비스 내부에서 Instant.now()로 만들어진다.
@@ -153,7 +162,7 @@ class UserServiceTest {
 
             // create()는 읽음 상태 정리나 메시지 작성자 연결 해제와 무관하다.
             verifyNoInteractions(readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper);
+            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper, passwordEncoder);
         }
 
         @Test
@@ -181,6 +190,7 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(User.class));
             verify(userStatusService, never()).create(any(User.class), any(UserStatusCreateCommand.class));
             verify(userMapper, never()).toDto(any(User.class), anyBoolean());
+            verifyNoInteractions(passwordEncoder);
 
         }
 
@@ -212,6 +222,7 @@ class UserServiceTest {
             verify(userRepository, never()).save(any(User.class));
             verify(userStatusService, never()).create(any(User.class), any(UserStatusCreateCommand.class));
             verify(userMapper, never()).toDto(any(User.class), anyBoolean());
+            verifyNoInteractions(passwordEncoder);
         }
 
         @Test
@@ -240,6 +251,7 @@ class UserServiceTest {
             // 사용자 생성 가능 조건을 명시한다.
             given(userRepository.existsByEmail(command.email())).willReturn(false);
             given(userRepository.existsByUsername(command.username())).willReturn(false);
+            given(passwordEncoder.encode(command.password())).willReturn(ENCODED_PASSWORD);
 
             // 프로필 파일 저장 결과로 BinaryContent가 반환되는 상황을 만든다.
             given(binaryContentService.create(file)).willReturn(Optional.of(profile));
@@ -273,12 +285,14 @@ class UserServiceTest {
             User savedUser = userCaptor.getValue();
             assertThat(savedUser.getId()).isEqualTo(userId);
             assertThat(savedUser.getUsername()).isEqualTo(command.username());
-            assertThat(savedUser.getPassword()).isEqualTo(command.password());
+            assertThat(savedUser.getPassword()).isEqualTo(ENCODED_PASSWORD);
+            assertThat(savedUser.getPassword()).isNotEqualTo(command.password());
             assertThat(savedUser.getEmail()).isEqualTo(command.email());
             assertThat(savedUser.getProfile()).isEqualTo(profile);
 
             verify(userRepository).existsByEmail(command.email());
             verify(userRepository).existsByUsername(command.username());
+            verify(passwordEncoder).encode(command.password());
             verify(binaryContentService).create(file);
 
             // UserStatus 생성에는 저장된 User와 생성 시간이 들어 있는 command가 전달되어야 한다.
@@ -290,7 +304,7 @@ class UserServiceTest {
 
             // 사용자 생성은 읽음 상태 정리나 메시지 작성자 연결 해제와 무관하다.
             verifyNoInteractions(readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper);
+            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper, passwordEncoder);
         }
 
     }
@@ -457,6 +471,7 @@ class UserServiceTest {
             // 이번 테스트는 프로필 이미지 변경이 없는 사용자 정보 수정만 검증한다.
             // 따라서 파일 생성 결과는 Optional.empty()로 설정한다.
             given(binaryContentService.create(null)).willReturn(Optional.empty());
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
 
             // update()는 수정된 User를 저장한 뒤 저장 결과를 mapper에 넘긴다.
             // mock repository는 기본적으로 null을 반환하므로 명시적으로 user를 반환하게 한다.
@@ -473,13 +488,15 @@ class UserServiceTest {
 
             // 반환 DTO뿐 아니라 실제 User 엔티티 상태도 수정됐는지 확인한다.
             assertThat(user.getUsername()).isEqualTo(updateCommand.username());
-            assertThat(user.getPassword()).isEqualTo(updateCommand.password());
+            assertThat(user.getPassword()).isEqualTo(ENCODED_PASSWORD);
+            assertThat(user.getPassword()).isNotEqualTo(updateCommand.password());
             assertThat(user.getEmail()).isEqualTo(updateCommand.email());
 
             // update()가 기대한 협력 객체들을 호출했는지 확인한다.
             verify(userRepository).findById(userId);
             verify(userRepository).existsByEmail(updateCommand.email());
             verify(userRepository).existsByUsername(updateCommand.username());
+            verify(passwordEncoder).encode(updateCommand.password());
             verify(binaryContentService).create(null);
             verify(userRepository).save(user);
             verify(userMapper).toDto(user);
@@ -623,6 +640,7 @@ class UserServiceTest {
 
             // 이 테스트는 프로필 이미지 변경 없이 사용자 정보만 수정하는 케이스다.
             given(binaryContentService.create(null)).willReturn(Optional.empty());
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
 
             // mock repository는 기본적으로 save() 호출 시 null을 반환한다.
             // 서비스는 save() 결과를 mapper에 넘기므로 저장된 user를 반환하게 설정한다.
@@ -638,8 +656,9 @@ class UserServiceTest {
             // 서비스 반환값이 mapper가 반환한 DTO와 같은지 확인한다.
             assertThat(resultDto).isEqualTo(expectedDto);
 
-            // 비밀번호는 변경 요청 값으로 수정되어야 한다.
-            assertThat(user.getPassword()).isEqualTo(updateCommand.password());
+            // 비밀번호는 인코더가 반환한 해시로 수정되어야 한다.
+            assertThat(user.getPassword()).isEqualTo(ENCODED_PASSWORD);
+            assertThat(user.getPassword()).isNotEqualTo(updateCommand.password());
 
             // 수정 대상 사용자를 조회했는지 확인한다.
             verify(userRepository).findById(userId);
@@ -647,6 +666,7 @@ class UserServiceTest {
             // 사용자명과 이메일이 기존 값과 같으므로 중복 검사는 실행되지 않아야 한다.
             verify(userRepository, never()).existsByEmail(anyString());
             verify(userRepository, never()).existsByUsername(anyString());
+            verify(passwordEncoder).encode(updateCommand.password());
 
             // 프로필 이미지 변경은 없지만, 서비스는 파일 생성 시도를 하고 Optional.empty()를 받는다.
             verify(binaryContentService).create(null);
@@ -660,6 +680,42 @@ class UserServiceTest {
             // 저장된 User가 DTO로 변환되어야 한다.
             verify(userMapper).toDto(user);
 
+        }
+
+        @Test
+        @DisplayName("사용자 수정 성공 - 비밀번호가 없으면 기존 해시를 유지")
+        void update_keepsExistingPassword_whenPasswordIsNull() {
+            // given
+            UserCreateCommand storedCommand = new UserCreateCommand(
+                    "testUsername",
+                    ENCODED_PASSWORD,
+                    "test@gmail.com"
+            );
+            User user = new User(storedCommand, null);
+            UUID userId = UUID.randomUUID();
+            UserUpdateCommand updateCommand = new UserUpdateCommand(
+                    storedCommand.username(),
+                    null,
+                    storedCommand.email()
+            );
+            UserDto expectedDto = createExpectedDto(userId, updateCommand, false);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(user));
+            given(binaryContentService.create(null)).willReturn(Optional.empty());
+            given(userRepository.save(user)).willReturn(user);
+            given(userMapper.toDto(user)).willReturn(expectedDto);
+
+            // when
+            UserDto result = userService.update(userId, updateCommand, null);
+
+            // then
+            assertThat(result).isEqualTo(expectedDto);
+            assertThat(user.getPassword()).isEqualTo(ENCODED_PASSWORD);
+            verifyNoInteractions(passwordEncoder);
+            verify(userRepository).findById(userId);
+            verify(binaryContentService).create(null);
+            verify(userRepository).save(user);
+            verify(userMapper).toDto(user);
         }
 
         @Test
@@ -692,6 +748,7 @@ class UserServiceTest {
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
             given(userRepository.existsByEmail(updateCommand.email())).willReturn(false);
             given(userRepository.existsByUsername(updateCommand.username())).willReturn(false);
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
             given(binaryContentService.create(newFile)).willReturn(Optional.of(newProfileContent));
             given(userRepository.save(user)).willReturn(user);
             given(userMapper.toDto(user)).willReturn(expectedDto);
@@ -710,6 +767,7 @@ class UserServiceTest {
             verify(userRepository).findById(userId);
             verify(userRepository).existsByEmail(updateCommand.email());
             verify(userRepository).existsByUsername(updateCommand.username());
+            verify(passwordEncoder).encode(updateCommand.password());
             verify(binaryContentService).create(newFile);
             verify(userRepository).save(user);
 
@@ -747,6 +805,7 @@ class UserServiceTest {
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
             given(userRepository.existsByEmail(updateCommand.email())).willReturn(false);
             given(userRepository.existsByUsername(updateCommand.username())).willReturn(false);
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
 
             // 새 파일이 없으므로 파일 생성 결과는 Optional.empty()다.
             // 서비스는 새 이미지 대신 기존 profile을 유지해야 한다.
@@ -772,6 +831,7 @@ class UserServiceTest {
             verify(userRepository).findById(userId);
             verify(userRepository).existsByEmail(updateCommand.email());
             verify(userRepository).existsByUsername(updateCommand.username());
+            verify(passwordEncoder).encode(updateCommand.password());
             verify(binaryContentService).create(null);
             verify(userRepository).save(user);
 
@@ -806,6 +866,7 @@ class UserServiceTest {
 
             // 이메일만 변경되므로 이메일 중복 검사 결과만 준비한다.
             given(userRepository.existsByEmail(updateCommand.email())).willReturn(false);
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
 
             // 이 테스트는 프로필 이미지 변경 없이 사용자 정보만 수정하는 케이스다.
             given(binaryContentService.create(null)).willReturn(Optional.empty());
@@ -829,6 +890,7 @@ class UserServiceTest {
             // 이메일만 변경됐으므로 이메일 중복 검사만 실행되어야 한다.
             verify(userRepository).existsByEmail(updateCommand.email());
             verify(userRepository, never()).existsByUsername(anyString());
+            verify(passwordEncoder).encode(updateCommand.password());
 
             verify(binaryContentService).create(null);
             verify(userRepository).save(user);
@@ -864,6 +926,7 @@ class UserServiceTest {
 
             // 사용자명만 변경되므로 사용자명 중복 검사 결과만 준비한다.
             given(userRepository.existsByUsername(updateCommand.username())).willReturn(false);
+            given(passwordEncoder.encode(updateCommand.password())).willReturn(ENCODED_PASSWORD);
 
             // 이 테스트는 프로필 이미지 변경 없이 사용자 정보만 수정하는 케이스다.
             given(binaryContentService.create(null)).willReturn(Optional.empty());
@@ -888,6 +951,7 @@ class UserServiceTest {
             // 사용자명만 변경됐으므로 사용자명 중복 검사만 실행되어야 한다.
             verify(userRepository).existsByUsername(updateCommand.username());
             verify(userRepository, never()).existsByEmail(anyString());
+            verify(passwordEncoder).encode(updateCommand.password());
 
             verify(binaryContentService).create(null);
             verify(userRepository).save(user);

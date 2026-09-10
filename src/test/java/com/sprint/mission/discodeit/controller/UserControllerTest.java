@@ -58,8 +58,8 @@ class UserControllerTest {
     UserStatusService userStatusService;
 
     @Test
-    @DisplayName("사용자 생성 성공 - multipart 요청이면 201 Created와 사용자 정보 반환")
-    void create_returnsCreatedAndUser_whenMultipartRequestIsValid() throws Exception {
+    @DisplayName("사용자 생성 성공 - multipart 요청이면 200 OK와 사용자 정보 반환")
+    void create_returnsOkAndUser_whenMultipartRequestIsValid() throws Exception {
         // given
         // UserController.create(...)는 @RequestBody가 아니라 @RequestPart를 사용한다.
         // 따라서 UserCreateRequest JSON도 multipart의 한 part로 만들어야 한다.
@@ -95,9 +95,9 @@ class UserControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
 
                 // then
-                // Controller가 201 Created를 반환하고, Service가 반환한 UserDto가 JSON으로 직렬화되는지 확인한다.
+                // Controller가 200 OK를 반환하고, Service가 반환한 UserDto가 JSON으로 직렬화되는지 확인한다.
                 // profile은 중첩 객체이므로 id뿐 아니라 파일명, 크기, contentType까지 같이 검증한다.
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.username").value(response.username()))
