@@ -213,6 +213,39 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("로그아웃 성공 - 인증과 세션을 제거하고 204 응답 반환")
+    void logout_invalidatesSessionAndReturnsNoContent() throws Exception {
+        // given
+        // 실제 사용자 생성 및 폼 로그인을 통해 SecurityContext가 저장된 HTTP 세션을 준비한다.
+        String suffix = uniqueSuffix();
+        String username = "logoutUser-" + suffix;
+        createUser(username, "logout-user-" + suffix + "@gmail.com");
+
+        // 실제로 분리된 HTTP 요청처럼 로그인에서 사용자를 DB로부터 다시 조회하도록 한다.
+        flushAndClear();
+
+        MvcResult loginResult = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        // when & then
+        // 동일한 세션과 CSRF 토큰으로 로그아웃하면 인증 및 세션과 JSESSIONID 쿠키가 제거되어야 한다.
+        mockMvc.perform(post("/api/auth/logout")
+                        .session(session)
+                        .with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
+                .andExpect(unauthenticated())
+                .andExpect(cookie().maxAge("JSESSIONID", 0));
+
+        assertThat(session.isInvalid()).isTrue();
+    }
+
+    @Test
     @DisplayName("로그인 실패 - 비밀번호가 일치하지 않으면 표준 401 오류 응답 반환")
     void login_returnsUnauthorized_whenPasswordIsIncorrect() throws Exception {
         String suffix = uniqueSuffix();
