@@ -9,23 +9,10 @@ import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
-import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
-import com.sprint.mission.discodeit.entity.Channel;
-import com.sprint.mission.discodeit.entity.ChannelType;
-import com.sprint.mission.discodeit.entity.Message;
-import com.sprint.mission.discodeit.entity.MessageFile;
-import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.entity.UserStatus;
-import com.sprint.mission.discodeit.repository.BinaryContentRepository;
-import com.sprint.mission.discodeit.repository.ChannelRepository;
-import com.sprint.mission.discodeit.repository.MessageFileRepository;
-import com.sprint.mission.discodeit.repository.MessageRepository;
-import com.sprint.mission.discodeit.repository.ReadStatusRepository;
-import com.sprint.mission.discodeit.repository.UserRepository;
-import com.sprint.mission.discodeit.repository.UserStatusRepository;
+import com.sprint.mission.discodeit.entity.*;
+import com.sprint.mission.discodeit.repository.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -47,15 +35,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -160,22 +143,16 @@ class DiscodeitApiIntegrationTest {
 
         // when
         // 생성한 사용자 계정으로 실제 로그인 API를 호출한다.
-        UserLoginRequest loginRequest = new UserLoginRequest(
-                createRequest.username(),
-                createRequest.password()
-        );
-        mockMvc.perform(post("/api/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
+        performLogin(createRequest.username(), createRequest.password())
 
                 // then
-                // AuthService, UserReader, UserStatusService, UserMapper가 함께 동작해 로그인 응답을 내려줘야 한다.
+                // 폼 로그인 필터와 커스텀 인증 컴포넌트가 함께 동작해 사용자 정보를 내려줘야 한다.
                 .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.username").value(createRequest.username()))
-                .andExpect(jsonPath("$.online").value(true));
+                .andExpect(jsonPath("$.online").value(true))
+                .andExpect(authenticated().withUsername(createRequest.username()));
 
         // when
         // 사용자 상태 수정 API로 lastActiveAt을 명시적으로 갱신한다.
@@ -197,6 +174,40 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         UserStatus updatedStatus = userStatusRepository.findByUserId(userId).orElseThrow(AssertionError::new);
         assertThat(updatedStatus.getLastActiveAt()).isEqualTo(updatedLastActiveAt);
+    }
+
+    @Test
+    @DisplayName("로그인 실패 - 비밀번호가 일치하지 않으면 표준 401 오류 응답 반환")
+    void login_returnsUnauthorized_whenPasswordIsIncorrect() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "wrongPasswordUser-" + suffix;
+        createUser(username, "wrong-password-" + suffix + "@gmail.com");
+
+        performLogin(username, "incorrectPassword")
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.exceptionType").value("UserLoginFailedException"))
+                .andExpect(jsonPath("$.code").value("USER_LOGIN_FAILED"))
+                .andExpect(jsonPath("$.message").value("아이디 또는 비밀번호가 일치하지 않습니다."))
+                .andExpect(jsonPath("$.details").isEmpty())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(unauthenticated());
+    }
+
+    @Test
+    @DisplayName("로그인 실패 - 사용자가 존재하지 않으면 표준 401 오류 응답 반환")
+    void login_returnsUnauthorized_whenUserDoesNotExist() throws Exception {
+        performLogin("unknownUser-" + uniqueSuffix(), "integrationPassword")
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.exceptionType").value("UserLoginFailedException"))
+                .andExpect(jsonPath("$.code").value("USER_LOGIN_FAILED"))
+                .andExpect(jsonPath("$.message").value("아이디 또는 비밀번호가 일치하지 않습니다."))
+                .andExpect(jsonPath("$.details").isEmpty())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(unauthenticated());
     }
 
     @Test
@@ -591,6 +602,15 @@ class DiscodeitApiIntegrationTest {
                 .andReturn();
 
         return uuidAt(readBody(result), "/id");
+    }
+
+    private ResultActions performLogin(String username, String password) throws Exception {
+        return mockMvc.perform(post("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .param("username", username)
+                .param("password", password));
     }
 
     private UUID createPublicChannel(String name, String description) throws Exception {
