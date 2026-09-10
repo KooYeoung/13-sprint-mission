@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -44,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MessageController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("MessageController 슬라이스 테스트")
 class MessageControllerTest {
 
@@ -393,4 +395,5 @@ class MessageControllerTest {
         assertThat(actual.getSize()).isEqualTo(expected.getSize());
         assertThat(actual.getBytes()).isEqualTo(expected.getBytes());
     }
+
 }

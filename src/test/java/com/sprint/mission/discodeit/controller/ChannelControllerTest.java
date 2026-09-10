@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ChannelController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("ChannelController 슬라이스 테스트")
 class ChannelControllerTest {
 
@@ -394,4 +396,5 @@ class ChannelControllerTest {
                 OffsetDateTime.parse("2026-07-28T09:20:30+09:00")
         );
     }
+
 }

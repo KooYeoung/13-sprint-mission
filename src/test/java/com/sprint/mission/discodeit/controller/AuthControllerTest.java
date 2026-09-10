@@ -1,19 +1,23 @@
 package com.sprint.mission.discodeit.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sprint.mission.discodeit.config.SecurityConfig;
 import com.sprint.mission.discodeit.dto.command.user.UserLoginCommand;
 import com.sprint.mission.discodeit.dto.request.ValidationMessage;
 import com.sprint.mission.discodeit.dto.request.user.UserLoginRequest;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.service.basic.AuthService;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -23,11 +27,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Import(SecurityConfig.class)
 @WebMvcTest(AuthController.class)
 @DisplayName("AuthController 슬라이스 테스트")
 class AuthControllerTest {
@@ -78,7 +82,10 @@ class AuthControllerTest {
         //
         // when
         // POST /api/auth/login 요청을 application/json으로 전송한다.
+        Cookie csrfCookie = initCsrfToken();
         mockMvc.perform(post("/api/auth/login")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -123,7 +130,10 @@ class AuthControllerTest {
         //
         // when
         // POST /api/auth/login 요청을 application/json으로 전송한다.
+        Cookie csrfCookie = initCsrfToken();
         mockMvc.perform(post("/api/auth/login")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -147,5 +157,27 @@ class AuthControllerTest {
         // validation이 실패한 요청은 AuthController.login(...) 본문까지 도달하지 않아야 한다.
         // 따라서 AuthService.login(...) 호출이 한 번도 없어야 한다.
         verify(authService, never()).login(any(UserLoginCommand.class));
+    }
+
+    @Test
+    @DisplayName("csrfToken 발급후 203 반환")
+    void csrfToken() throws Exception {
+
+        String csrfTokenName = "XSRF-TOKEN";
+
+        mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isNonAuthoritativeInformation())
+                .andExpect(cookie().exists(csrfTokenName))
+                .andExpect(cookie().httpOnly(csrfTokenName,false))
+        ;
+    }
+
+    private Cookie initCsrfToken() throws Exception {
+
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isNonAuthoritativeInformation())
+                .andReturn();
+
+       return result.getResponse().getCookie("XSRF-TOKEN");
     }
 }

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -40,6 +41,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("UserController 슬라이스 테스트")
 class UserControllerTest {
 
@@ -90,8 +92,7 @@ class UserControllerTest {
         mockMvc.perform(multipart("/api/users")
                         .file(userCreateRequestPart)
                         .file(profilePart)
-                        .accept(MediaType.APPLICATION_JSON)
-                )
+                        .accept(MediaType.APPLICATION_JSON))
 
                 // then
                 // Controller가 201 Created를 반환하고, Service가 반환한 UserDto가 JSON으로 직렬화되는지 확인한다.
@@ -145,8 +146,7 @@ class UserControllerTest {
         // @RequestPart 바인딩에서는 raw body .content(...)를 넣지 않고, JSON part 자체의 content-type을 application/json으로 둔다.
         mockMvc.perform(multipart("/api/users")
                         .file(userCreateRequestPart)
-                        .accept(MediaType.APPLICATION_JSON)
-                )
+                        .accept(MediaType.APPLICATION_JSON))
 
                 // then
                 // @Valid 검증이 Controller 본문 실행 전에 실패하므로 400 Bad Request가 반환되어야 한다.
@@ -224,8 +224,7 @@ class UserControllerTest {
         // GET /api/users 요청을 보낸다.
         // GET 요청에는 body가 없으므로 contentType은 지정하지 않고, 받을 응답 타입만 accept로 지정한다.
         mockMvc.perform(get("/api/users")
-                        .accept(MediaType.APPLICATION_JSON)
-                )
+                        .accept(MediaType.APPLICATION_JSON))
 
                 // then
                 // 응답 상태가 200 OK이고 body가 JSON 배열인지 확인한다.
@@ -294,8 +293,7 @@ class UserControllerTest {
                             servletRequest.setMethod("PATCH");
                             return servletRequest;
                         })
-                        .accept(MediaType.APPLICATION_JSON)
-                )
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(userId.toString()))
@@ -345,8 +343,7 @@ class UserControllerTest {
         // when
         // DELETE /api/users/{userId} 요청을 전송한다.
         mockMvc.perform(delete("/api/users/{userId}", userId)
-                        .accept(MediaType.APPLICATION_JSON)
-                )
+                        .accept(MediaType.APPLICATION_JSON))
 
                 // then
                 // 응답 상태가 204 No Content인지 확인한다.
@@ -502,6 +499,5 @@ class UserControllerTest {
     private UserUpdateRequest getUserUpdateRequest(String username, String password, String email) {
         return new UserUpdateRequest(username, password, email);
     }
-
 
 }
