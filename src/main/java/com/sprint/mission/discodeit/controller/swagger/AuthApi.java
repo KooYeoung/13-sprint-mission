@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name = "Auth", description = "인증 API")
@@ -32,4 +33,7 @@ public interface AuthApi {
             )
     })
     ResponseEntity<UserDto> login(@Valid @RequestBody UserLoginRequest request);
+
+    @Operation(summary = "csrf-token 발급")
+    ResponseEntity<Void> getCsrfToken(CsrfToken csrfToken);
 }
