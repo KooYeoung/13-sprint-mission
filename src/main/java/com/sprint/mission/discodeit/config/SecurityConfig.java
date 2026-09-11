@@ -17,11 +17,14 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 import java.io.IOException;
 import java.util.Map;
@@ -37,7 +40,8 @@ public class SecurityConfig {
             LoginSuccessHandler loginSuccessHandler,
             LoginFailureHandler loginFailureHandler,
             AuthenticationEntryPoint restAuthenticationEntryPoint,
-            AccessDeniedHandler restAccessDeniedHandler
+            AccessDeniedHandler restAccessDeniedHandler,
+            SessionRegistry sessionRegistry
     ) throws Exception {
 
         return http
@@ -79,7 +83,15 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restAuthenticationEntryPoint)
-                        .accessDeniedHandler(restAccessDeniedHandler))
+                        .accessDeniedHandler(restAccessDeniedHandler)
+                )
+                .sessionManagement(session -> session
+                        .sessionConcurrency(concurrency -> concurrency
+                                .maximumSessions(1)
+                                .maxSessionsPreventsLogin(false)
+                                .sessionRegistry(sessionRegistry)
+                        )
+                )
                 .build();
     }
 
@@ -164,4 +176,14 @@ public class SecurityConfig {
      *     return handler;
      * }
      */
+
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
 }

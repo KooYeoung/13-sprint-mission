@@ -33,10 +33,37 @@ class DiscodeitUserDetailsTest {
         assertThat(userDetails.isEnabled()).isTrue();
     }
 
+    @Test
+    @DisplayName("같은 사용자 ID를 가진 인증 정보는 동일한 사용자로 판단한다")
+    void equalsAndHashCode_areBasedOnUserId() {
+        UUID userId = UUID.randomUUID();
+        DiscodeitUserDetails first = new DiscodeitUserDetails(
+                userDto(userId, "firstUsername"),
+                "firstPassword"
+        );
+        DiscodeitUserDetails second = new DiscodeitUserDetails(
+                userDto(userId, "changedUsername"),
+                "changedPassword"
+        );
+        DiscodeitUserDetails other = new DiscodeitUserDetails(
+                userDto(UUID.randomUUID(), "otherUsername"),
+                "otherPassword"
+        );
+
+        assertThat(first)
+                .isEqualTo(second)
+                .hasSameHashCodeAs(second)
+                .isNotEqualTo(other);
+    }
+
     private UserDto userDto(String username) {
+        return userDto(UUID.randomUUID(), username);
+    }
+
+    private UserDto userDto(UUID id, String username) {
         OffsetDateTime now = OffsetDateTime.parse("2026-09-10T10:00:00+09:00");
         return new UserDto(
-                UUID.randomUUID(),
+                id,
                 username,
                 "test@example.com",
                 null,
