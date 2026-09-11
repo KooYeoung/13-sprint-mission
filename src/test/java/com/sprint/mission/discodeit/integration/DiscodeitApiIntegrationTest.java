@@ -24,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -146,7 +147,7 @@ class DiscodeitApiIntegrationTest {
 
         // when
         // 생성한 사용자 계정으로 실제 로그인 API를 호출한다.
-        performLogin(createRequest.username(), createRequest.password())
+        MvcResult loginResult = performLogin(createRequest.username(), createRequest.password())
 
                 // then
                 // 폼 로그인 필터와 커스텀 인증 컴포넌트가 함께 동작해 사용자 정보를 내려줘야 한다.
@@ -156,13 +157,18 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(jsonPath("$.username").value(createRequest.username()))
                 .andExpect(jsonPath("$.online").value(true))
                 .andExpect(jsonPath("$.role").value(Role.USER.name()))
-                .andExpect(authenticated().withUsername(createRequest.username()));
+                .andExpect(authenticated().withUsername(createRequest.username()))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
 
         // when
         // 사용자 상태 수정 API로 lastActiveAt을 명시적으로 갱신한다.
         Instant updatedLastActiveAt = Instant.parse("2026-07-28T01:40:30Z");
         UserStatusUpdateRequest statusUpdateRequest = new UserStatusUpdateRequest(updatedLastActiveAt);
         mockMvc.perform(patch("/api/users/{userId}/userStatus", userId)
+                        .session(session)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
@@ -283,6 +289,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("공개 채널, 메시지, 첨부 파일 통합 성공 - 메시지 저장 후 목록 조회와 다운로드 가능")
     void publicChannelMessageAndAttachment_flowPersistsAndDownloadsAttachment() throws Exception {
         // given
@@ -393,6 +400,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("비공개 채널과 읽음 상태 통합 성공 - 참여자별 ReadStatus 생성 후 수정 가능")
     void privateChannelAndReadStatus_flowCreatesAndUpdatesParticipantReadStatuses() throws Exception {
         // given
@@ -486,6 +494,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "USER")
     @DisplayName("사용자 목록, 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
     void userListUpdateAndDelete_flowPersistsUpdatesAndRemovesUser() throws Exception {
         // given
@@ -569,6 +578,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("채널 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
     void channelUpdateAndDelete_flowPersistsUpdatesAndRemovesChannel() throws Exception {
         // given
@@ -614,6 +624,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("메시지 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
     void messageUpdateAndDelete_flowPersistsUpdatesAndRemovesMessage() throws Exception {
         // given
@@ -659,6 +670,7 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("사용자 역할 변경 통합 성공 - 응답과 DB에 변경된 역할이 반영")
     void updateUserRole_updatesResponseAndDatabase() throws Exception {
         String suffix = uniqueSuffix();

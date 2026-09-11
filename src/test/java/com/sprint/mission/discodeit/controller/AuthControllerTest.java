@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -64,6 +65,7 @@ class AuthControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("사용자 역할 변경 요청 시 변경된 사용자 정보를 반환한다")
     void updateRole_returnsUpdatedUser() throws Exception {
         UUID userId = UUID.randomUUID();
@@ -82,6 +84,7 @@ class AuthControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     @DisplayName("사용자 역할 변경 요청값이 비어 있으면 400을 반환한다")
     void updateRole_returnsBadRequest_whenRequestIsInvalid() throws Exception {
         UserRoleUpdateRequest request = new UserRoleUpdateRequest(null, null);
@@ -90,6 +93,25 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isBadRequest());
+
+        then(userRoleUpdater).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("관리자 권한이 없으면 사용자 역할 변경 요청에 403을 반환한다")
+    void updateRole_returnsForbidden_whenUserIsNotAdmin() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserRoleUpdateRequest request = new UserRoleUpdateRequest(userId, Role.CHANNEL_MANAGER);
+
+        mockMvc.perform(withCsrf(put("/api/auth/role")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))))
+                .andExpectAll(
+                        status().isForbidden(),
+                        jsonPath("$.status").value(403),
+                        jsonPath("$.code").value("AUTH_403")
+                );
 
         then(userRoleUpdater).shouldHaveNoInteractions();
     }
