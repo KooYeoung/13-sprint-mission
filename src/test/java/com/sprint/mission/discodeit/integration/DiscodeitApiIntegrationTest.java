@@ -14,6 +14,7 @@ import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.entity.*;
 import com.sprint.mission.discodeit.repository.*;
 import jakarta.persistence.EntityManager;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -304,6 +305,108 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.online").value(true));
+    }
+
+    @Test
+    @DisplayName("로그인 유지 성공 - 세션 쿠키 없이 Remember-Me 쿠키로 자동 로그인")
+    void rememberMe_autoLogsIn_whenSessionCookieIsMissing() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "rememberMeUser-" + suffix;
+        UUID userId = createUser(username, "remember-me-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult loginResult = performRememberMeLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andExpect(cookie().exists("remember-me"))
+                .andExpect(cookie().maxAge("remember-me", 60 * 60 * 24 * 30))
+                .andReturn();
+
+        Cookie rememberMeCookie = loginResult.getResponse().getCookie("remember-me");
+        MockHttpSession loginSession = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(rememberMeCookie).isNotNull();
+        assertThat(loginSession).isNotNull();
+
+        MvcResult autoLoginResult = mockMvc.perform(get("/api/auth/me")
+                        .cookie(rememberMeCookie)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.online").value(true))
+                .andReturn();
+
+        MockHttpSession autoLoginSession =
+                (MockHttpSession) autoLoginResult.getRequest().getSession(false);
+        assertThat(autoLoginSession).isNotNull();
+        assertThat(autoLoginSession.getId()).isNotEqualTo(loginSession.getId());
+    }
+
+    @Test
+    @DisplayName("로그인 유지 미선택 - Remember-Me 쿠키를 발급하지 않는다")
+    void rememberMe_doesNotIssueCookie_whenParameterIsMissing() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "noRememberMeUser-" + suffix;
+        createUser(username, "no-remember-me-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult loginResult = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andExpect(cookie().doesNotExist("remember-me"))
+                .andReturn();
+
+        assertThat(loginResult.getResponse().getCookie("remember-me")).isNull();
+    }
+
+    @Test
+    @DisplayName("로그인 유지 해제 - remember-me가 false이면 쿠키를 발급하지 않는다")
+    void rememberMe_doesNotIssueCookie_whenParameterIsFalse() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "falseRememberMeUser-" + suffix;
+        createUser(username, "false-remember-me-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult loginResult = performLoginWithRememberMe(
+                        username,
+                        "integrationPassword",
+                        false
+                )
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andExpect(cookie().doesNotExist("remember-me"))
+                .andReturn();
+
+        assertThat(loginResult.getResponse().getCookie("remember-me")).isNull();
+    }
+
+    @Test
+    @DisplayName("로그인 유지 로그아웃 성공 - 세션과 Remember-Me 쿠키를 제거한다")
+    void rememberMe_logoutInvalidatesSessionAndCookie() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "rememberMeLogoutUser-" + suffix;
+        createUser(username, "remember-me-logout-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult loginResult = performRememberMeLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie rememberMeCookie = loginResult.getResponse().getCookie("remember-me");
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(rememberMeCookie).isNotNull();
+        assertThat(session).isNotNull();
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .session(session)
+                        .cookie(rememberMeCookie)
+                        .with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(unauthenticated())
+                .andExpect(cookie().maxAge("JSESSIONID", 0))
+                .andExpect(cookie().maxAge("remember-me", 0));
+
+        assertThat(session.isInvalid()).isTrue();
     }
 
     @Test
@@ -833,6 +936,24 @@ class DiscodeitApiIntegrationTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .param("username", username)
                 .param("password", password));
+    }
+
+    private ResultActions performRememberMeLogin(String username, String password) throws Exception {
+        return performLoginWithRememberMe(username, password, true);
+    }
+
+    private ResultActions performLoginWithRememberMe(
+            String username,
+            String password,
+            boolean rememberMe
+    ) throws Exception {
+        return mockMvc.perform(post("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .param("username", username)
+                .param("password", password)
+                .param("remember-me", Boolean.toString(rememberMe)));
     }
 
     private UUID createPublicChannel(String name, String description) throws Exception {
