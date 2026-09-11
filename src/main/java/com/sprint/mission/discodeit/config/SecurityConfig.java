@@ -1,8 +1,8 @@
 package com.sprint.mission.discodeit.config;
 
-import com.sprint.mission.discodeit.security.LoginFailureHandler;
-import com.sprint.mission.discodeit.security.LoginSuccessHandler;
-import com.sprint.mission.discodeit.security.SpaCsrfTokenRequestHandler;
+import com.sprint.mission.discodeit.security.handler.LoginFailureHandler;
+import com.sprint.mission.discodeit.security.handler.LoginSuccessHandler;
+import com.sprint.mission.discodeit.security.handler.SpaCsrfTokenRequestHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
