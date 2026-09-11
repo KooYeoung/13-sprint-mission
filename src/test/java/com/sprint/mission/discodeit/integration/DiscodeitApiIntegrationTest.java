@@ -11,10 +11,10 @@ import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateReque
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserRoleUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
-import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.entity.*;
 import com.sprint.mission.discodeit.repository.*;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,13 +23,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.session.SessionInformation;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -60,9 +65,6 @@ class DiscodeitApiIntegrationTest {
     UserRepository userRepository;
 
     @Autowired
-    UserStatusRepository userStatusRepository;
-
-    @Autowired
     ChannelRepository channelRepository;
 
     @Autowired
@@ -83,13 +85,31 @@ class DiscodeitApiIntegrationTest {
     @Autowired
     PasswordEncoder passwordEncoder;
 
+    @Autowired
+    SessionRegistry sessionRegistry;
+
+    @Autowired
+    HttpSessionEventPublisher httpSessionEventPublisher;
+
+    @Autowired
+    WebApplicationContext webApplicationContext;
+
+    @AfterEach
+    void clearSessionRegistry() {
+        sessionRegistry.getAllPrincipals().forEach(principal ->
+                sessionRegistry.getAllSessions(principal, true).forEach(sessionInformation ->
+                        sessionRegistry.removeSessionInformation(sessionInformation.getSessionId())
+                )
+        );
+    }
+
     @Test
-    @DisplayName("사용자 생성, 로그인, 상태 수정 통합 성공 - 실제 DB에 사용자와 상태가 반영")
-    void userCreateLoginAndStatusUpdate_flowPersistsUserAndStatus() throws Exception {
+    @DisplayName("사용자 생성 및 로그인 통합 성공 - 실제 DB 사용자로 인증")
+    void userCreateAndLogin_authenticatesPersistedUser() throws Exception {
         // given
         // 통합 테스트는 Controller 슬라이스 테스트와 달리 Service, Repository, Mapper, DB를 모두 실제 Bean으로 사용한다.
-        // 이 테스트는 사용자 생성 요청이 User, BinaryContent, UserStatus 저장까지 이어지고,
-        // 이후 로그인과 상태 수정 API가 같은 사용자 상태 row를 갱신하는지 확인한다.
+        // 이 테스트는 사용자 생성 요청이 User와 BinaryContent 저장까지 이어지고,
+        // 이후 저장된 계정으로 로그인할 수 있는지 확인한다.
         String suffix = uniqueSuffix();
         UserCreateRequest createRequest = new UserCreateRequest(
                 "integrationUser-" + suffix,
@@ -123,7 +143,7 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(jsonPath("$.profile.fileName").value(profilePart.getOriginalFilename()))
                 .andExpect(jsonPath("$.profile.size").value(profilePart.getSize()))
                 .andExpect(jsonPath("$.profile.contentType").value(profilePart.getContentType()))
-                .andExpect(jsonPath("$.online").value(true))
+                .andExpect(jsonPath("$.online").value(false))
                 .andExpect(jsonPath("$.role").value(Role.USER.name()))
                 .andReturn();
 
@@ -135,14 +155,12 @@ class DiscodeitApiIntegrationTest {
         // 영속성 컨텍스트를 비워 API 호출 결과가 1차 캐시가 아니라 DB에 flush된 상태인지 확인한다.
         flushAndClear();
         User savedUser = userRepository.findById(userId).orElseThrow(AssertionError::new);
-        UserStatus savedStatus = userStatusRepository.findByUserId(userId).orElseThrow(AssertionError::new);
 
         assertThat(savedUser.getUsername()).isEqualTo(createRequest.username());
         assertThat(savedUser.getPassword()).isNotEqualTo(createRequest.password());
         assertThat(passwordEncoder.matches(createRequest.password(), savedUser.getPassword())).isTrue();
         assertThat(savedUser.getEmail()).isEqualTo(createRequest.email());
         assertThat(savedUser.getProfileId()).isEqualTo(profileId);
-        assertThat(savedStatus.getUserId()).isEqualTo(userId);
         assertThat(binaryContentRepository.findById(profileId)).isPresent();
 
         // when
@@ -162,28 +180,6 @@ class DiscodeitApiIntegrationTest {
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
         assertThat(session).isNotNull();
-
-        // when
-        // 사용자 상태 수정 API로 lastActiveAt을 명시적으로 갱신한다.
-        Instant updatedLastActiveAt = Instant.parse("2026-07-28T01:40:30Z");
-        UserStatusUpdateRequest statusUpdateRequest = new UserStatusUpdateRequest(updatedLastActiveAt);
-        mockMvc.perform(patch("/api/users/{userId}/userStatus", userId)
-                        .session(session)
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(statusUpdateRequest)))
-
-                // then
-                // 상태 수정 응답은 같은 userId를 포함해야 한다.
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(userId.toString()))
-                .andExpect(jsonPath("$.lastActiveAt").exists());
-
-        // DB에 저장된 UserStatus.lastActiveAt이 요청값으로 갱신됐는지 확인한다.
-        flushAndClear();
-        UserStatus updatedStatus = userStatusRepository.findByUserId(userId).orElseThrow(AssertionError::new);
-        assertThat(updatedStatus.getLastActiveAt()).isEqualTo(updatedLastActiveAt);
     }
 
     @Test
@@ -240,6 +236,7 @@ class DiscodeitApiIntegrationTest {
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
         assertThat(session).isNotNull();
+        assertThat(sessionRegistry.getSessionInformation(session.getId())).isNotNull();
 
         // when & then
         // 동일한 세션과 CSRF 토큰으로 로그아웃하면 인증 및 세션과 JSESSIONID 쿠키가 제거되어야 한다.
@@ -252,6 +249,110 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(cookie().maxAge("JSESSIONID", 0));
 
         assertThat(session.isInvalid()).isTrue();
+    }
+
+    @Test
+    @DisplayName("HTTP 세션 만료 이벤트가 발생하면 세션 레지스트리에서도 제거한다")
+    void sessionDestroyedEvent_removesSessionFromRegistry() {
+        MockServletContext servletContext = new MockServletContext();
+        servletContext.setAttribute(
+                WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE,
+                webApplicationContext
+        );
+        MockHttpSession session = new MockHttpSession(servletContext);
+        String principal = "session-event-user";
+        sessionRegistry.registerNewSession(session.getId(), principal);
+        assertThat(sessionRegistry.getSessionInformation(session.getId())).isNotNull();
+
+        httpSessionEventPublisher.sessionDestroyed(new jakarta.servlet.http.HttpSessionEvent(session));
+
+        assertThat(sessionRegistry.getSessionInformation(session.getId())).isNull();
+    }
+
+    @Test
+    @DisplayName("동일한 계정으로 다시 로그인하면 기존 세션을 만료하고 새 세션을 유지한다")
+    void login_expiresPreviousSession_whenSameAccountLogsInAgain() throws Exception {
+        String suffix = uniqueSuffix();
+        String username = "concurrentUser-" + suffix;
+        UUID userId = createUser(username, "concurrent-user-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult firstLogin = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession firstSession = (MockHttpSession) firstLogin.getRequest().getSession(false);
+        assertThat(firstSession).isNotNull();
+
+        MvcResult secondLogin = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession secondSession = (MockHttpSession) secondLogin.getRequest().getSession(false);
+        assertThat(secondSession).isNotNull();
+        assertThat(secondSession.getId()).isNotEqualTo(firstSession.getId());
+
+        SessionInformation firstSessionInformation =
+                sessionRegistry.getSessionInformation(firstSession.getId());
+        SessionInformation secondSessionInformation =
+                sessionRegistry.getSessionInformation(secondSession.getId());
+
+        assertThat(firstSessionInformation).isNotNull();
+        assertThat(firstSessionInformation.isExpired()).isTrue();
+        assertThat(secondSessionInformation).isNotNull();
+        assertThat(secondSessionInformation.isExpired()).isFalse();
+
+        mockMvc.perform(get("/api/auth/me").session(secondSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.online").value(true));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("사용자 역할을 변경하면 대상 사용자의 세션만 만료한다")
+    void updateUserRole_expiresOnlyTargetUserSession() throws Exception {
+        String suffix = uniqueSuffix();
+        String targetUsername = "roleSessionTarget-" + suffix;
+        String otherUsername = "roleSessionOther-" + suffix;
+        UUID targetUserId = createUser(
+                targetUsername,
+                "role-session-target-" + suffix + "@gmail.com"
+        );
+        createUser(otherUsername, "role-session-other-" + suffix + "@gmail.com");
+        flushAndClear();
+
+        MvcResult targetLogin = performLogin(targetUsername, "integrationPassword")
+                .andExpect(status().isOk())
+                .andReturn();
+        MvcResult otherLogin = performLogin(otherUsername, "integrationPassword")
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession targetSession = (MockHttpSession) targetLogin.getRequest().getSession(false);
+        MockHttpSession otherSession = (MockHttpSession) otherLogin.getRequest().getSession(false);
+        assertThat(targetSession).isNotNull();
+        assertThat(otherSession).isNotNull();
+
+        UserRoleUpdateRequest request = new UserRoleUpdateRequest(
+                targetUserId,
+                Role.CHANNEL_MANAGER
+        );
+        mockMvc.perform(put("/api/auth/role")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(targetUserId.toString()))
+                .andExpect(jsonPath("$.role").value(Role.CHANNEL_MANAGER.name()))
+                .andExpect(jsonPath("$.online").value(false));
+
+        SessionInformation targetSessionInformation =
+                sessionRegistry.getSessionInformation(targetSession.getId());
+        SessionInformation otherSessionInformation =
+                sessionRegistry.getSessionInformation(otherSession.getId());
+
+        assertThat(targetSessionInformation).isNotNull();
+        assertThat(targetSessionInformation.isExpired()).isTrue();
+        assertThat(otherSessionInformation).isNotNull();
+        assertThat(otherSessionInformation.isExpired()).isFalse();
     }
 
     @Test
@@ -570,10 +671,9 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         // then
-        // User와 UserStatus가 실제 DB에서 제거되고, 대조군 사용자는 남아 있어야 한다.
+        // User가 실제 DB에서 제거되고, 대조군 사용자는 남아 있어야 한다.
         flushAndClear();
         assertThat(userRepository.findById(firstUserId)).isEmpty();
-        assertThat(userStatusRepository.findByUserId(firstUserId)).isEmpty();
         assertThat(userRepository.findById(secondUserId)).isPresent();
     }
 

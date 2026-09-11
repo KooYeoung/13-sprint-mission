@@ -3,9 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
-import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
-import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
@@ -23,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,7 +31,6 @@ import java.util.UUID;
 public class BasicUserService implements UserService {
     private final UserRepository userRepository;
     private final BinaryContentService binaryContentService;
-    private final UserStatusService userStatusService;
     private final ReadStatusService readStatusService;
     private final MessageService messageService;
     private final UserMapper userMapper;
@@ -49,9 +45,7 @@ public class BasicUserService implements UserService {
 
         User savedUser = userRepository.save(new User(withEncodedPassword(command), profile));
 
-        UserStatusDto userStatusDto = userStatusService.create(savedUser, new UserStatusCreateCommand(Instant.now()));
-
-        return userMapper.toDto(savedUser, userStatusDto.isOnline());
+        return userMapper.toDto(savedUser);
     }
 
     @Transactional(readOnly = true)
@@ -96,14 +90,9 @@ public class BasicUserService implements UserService {
     @Override
     public void delete(UUID userId) {
         User user = getUserRequireThrow(userId);
-        UUID userStatusId = user.getStatusId();
-        user.detachUserStatus();
 
         readStatusService.deleteByUserId(userId);
         messageService.detachByAuthorId(userId);
-        if (userStatusId != null) {
-            userStatusService.delete(userStatusId, userId);
-        }
 
         userRepository.deleteById(user.getId());
 

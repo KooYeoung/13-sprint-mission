@@ -14,13 +14,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmail(String email);
 
-    @EntityGraph(attributePaths = {"userStatus", "profile"})
+    @EntityGraph(attributePaths = {"profile"})
     List<User> findAll();
 
-    @EntityGraph(attributePaths = {"userStatus", "profile"})
+    @EntityGraph(attributePaths = {"profile"})
     Optional<User> findById(UUID id);
 
-    @EntityGraph(attributePaths = {"userStatus", "profile"})
+    @EntityGraph(attributePaths = {"profile"})
     Optional<User> findByUsername(String username);
 
     boolean existsByRole(Role role);

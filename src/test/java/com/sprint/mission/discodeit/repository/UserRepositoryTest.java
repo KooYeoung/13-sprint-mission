@@ -5,11 +5,9 @@ import com.sprint.mission.discodeit.config.P6SpySqlFormatter;
 import com.sprint.mission.discodeit.config.QuerydslTestConfig;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
-import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.entity.UserStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -34,9 +32,6 @@ class UserRepositoryTest {
 
     @Autowired
     UserRepository userRepository;
-
-    @Autowired
-    UserStatusRepository userStatusRepository;
 
     @Autowired
     BinaryContentRepository binaryContentRepository;
@@ -176,21 +171,18 @@ class UserRepositoryTest {
 
 
     @Test
-    @DisplayName("사용자 목록 조회 성공 - UserStatus와 프로필을 함께 조회")
-    void findAll_fetchesUserStatusAndProfile_whenUsersExist() {
+    @DisplayName("사용자 목록 조회 성공 - 프로필을 함께 조회")
+    void findAll_fetchesProfile_whenUsersExist() {
         // given
-        // UserRepository.findAll()에는 @EntityGraph(attributePaths = {"userStatus", "profile"})가 선언되어 있다.
         // 따라서 이 테스트는 단순히 User 목록이 반환되는지만 보는 것이 아니라,
-        // User와 연관된 UserStatus, profile(BinaryContent)이 함께 로딩되는지까지 검증한다.
         UserCreateCommand command = userCreateCommand();
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        UserFixture fixture = saveUserWithProfileAndStatus(command);
+        UserFixture fixture = saveUserWithProfile(command);
 
         UUID savedProfileId = fixture.profile().getId();
         UUID savedUserId = fixture.user().getId();
-        UUID savedUserStatusId = fixture.userStatus().getId();
 
         // 영속성 컨텍스트를 비워야 findAll()이 1차 캐시에 남아 있는 엔티티를 그대로 반환하지 않는다.
         // 이 clear() 덕분에 아래 조회는 실제 DB에서 다시 읽어 오는 흐름이 된다.
@@ -210,7 +202,6 @@ class UserRepositoryTest {
         // 연관 객체의 getter를 먼저 호출하면 지연 로딩이 발생해서
         // EntityGraph로 함께 조회됐는지, getter 접근 때문에 뒤늦게 조회됐는지 구분하기 어렵다.
         // 그래서 연관 객체에 접근하기 전에 JPA 표준 PersistenceUnitUtil.isLoaded(...)로 로딩 여부를 먼저 확인한다.
-        assertThat(persistenceUnitUtil.isLoaded(foundUser, "userStatus")).isTrue();
         assertThat(persistenceUnitUtil.isLoaded(foundUser, "profile")).isTrue();
 
         // em.clear() 이후 조회된 foundUser는 DB에서 다시 조회된 엔티티다.
@@ -221,11 +212,7 @@ class UserRepositoryTest {
         assertThat(foundUser.getUsername()).isEqualTo(command.username());
         assertThat(foundUser.getEmail()).isEqualTo(command.email());
 
-        // UserStatus와 profile도 실제 연관 엔티티가 조회됐는지 id 기준으로 확인한다.
         // 이 검증은 단순 null 여부보다 명확하게 "저장한 연관 데이터가 함께 조회됐다"는 사실을 보장한다.
-        assertThat(savedUserStatusId).isNotNull();
-        assertThat(foundUser.getUserStatus()).isNotNull();
-        assertThat(foundUser.getUserStatus().getId()).isEqualTo(savedUserStatusId);
 
         assertThat(savedProfileId).isNotNull();
         assertThat(foundUser.getProfile()).isNotNull();
@@ -233,21 +220,18 @@ class UserRepositoryTest {
     }
 
     @Test
-    @DisplayName("사용자 단건 조회 성공 - UserStatus와 프로필을 함께 조회")
-    void findById_fetchesUserStatusAndProfile_whenUserExists() {
+    @DisplayName("사용자 단건 조회 성공 - 프로필을 함께 조회")
+    void findById_fetchesProfile_whenUserExists() {
         // given
-        // UserRepository.findById(...)에는 @EntityGraph(attributePaths = {"userStatus", "profile"})가 선언되어 있다.
         // 따라서 이 테스트는 단순히 id로 User 단건을 찾는지만 보는 것이 아니라,
-        // 단건 조회 시 User와 연관된 UserStatus, profile(BinaryContent)이 함께 로딩되는지까지 검증한다.
         UserCreateCommand command = userCreateCommand();
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        UserFixture fixture = saveUserWithProfileAndStatus(command);
+        UserFixture fixture = saveUserWithProfile(command);
 
         UUID savedProfileId = fixture.profile().getId();
         UUID savedUserId = fixture.user().getId();
-        UUID savedUserStatusId = fixture.userStatus().getId();
 
         // 영속성 컨텍스트를 비워야 findById(...)가 1차 캐시에 남아 있는 savedUser를 그대로 반환하지 않는다.
         // 이 clear() 덕분에 아래 조회는 실제 DB에서 다시 읽어 오는 흐름이 된다.
@@ -262,7 +246,6 @@ class UserRepositoryTest {
         // EntityGraph로 함께 조회됐는지, getter 접근 때문에 뒤늦게 조회됐는지 구분하기 어렵다.
         // 그래서 연관 객체에 접근하기 전에 JPA 표준 PersistenceUnitUtil.isLoaded(...)로 로딩 여부를 먼저 확인한다.
         PersistenceUnitUtil persistenceUnitUtil = getPersistenceUnitUtil();
-        assertThat(persistenceUnitUtil.isLoaded(foundUser, "userStatus")).isTrue();
         assertThat(persistenceUnitUtil.isLoaded(foundUser, "profile")).isTrue();
 
         // em.clear() 이후 조회된 foundUser는 DB에서 다시 조회된 엔티티다.
@@ -273,11 +256,6 @@ class UserRepositoryTest {
         assertThat(foundUser.getUsername()).isEqualTo(command.username());
         assertThat(foundUser.getEmail()).isEqualTo(command.email());
 
-        // UserStatus도 실제 연관 엔티티가 함께 조회됐는지 id 기준으로 확인한다.
-        // 단순히 notNull만 확인하면 저장한 UserStatus와 같은 데이터인지 알기 어렵다.
-        assertThat(savedUserStatusId).isNotNull();
-        assertThat(foundUser.getUserStatus()).isNotNull();
-        assertThat(foundUser.getUserStatus().getId()).isEqualTo(savedUserStatusId);
 
         // profile도 마찬가지로 실제 저장한 BinaryContent가 함께 조회됐는지 확인한다.
         assertThat(savedProfileId).isNotNull();
@@ -313,25 +291,21 @@ class UserRepositoryTest {
     }
 
     @Test
-    @DisplayName("사용자명 조회 성공 - UserStatus와 프로필을 함께 조회")
-    void findByUsername_fetchesUserStatusAndProfile_whenUsernameMatches() {
+    @DisplayName("사용자명 조회 성공 - 프로필을 함께 조회")
+    void findByUsername_fetchesProfile_whenUsernameMatches() {
         // given
         // UserRepository.findByUsername(...)에는
-        // @EntityGraph(attributePaths = {"userStatus", "profile"})가 선언되어 있다.
         // 따라서 이 테스트는 사용자명이 일치하는 User를 찾는지뿐 아니라,
-        // 인증 조회 결과에 UserStatus와 profile(BinaryContent)이 함께 로딩되는지도 검증한다.
         UserCreateCommand command = userCreateCommand();
 
         // profile을 null로 두면 "프로필을 함께 조회한다"는 요구사항을 검증할 수 없다.
         // 그래서 실제 BinaryContent를 먼저 저장하고 User의 profile 연관관계에 연결한다.
-        UserFixture fixture = saveUserWithProfileAndStatus(command);
+        UserFixture fixture = saveUserWithProfile(command);
 
         UUID savedUserId = fixture.user().getId();
-        UUID savedUserStatusId = fixture.userStatus().getId();
         UUID savedProfileId = fixture.profile().getId();
 
         assertThat(savedUserId).isNotNull();
-        assertThat(savedUserStatusId).isNotNull();
         assertThat(savedProfileId).isNotNull();
 
         // 영속성 컨텍스트를 비워야 findByUsername(...)가
@@ -349,7 +323,6 @@ class UserRepositoryTest {
         // EntityGraph로 함께 조회됐는지, getter 접근 때문에 뒤늦게 조회됐는지 구분하기 어렵다.
         // 그래서 연관 객체에 접근하기 전에 JPA 표준 PersistenceUnitUtil.isLoaded(...)로 로딩 여부를 먼저 확인한다.
         PersistenceUnitUtil persistenceUnitUtil = getPersistenceUnitUtil();
-        assertThat(persistenceUnitUtil.isLoaded(foundUser, "userStatus")).isTrue();
         assertThat(persistenceUnitUtil.isLoaded(foundUser, "profile")).isTrue();
 
         // 조회 조건으로 사용한 username과 일치하는 사용자가 조회됐는지 확인한다.
@@ -359,11 +332,8 @@ class UserRepositoryTest {
         assertThat(foundUser.getPassword()).isEqualTo(command.password());
         assertThat(foundUser.getEmail()).isEqualTo(command.email());
 
-        // profile과 UserStatus도 실제 저장한 연관 엔티티가 함께 조회됐는지 id 기준으로 확인한다.
         assertThat(foundUser.getProfile()).isNotNull();
         assertThat(foundUser.getProfile().getId()).isEqualTo(savedProfileId);
-        assertThat(foundUser.getUserStatus()).isNotNull();
-        assertThat(foundUser.getUserStatus().getId()).isEqualTo(savedUserStatusId);
     }
 
     @Test
@@ -375,9 +345,7 @@ class UserRepositoryTest {
         // 다른 username으로 조회하면 Optional.empty가 반환되는지 검증한다.
         UserCreateCommand command = userCreateCommand();
 
-        // 결과가 empty인 조회에서는 UserStatus나 profile을 반환받을 수 없다.
         // 따라서 이 테스트에서는 연관관계 로딩이 아니라 username 조건 적용이 관심사이므로
-        // 불필요한 BinaryContent, UserStatus를 만들지 않고 실제 User row만 저장한다.
         User savedUser = saveUser(command);
         UUID savedUserId = savedUser.getId();
 
@@ -408,10 +376,6 @@ class UserRepositoryTest {
         );
     }
 
-    private UserStatusCreateCommand userStatusCreateCommand() {
-        return new UserStatusCreateCommand(Instant.now());
-    }
-
     private User saveUser(UserCreateCommand command) {
         return userRepository.saveAndFlush(new User(command, null));
     }
@@ -420,22 +384,17 @@ class UserRepositoryTest {
         return binaryContentRepository.saveAndFlush(new BinaryContent("profile.png", "image/png", 1_024L));
     }
 
-    private UserStatus saveUserStatus(User user) {
-        return userStatusRepository.saveAndFlush(new UserStatus(user, userStatusCreateCommand()));
-    }
-
-    private UserFixture saveUserWithProfileAndStatus(UserCreateCommand command) {
+    private UserFixture saveUserWithProfile(UserCreateCommand command) {
         BinaryContent savedProfile = saveProfile();
         User savedUser = userRepository.saveAndFlush(new User(command, savedProfile));
-        UserStatus savedUserStatus = saveUserStatus(savedUser);
 
-        return new UserFixture(savedUser, savedProfile, savedUserStatus);
+        return new UserFixture(savedUser, savedProfile);
     }
 
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();
     }
 
-    private record UserFixture(User user, BinaryContent profile, UserStatus userStatus) {
+    private record UserFixture(User user, BinaryContent profile) {
     }
 }

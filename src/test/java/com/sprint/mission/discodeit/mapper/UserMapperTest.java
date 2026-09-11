@@ -9,18 +9,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(SpringExtension.class)
-@ContextConfiguration(classes = {UserMapperImpl.class, BinaryContentMapperImpl.class})
+@ContextConfiguration(classes = {UserMapperImpl.class, BinaryContentMapperImpl.class, UserOnlineMapper.class})
 @DisplayName("UserMapper 단위 테스트")
 class UserMapperTest {
 
     @Autowired
     UserMapper userMapper;
+
+    @MockitoBean
+    SessionRegistry sessionRegistry;
 
     @Test
     @DisplayName("사용자 엔티티의 역할을 DTO에 매핑한다")

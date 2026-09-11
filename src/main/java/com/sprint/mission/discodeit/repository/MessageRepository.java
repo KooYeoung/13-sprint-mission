@@ -13,7 +13,7 @@ import java.util.UUID;
 public interface MessageRepository extends JpaRepository<Message, UUID> , MessageRepositoryCustom{
 
     @Override
-    @EntityGraph(attributePaths = {"author", "channel", "author.userStatus", "author.profile"})
+    @EntityGraph(attributePaths = {"author", "channel", "author.profile"})
     Optional<Message> findById(UUID id);
 
     Optional<Message> findTop1ByChannel_IdOrderByCreatedAtDesc(UUID channelId);

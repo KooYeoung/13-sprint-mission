@@ -17,7 +17,7 @@ import java.util.UUID;
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "users")
-@ToString(exclude = {"password", "userStatus", "profile"}, callSuper = true)
+@ToString(exclude = {"password", "profile"}, callSuper = true)
 public class User extends UpdatableEntity {
 
     @Column(unique = true, nullable = false, length = 50)
@@ -32,9 +32,6 @@ public class User extends UpdatableEntity {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profile_id")
     private BinaryContent profile;
-
-    @OneToOne(fetch = FetchType.LAZY, mappedBy = "user")
-    private UserStatus userStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -77,20 +74,6 @@ public class User extends UpdatableEntity {
         if (profile == null) return null;
 
         return profile.getId();
-    }
-
-    public boolean isOnline() {
-        if (userStatus == null) return false;
-        return userStatus.isOnline();
-    }
-
-    public UUID getStatusId() {
-        if (userStatus == null) return null;
-        return userStatus.getId();
-    }
-
-    public void detachUserStatus() {
-        this.userStatus = null;
     }
 
     public void updateRole(UserRoleUpdateCommand command) {

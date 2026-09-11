@@ -47,7 +47,7 @@ class DiscodeitUserDetailsServiceTest {
         );
         UserDto userDto = userDto(username);
         given(userReader.getByUsername(username)).willReturn(user);
-        given(userMapper.toDto(user)).willReturn(userDto);
+        given(userMapper.toDto(user, true)).willReturn(userDto);
 
         DiscodeitUserDetails result = (DiscodeitUserDetails) userDetailsService.loadUserByUsername(username);
 
@@ -55,7 +55,7 @@ class DiscodeitUserDetailsServiceTest {
         assertThat(result.getUsername()).isEqualTo(username);
         assertThat(result.getPassword()).isEqualTo(encodedPassword);
         then(userReader).should().getByUsername(username);
-        then(userMapper).should().toDto(user);
+        then(userMapper).should().toDto(user, true);
     }
 
     @Test

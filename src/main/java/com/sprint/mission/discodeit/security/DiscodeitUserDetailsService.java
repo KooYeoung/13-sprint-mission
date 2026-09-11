@@ -28,6 +28,6 @@ public class DiscodeitUserDetailsService implements UserDetailsService {
     }
 
     private DiscodeitUserDetails convertToUserDetails(User user) {
-        return new DiscodeitUserDetails(userMapper.toDto(user), user.getPassword());
+        return new DiscodeitUserDetails(userMapper.toDto(user, true), user.getPassword());
     }
 }

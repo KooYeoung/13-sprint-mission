@@ -2,14 +2,11 @@ package com.sprint.mission.discodeit.service;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
-import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
-import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
-import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserUsernameDuplicatedException;
@@ -18,7 +15,6 @@ import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.basic.BasicUserService;
 import com.sprint.mission.discodeit.service.basic.BinaryContentService;
 import com.sprint.mission.discodeit.service.basic.ReadStatusService;
-import com.sprint.mission.discodeit.service.basic.UserStatusService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -63,9 +59,6 @@ class UserServiceTest {
     BinaryContentService binaryContentService;
 
     @Mock
-    UserStatusService userStatusService;
-
-    @Mock
     ReadStatusService readStatusService;
 
     @Mock
@@ -90,15 +83,11 @@ class UserServiceTest {
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
 
-            // create() 성공 흐름에서는 생성된 User로 UserStatus를 만들고,
-            // UserStatusDto.isOnline() 값을 mapper.toDto(user, isOnline)에 전달한다.
-            // UserStatusService는 외부 협력 객체이므로 mock으로 두고 반환 DTO만 실제 객체로 준비한다.
-            UserStatusDto userStatusDto = createUserStatusDto(userId);
 
             // mapper가 반환할 최종 UserDto도 실제 record 객체로 만든다.
             // 서비스 테스트는 mapper 내부 필드 매핑을 검증하지 않고,
             // mapper가 반환한 DTO가 서비스 반환값으로 이어지는지만 검증한다.
-            UserDto expectedDto = createExpectedDto(userId, command, userStatusDto.isOnline());
+            UserDto expectedDto = createExpectedDto(userId, command, true);
 
             // 사용자 생성 전 이메일/사용자명 중복 검사를 모두 통과하는 상황을 명시한다.
             // boolean mock 기본값 false에 기대면 테스트 의도가 흐려지므로 성공 조건을 직접 stub 한다.
@@ -111,7 +100,7 @@ class UserServiceTest {
             given(binaryContentService.create(null)).willReturn(Optional.empty());
 
             // Repository는 mock이므로 실제 DB 저장이나 UUID 생성을 하지 않는다.
-            // 서비스는 저장된 User를 UserStatus 생성과 mapper 변환에 사용하므로,
+            // 서비스는 저장된 User를 mapper 변환에 사용하므로,
             // save(...)에 들어온 실제 User 엔티티에 id를 부여한 뒤 그대로 반환하게 한다.
             given(userRepository.save(any(User.class)))
                     .willAnswer(invocation -> {
@@ -119,11 +108,7 @@ class UserServiceTest {
                         ReflectionTestUtils.setField(user, "id", userId);
                         return user;
                     });
-
-            given(userStatusService.create(any(User.class), any(UserStatusCreateCommand.class)))
-                    .willReturn(userStatusDto);
-            given(userMapper.toDto(any(User.class), eq(userStatusDto.isOnline())))
-                    .willReturn(expectedDto);
+            given(userMapper.toDto(any(User.class))).willReturn(expectedDto);
 
             // when
             // 실제 테스트 대상인 BasicUserService.create(...)를 실행한다.
@@ -151,19 +136,11 @@ class UserServiceTest {
             verify(userRepository).existsByUsername(command.username());
             verify(passwordEncoder).encode(command.password());
             verify(binaryContentService).create(null);
-
-            // UserStatus 생성 command는 서비스 내부에서 Instant.now()로 만들어진다.
-            // 정확한 시간을 고정하지 않고, null이 아닌 생성 시간이 전달됐는지만 캡처해서 확인한다.
-            ArgumentCaptor<UserStatusCreateCommand> statusCommandCaptor = ArgumentCaptor.forClass(UserStatusCreateCommand.class);
-            verify(userStatusService).create(eq(savedUser), statusCommandCaptor.capture());
-            assertThat(statusCommandCaptor.getValue().createdAt()).isNotNull();
-
-            // mapper에는 저장된 User와 UserStatusService가 반환한 온라인 상태가 전달되어야 한다.
-            verify(userMapper).toDto(savedUser, userStatusDto.isOnline());
+            verify(userMapper).toDto(savedUser);
 
             // create()는 읽음 상태 정리나 메시지 작성자 연결 해제와 무관하다.
             verifyNoInteractions(readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper, passwordEncoder);
+            verifyNoMoreInteractions(userRepository, binaryContentService, userMapper, passwordEncoder);
         }
 
         @Test
@@ -189,8 +166,6 @@ class UserServiceTest {
             // 이메일 중복 검증에서 예외가 발생했으므로 이후 생성 절차는 실행되면 안 된다.
             verify(binaryContentService, never()).create(any());
             verify(userRepository, never()).save(any(User.class));
-            verify(userStatusService, never()).create(any(User.class), any(UserStatusCreateCommand.class));
-            verify(userMapper, never()).toDto(any(User.class), anyBoolean());
             verifyNoInteractions(passwordEncoder);
 
         }
@@ -221,8 +196,6 @@ class UserServiceTest {
             // 사용자명 중복 검증에서 예외가 발생했으므로 이후 생성 절차는 실행되면 안 된다.
             verify(binaryContentService, never()).create(any());
             verify(userRepository, never()).save(any(User.class));
-            verify(userStatusService, never()).create(any(User.class), any(UserStatusCreateCommand.class));
-            verify(userMapper, never()).toDto(any(User.class), anyBoolean());
             verifyNoInteractions(passwordEncoder);
         }
 
@@ -246,8 +219,7 @@ class UserServiceTest {
             // 이 객체가 실제 User 생성자에 전달되어 저장되는지 ArgumentCaptor로 확인한다.
             BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
 
-            UserStatusDto userStatusDto = createUserStatusDto(userId);
-            UserDto expectedDto = createExpectedDto(userId, command, userStatusDto.isOnline());
+            UserDto expectedDto = createExpectedDto(userId, command, true);
 
             // 사용자 생성 가능 조건을 명시한다.
             given(userRepository.existsByEmail(command.email())).willReturn(false);
@@ -258,18 +230,14 @@ class UserServiceTest {
             given(binaryContentService.create(file)).willReturn(Optional.of(profile));
 
             // mock repository는 실제 id 생성을 하지 않으므로 저장된 User에 id를 직접 넣어 반환한다.
-            // 이렇게 하면 이후 UserStatus 생성과 mapper 변환에 사용되는 객체가 실제 저장 완료 상태와 더 가까워진다.
+            // 이렇게 하면 이후 mapper 변환에 사용되는 객체가 실제 저장 완료 상태와 더 가까워진다.
             given(userRepository.save(any(User.class)))
                     .willAnswer(invocation -> {
                         User user = invocation.getArgument(0);
                         ReflectionTestUtils.setField(user, "id", userId);
                         return user;
                     });
-
-            given(userStatusService.create(any(User.class), any(UserStatusCreateCommand.class)))
-                    .willReturn(userStatusDto);
-            given(userMapper.toDto(any(User.class), eq(userStatusDto.isOnline())))
-                    .willReturn(expectedDto);
+            given(userMapper.toDto(any(User.class))).willReturn(expectedDto);
 
             // when
             // 프로필 파일이 있는 사용자 생성 로직을 실행한다.
@@ -295,17 +263,11 @@ class UserServiceTest {
             verify(userRepository).existsByUsername(command.username());
             verify(passwordEncoder).encode(command.password());
             verify(binaryContentService).create(file);
-
-            // UserStatus 생성에는 저장된 User와 생성 시간이 들어 있는 command가 전달되어야 한다.
-            ArgumentCaptor<UserStatusCreateCommand> statusCommandCaptor = ArgumentCaptor.forClass(UserStatusCreateCommand.class);
-            verify(userStatusService).create(eq(savedUser), statusCommandCaptor.capture());
-            assertThat(statusCommandCaptor.getValue().createdAt()).isNotNull();
-
-            verify(userMapper).toDto(savedUser, userStatusDto.isOnline());
+            verify(userMapper).toDto(savedUser);
 
             // 사용자 생성은 읽음 상태 정리나 메시지 작성자 연결 해제와 무관하다.
             verifyNoInteractions(readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, binaryContentService, userStatusService, userMapper, passwordEncoder);
+            verifyNoMoreInteractions(userRepository, binaryContentService, userMapper, passwordEncoder);
         }
 
     }
@@ -345,7 +307,7 @@ class UserServiceTest {
             verify(userMapper).toDto(user);
 
             // findById()는 파일 저장, 사용자 상태 생성/삭제, 읽음 상태 정리, 메시지 작성자 연결 해제를 수행하지 않는다.
-            verifyNoInteractions(binaryContentService, userStatusService, readStatusService, messageService);
+            verifyNoInteractions(binaryContentService, readStatusService, messageService);
             verifyNoMoreInteractions(userRepository, userMapper);
         }
 
@@ -370,7 +332,7 @@ class UserServiceTest {
             verifyNoMoreInteractions(userRepository);
 
             // 사용자를 찾지 못했으므로 DTO 변환이나 다른 부가 작업은 실행되면 안 된다.
-            verifyNoInteractions(userMapper, binaryContentService, userStatusService, readStatusService, messageService);
+            verifyNoInteractions(userMapper, binaryContentService, readStatusService, messageService);
         }
 
         @Test
@@ -407,7 +369,7 @@ class UserServiceTest {
             verify(userMapper).toDto(users.get(1));
 
             // findAll()은 조회 전용이므로 파일/상태/메시지 정리 협력 객체를 사용하지 않는다.
-            verifyNoInteractions(binaryContentService, userStatusService, readStatusService, messageService);
+            verifyNoInteractions(binaryContentService, readStatusService, messageService);
             verifyNoMoreInteractions(userRepository, userMapper);
         }
 
@@ -433,7 +395,7 @@ class UserServiceTest {
 
             // 변환할 User가 없으므로 mapper는 호출되지 않아야 한다.
             // 조회 전용 흐름이므로 다른 부가 협력 객체도 사용하지 않는다.
-            verifyNoInteractions(userMapper, binaryContentService, userStatusService, readStatusService, messageService);
+            verifyNoInteractions(userMapper, binaryContentService, readStatusService, messageService);
         }
     }
 
@@ -979,12 +941,8 @@ class UserServiceTest {
             // User를 mock으로 만들기보다 실제 엔티티에 id를 넣어 사용하는 편이 안전하다.
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
-            UUID userStatusId = UUID.randomUUID();
             User user = new User(command, null);
             ReflectionTestUtils.setField(user, "id", userId);
-            UserStatus userStatus = new UserStatus(user, new UserStatusCreateCommand(Instant.now()));
-            ReflectionTestUtils.setField(userStatus, "id", userStatusId);
-            ReflectionTestUtils.setField(user, "userStatus", userStatus);
 
             // userId로 조회하면 삭제 대상 사용자가 존재하는 상황을 만든다.
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -998,23 +956,20 @@ class UserServiceTest {
             // 1. 삭제 대상 사용자 조회
             // 2. 읽음 상태 삭제
             // 3. 메시지 작성자 연결 해제
-            // 4. 사용자 상태 명시 삭제
-            // 5. 사용자 엔티티 삭제
+            // 4. 사용자 엔티티 삭제
             // 프로필 이미지가 없으면 파일 삭제는 실행되지 않는다.
-            InOrder inOrder = inOrder(userRepository, readStatusService, messageService, userStatusService);
+            InOrder inOrder = inOrder(userRepository, readStatusService, messageService);
             inOrder.verify(userRepository).findById(userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
-            inOrder.verify(userStatusService).delete(userStatusId, userId);
             inOrder.verify(userRepository).deleteById(userId);
-            assertThat(user.getStatusId()).isNull();
 
             // 프로필 이미지가 없는 사용자이므로 파일 삭제는 실행되지 않아야 한다.
             verify(binaryContentService, never()).delete(any(BinaryContent.class));
 
             // delete()는 DTO를 반환하지 않으므로 mapper를 사용하지 않는다.
             verifyNoInteractions(userMapper);
-            verifyNoMoreInteractions(userRepository, userStatusService, readStatusService, messageService, binaryContentService);
+            verifyNoMoreInteractions(userRepository, readStatusService, messageService, binaryContentService);
         }
 
         @Test
@@ -1038,7 +993,7 @@ class UserServiceTest {
             verifyNoMoreInteractions(userRepository);
 
             // 조회 단계에서 예외가 발생했으므로 연결 데이터 정리, 파일 삭제, DTO 변환은 실행되면 안 된다.
-            verifyNoInteractions(userStatusService, readStatusService, messageService, binaryContentService, userMapper);
+            verifyNoInteractions( readStatusService, messageService, binaryContentService, userMapper);
         }
 
         @Test
@@ -1049,14 +1004,10 @@ class UserServiceTest {
             // User.isProfileImageExist()와 User.getProfile()의 실제 동작이 필요하므로 실제 User/파일 엔티티를 사용한다.
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
-            UUID userStatusId = UUID.randomUUID();
 
             BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
             User user = new User(command, profile);
             ReflectionTestUtils.setField(user, "id", userId);
-            UserStatus userStatus = new UserStatus(user, new UserStatusCreateCommand(Instant.now()));
-            ReflectionTestUtils.setField(userStatus, "id", userStatusId);
-            ReflectionTestUtils.setField(user, "userStatus", userStatus);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
@@ -1067,18 +1018,16 @@ class UserServiceTest {
             // then
             // 프로필이 있는 경우에도 먼저 사용자와 연결된 도메인 데이터를 정리한 뒤 사용자 엔티티를 삭제한다.
             // 파일 삭제는 DB 사용자 삭제 요청 이후에 수행되는 후처리다.
-            InOrder inOrder = inOrder(userRepository, readStatusService, messageService, userStatusService, binaryContentService);
+            InOrder inOrder = inOrder(userRepository, readStatusService, messageService, binaryContentService);
             inOrder.verify(userRepository).findById(userId);
             inOrder.verify(readStatusService).deleteByUserId(userId);
             inOrder.verify(messageService).detachByAuthorId(userId);
-            inOrder.verify(userStatusService).delete(userStatusId, userId);
             inOrder.verify(userRepository).deleteById(userId);
             inOrder.verify(binaryContentService).delete(profile);
-            assertThat(user.getStatusId()).isNull();
 
             // delete()는 DTO를 반환하지 않으므로 mapper를 사용하지 않는다.
             verifyNoInteractions(userMapper);
-            verifyNoMoreInteractions(userRepository, userStatusService, readStatusService, messageService, binaryContentService);
+            verifyNoMoreInteractions(userRepository, readStatusService, messageService, binaryContentService);
         }
     }
 
@@ -1128,15 +1077,6 @@ class UserServiceTest {
         return createExpectedDto(UUID.randomUUID(), command, false);
     }
 
-    private UserStatusDto createUserStatusDto(UUID userId) {
-        return new UserStatusDto(
-                UUID.randomUUID(),
-                OffsetDateTime.now(),
-                OffsetDateTime.now(),
-                userId,
-                OffsetDateTime.now()
-        );
-    }
 
     private UserUpdateCommand createUpdateCommand() {
         return new UserUpdateCommand("changeUsername", "changePassword", "changeEmail@gmail.com");
