@@ -5,6 +5,7 @@ import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.basic.BasicAdminUserService;
+import com.sprint.mission.discodeit.service.basic.UserRoleManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +31,7 @@ class AdminUserServiceTest {
     UserService userService;
 
     @Mock
-    UserRoleUpdater userRoleUpdater;
+    UserRoleManager userRoleManager;
 
     @Test
     @DisplayName("사용자를 생성한 뒤 관리자 역할로 변경한다")
@@ -46,13 +47,13 @@ class AdminUserServiceTest {
         UserRoleUpdateCommand roleCommand = new UserRoleUpdateCommand(Role.ADMIN);
 
         given(userService.create(command, null)).willReturn(createdUser);
-        given(userRoleUpdater.updateRole(userId, roleCommand)).willReturn(expected);
+        given(userRoleManager.updateRole(userId, roleCommand)).willReturn(expected);
 
         UserDto result = adminUserService.createAdmin(command);
 
         assertThat(result).isSameAs(expected);
         then(userService).should().create(command, null);
-        then(userRoleUpdater).should().updateRole(userId, roleCommand);
+        then(userRoleManager).should().updateRole(userId, roleCommand);
     }
 
     private UserDto userDto(UUID userId, Role role) {

@@ -5,7 +5,6 @@ import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.AdminUserService;
-import com.sprint.mission.discodeit.service.UserRoleUpdater;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,13 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class BasicAdminUserService implements AdminUserService {
 
     private final UserService userService;
-    private final UserRoleUpdater userRoleUpdater;
+    private final UserRoleManager userRoleManager;
 
     @Transactional
     @Override
     public UserDto createAdmin(UserCreateCommand command) {
         UserDto userDto = userService.create(command, null);
 
-        return userRoleUpdater.updateRole(userDto.id(), new UserRoleUpdateCommand(Role.ADMIN));
+        return userRoleManager.updateRole(userDto.id(), new UserRoleUpdateCommand(Role.ADMIN));
     }
 }

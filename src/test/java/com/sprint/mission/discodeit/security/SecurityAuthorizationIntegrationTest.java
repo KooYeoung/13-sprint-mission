@@ -2,17 +2,21 @@ package com.sprint.mission.discodeit.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.channel.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PublicChannelCreateRequest;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
+import com.sprint.mission.discodeit.service.UserRoleUpdater;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -21,8 +25,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,6 +56,9 @@ class SecurityAuthorizationIntegrationTest {
 
     @Autowired
     ChannelRepository channelRepository;
+
+    @Autowired
+    UserRoleUpdater userRoleUpdater;
 
     @Test
     @DisplayName("보호된 API에 미인증으로 접근하면 401을 반환한다")
@@ -180,6 +189,16 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertThat(channelRepository.existsById(channel.getId())).isFalse();
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("일반 사용자가 역할 변경 Service를 직접 호출하면 인가가 거부된다")
+    void updateUserRoleService_isDenied_whenUserIsNotAdmin() {
+        UserRoleUpdateCommand command = new UserRoleUpdateCommand(Role.CHANNEL_MANAGER);
+
+        assertThatThrownBy(() -> userRoleUpdater.updateRole(UUID.randomUUID(), command))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
