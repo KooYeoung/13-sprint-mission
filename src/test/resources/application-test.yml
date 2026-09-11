@@ -68,6 +68,9 @@ logging:
     org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: off
 discodeit:
+  security:
+    remember-me:
+      key: test-remember-me-key
   admin:
     user:
       username: test-admin

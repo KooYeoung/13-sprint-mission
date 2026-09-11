@@ -19,6 +19,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -41,7 +42,9 @@ public class SecurityConfig {
             LoginFailureHandler loginFailureHandler,
             AuthenticationEntryPoint restAuthenticationEntryPoint,
             AccessDeniedHandler restAccessDeniedHandler,
-            SessionRegistry sessionRegistry
+            SessionRegistry sessionRegistry,
+            UserDetailsService userDetailsService,
+            RememberMeProperties rememberMeProperties
     ) throws Exception {
 
         return http
@@ -91,6 +94,12 @@ public class SecurityConfig {
                                 .maxSessionsPreventsLogin(false)
                                 .sessionRegistry(sessionRegistry)
                         )
+                )
+                .rememberMe(remember -> remember
+                        .rememberMeParameter("remember-me")
+                        .key(rememberMeProperties.key())
+                        .tokenValiditySeconds(rememberMeProperties.tokenValiditySeconds())
+                        .userDetailsService(userDetailsService)
                 )
                 .build();
     }

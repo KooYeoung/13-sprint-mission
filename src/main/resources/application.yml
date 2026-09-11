@@ -71,6 +71,12 @@ management:
       # info.* 설정을 /actuator/info 응답에 포함
       enabled: true
 discodeit:
+  security:
+    remember-me:
+      # Remember-Me 쿠키 서명에 사용하는 비밀 키
+      key: ${REMEMBER_ME_KEY}
+      # 기본 유효기간: 30일
+      token-validity-seconds: 2592000
   storage:
     # 파일 저장 방식과 경로를 환경변수로 설정
     type: ${STORAGE_TYPE:local}
