@@ -35,11 +35,16 @@ public class User extends UpdatableEntity {
     @OneToOne(fetch = FetchType.LAZY, mappedBy = "user")
     private UserStatus userStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Role role;
+
     public User(UserCreateCommand command, BinaryContent profile) {
         this.username = command.username();
         this.password = command.password();
         this.email = command.email();
         this.profile = profile;
+        this.role = Role.USER;
     }
 
     public void updateInfo(

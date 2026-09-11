@@ -12,6 +12,7 @@ import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateReque
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.UserService;
 import com.sprint.mission.discodeit.service.basic.UserStatusService;
 import org.junit.jupiter.api.DisplayName;
@@ -475,6 +476,7 @@ class UserControllerTest {
                 request.email(),
                 profileDto,
                 true,
+                Role.USER,
                 createdAt,
                 updatedAt
         );
@@ -487,6 +489,7 @@ class UserControllerTest {
                 request.newEmail(),
                 profileDto,
                 true,
+                Role.USER,
                 createdAt,
                 updatedAt
         );

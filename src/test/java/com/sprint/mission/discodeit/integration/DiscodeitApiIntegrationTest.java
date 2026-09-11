@@ -122,6 +122,7 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(jsonPath("$.profile.size").value(profilePart.getSize()))
                 .andExpect(jsonPath("$.profile.contentType").value(profilePart.getContentType()))
                 .andExpect(jsonPath("$.online").value(true))
+                .andExpect(jsonPath("$.role").value(Role.USER.name()))
                 .andReturn();
 
         JsonNode createBody = readBody(createResult);
@@ -153,6 +154,7 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.username").value(createRequest.username()))
                 .andExpect(jsonPath("$.online").value(true))
+                .andExpect(jsonPath("$.role").value(Role.USER.name()))
                 .andExpect(authenticated().withUsername(createRequest.username()));
 
         // when
@@ -668,6 +670,7 @@ class DiscodeitApiIntegrationTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.role").value(Role.USER.name()))
                 .andReturn();
 
         return uuidAt(readBody(result), "/id");

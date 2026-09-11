@@ -7,6 +7,7 @@ import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.UserStatusDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
@@ -1098,6 +1099,7 @@ class UserServiceTest {
                 command.email(),
                 null,
                 isOnline,
+                Role.USER,
                 OffsetDateTime.now(),
                 OffsetDateTime.now()
         );
@@ -1115,6 +1117,7 @@ class UserServiceTest {
                 updateCommand.email(),
                 profile,
                 isOnline,
+                Role.USER,
                 OffsetDateTime.now(),
                 OffsetDateTime.now()
         );

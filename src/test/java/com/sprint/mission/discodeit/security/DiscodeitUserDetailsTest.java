@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.security;
 
 import com.sprint.mission.discodeit.dto.response.UserDto;
+import com.sprint.mission.discodeit.entity.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,9 @@ class DiscodeitUserDetailsTest {
         assertThat(userDetails.getUserDto()).isSameAs(userDto);
         assertThat(userDetails.getUsername()).isEqualTo(userDto.username());
         assertThat(userDetails.getPassword()).isEqualTo(password);
-        assertThat(userDetails.getAuthorities()).isEmpty();
+        assertThat(userDetails.getAuthorities())
+                .extracting("authority")
+                .containsExactly("ROLE_USER");
         assertThat(userDetails.isAccountNonExpired()).isTrue();
         assertThat(userDetails.isAccountNonLocked()).isTrue();
         assertThat(userDetails.isCredentialsNonExpired()).isTrue();
@@ -38,6 +41,7 @@ class DiscodeitUserDetailsTest {
                 "test@example.com",
                 null,
                 true,
+                Role.USER,
                 now,
                 now
         );

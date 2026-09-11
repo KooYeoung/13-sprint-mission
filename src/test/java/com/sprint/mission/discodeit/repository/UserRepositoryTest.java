@@ -6,6 +6,7 @@ import com.sprint.mission.discodeit.config.QuerydslTestConfig;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
 import jakarta.persistence.EntityManager;
@@ -146,6 +147,18 @@ class UserRepositoryTest {
         assertThat(exists).isFalse();
     }
 
+    @Test
+    @DisplayName("사용자 저장 성공 - 회원가입 사용자는 USER 역할을 가진다")
+    void save_persistsUserRole_whenUserIsCreated() {
+        User savedUser = saveUser(userCreateCommand());
+
+        em.clear();
+
+        User foundUser = userRepository.findById(savedUser.getId())
+                .orElseThrow(AssertionError::new);
+        assertThat(foundUser.getRole()).isEqualTo(Role.USER);
+        assertThat(userRepository.existsByRole(Role.USER)).isTrue();
+    }
 
     @Test
     @DisplayName("사용자 목록 조회 성공 - UserStatus와 프로필을 함께 조회")

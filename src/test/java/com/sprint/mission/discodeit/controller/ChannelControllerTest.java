@@ -12,6 +12,7 @@ import com.sprint.mission.discodeit.dto.request.channel.PublicChannelCreateReque
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.ChannelType;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.ChannelService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -392,6 +393,7 @@ class ChannelControllerTest {
                 email,
                 null,
                 true,
+                Role.USER,
                 OffsetDateTime.parse("2026-07-28T09:15:30+09:00"),
                 OffsetDateTime.parse("2026-07-28T09:20:30+09:00")
         );

@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.security;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
@@ -80,6 +81,7 @@ class DiscodeitUserDetailsServiceTest {
                 "test@example.com",
                 null,
                 true,
+                Role.USER,
                 now,
                 now
         );

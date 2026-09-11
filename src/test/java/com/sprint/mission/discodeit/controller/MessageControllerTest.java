@@ -11,6 +11,7 @@ import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.MessageDto;
 import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.dto.response.UserDto;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.MessageService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -379,6 +380,7 @@ class MessageControllerTest {
                 email,
                 null,
                 true,
+                Role.USER,
                 OffsetDateTime.parse("2026-07-28T09:15:30+09:00"),
                 OffsetDateTime.parse("2026-07-28T09:20:30+09:00")
         );

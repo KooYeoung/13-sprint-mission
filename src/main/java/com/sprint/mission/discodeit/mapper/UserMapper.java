@@ -16,6 +16,7 @@ public interface UserMapper {
     @Mapping(source = "user.email", target = "email")
     @Mapping(source = "user.profile", target = "profile")
     @Mapping(source = "online", target = "online")
+    @Mapping(source = "user.role", target = "role")
     @Mapping(source = "user.createdAt", target = "createdAt", qualifiedByName = "toOffsetDateTime")
     @Mapping(source = "user.updatedAt", target = "updatedAt", qualifiedByName = "toOffsetDateTime")
     UserDto toDto(User user, boolean online);
