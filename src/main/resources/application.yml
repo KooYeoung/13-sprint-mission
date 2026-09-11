@@ -81,6 +81,11 @@ discodeit:
       bucket: ${AWS_S3_BUCKET}
       endpoint: ${AWS_S3_ENDPOINT:}
       presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:600} # (기본값: 10분)
+  admin:
+    user:
+      username: ${ADMIN_USER_NAME}
+      password: ${ADMIN_USER_PASSWORD}
+      email: ${ADMIN_USER_EMAIL}
 
 info:
   application:

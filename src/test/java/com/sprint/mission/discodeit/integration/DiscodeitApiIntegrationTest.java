@@ -681,6 +681,20 @@ class DiscodeitApiIntegrationTest {
         assertThat(updatedUser.getRole()).isEqualTo(Role.CHANNEL_MANAGER);
     }
 
+    @Test
+    @DisplayName("애플리케이션 실행 시 관리자 계정이 한 번 초기화된다")
+    void applicationStartup_initializesSingleAdminUser() {
+        List<User> adminUsers = userRepository.findAll().stream()
+                .filter(user -> user.getRole() == Role.ADMIN)
+                .toList();
+
+        assertThat(adminUsers).hasSize(1);
+        User adminUser = adminUsers.get(0);
+        assertThat(adminUser.getUsername()).isEqualTo("test-admin");
+        assertThat(adminUser.getEmail()).isEqualTo("test-admin@discodeit.local");
+        assertThat(passwordEncoder.matches("test-admin-password", adminUser.getPassword())).isTrue();
+    }
+
     private UUID createUser(String username, String email) throws Exception {
         UserCreateRequest request = new UserCreateRequest(
                 username,

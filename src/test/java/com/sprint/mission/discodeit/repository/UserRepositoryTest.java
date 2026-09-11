@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.config.JpaAuditingTestConfig;
 import com.sprint.mission.discodeit.config.P6SpySqlFormatter;
 import com.sprint.mission.discodeit.config.QuerydslTestConfig;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.command.userStatus.UserStatusCreateCommand;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Role;
@@ -159,6 +160,20 @@ class UserRepositoryTest {
         assertThat(foundUser.getRole()).isEqualTo(Role.USER);
         assertThat(userRepository.existsByRole(Role.USER)).isTrue();
     }
+
+    @Test
+    @DisplayName("역할 존재 여부 조회 성공 - 일치하는 역할이 없으면 false를 반환한다")
+    void existsByRole_returnsFalse_whenRoleDoesNotExist() {
+        User user = new User(userCreateCommand(), null);
+        user.updateRole(new UserRoleUpdateCommand(Role.ADMIN));
+        userRepository.saveAndFlush(user);
+
+        em.clear();
+
+        assertThat(userRepository.existsByRole(Role.ADMIN)).isTrue();
+        assertThat(userRepository.existsByRole(Role.CHANNEL_MANAGER)).isFalse();
+    }
+
 
     @Test
     @DisplayName("사용자 목록 조회 성공 - UserStatus와 프로필을 함께 조회")
