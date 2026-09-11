@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.entity;
 
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.entity.base.UpdatableEntity;
 import jakarta.persistence.*;
@@ -90,5 +91,9 @@ public class User extends UpdatableEntity {
 
     public void detachUserStatus() {
         this.userStatus = null;
+    }
+
+    public void updateRole(UserRoleUpdateCommand command) {
+        this.role = command.newRole();
     }
 }

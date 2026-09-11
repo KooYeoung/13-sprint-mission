@@ -9,6 +9,7 @@ import com.sprint.mission.discodeit.dto.request.message.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.message.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.readStatus.ReadStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserCreateRequest;
+import com.sprint.mission.discodeit.dto.request.user.UserRoleUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.user.UserUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.userStatus.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.entity.*;
@@ -655,6 +656,29 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         assertThat(messageRepository.findById(messageId)).isEmpty();
         assertThat(messageFileRepository.findAllByMessage_Id(messageId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사용자 역할 변경 통합 성공 - 응답과 DB에 변경된 역할이 반영")
+    void updateUserRole_updatesResponseAndDatabase() throws Exception {
+        String suffix = uniqueSuffix();
+        UUID userId = createUser(
+                "roleUser-" + suffix,
+                "role-user-" + suffix + "@gmail.com"
+        );
+        UserRoleUpdateRequest request = new UserRoleUpdateRequest(userId, Role.CHANNEL_MANAGER);
+
+        mockMvc.perform(put("/api/auth/role")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.role").value(Role.CHANNEL_MANAGER.name()));
+
+        flushAndClear();
+        User updatedUser = userRepository.findById(userId).orElseThrow(AssertionError::new);
+        assertThat(updatedUser.getRole()).isEqualTo(Role.CHANNEL_MANAGER);
     }
 
     private UUID createUser(String username, String email) throws Exception {
