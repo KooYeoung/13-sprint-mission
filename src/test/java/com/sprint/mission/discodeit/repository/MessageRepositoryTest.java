@@ -205,6 +205,53 @@ class MessageRepositoryTest {
         assertThat(optionalMessage).isEmpty();
     }
 
+    @Test
+    @DisplayName("작성자 포함 메시지 조회 성공 - 작성자를 함께 조회한다")
+    void findWithAuthor_fetchesAuthor_whenMessageExists() {
+        AuthorFixture authorFixture = saveAuthorFixture("ownerUser", "owner-user@gmail.com");
+        ChannelFixture channelFixture = savePublicChannelFixture(
+                "ownerChannel",
+                "owner channel description"
+        );
+        MessageFixture messageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "owner message"
+        );
+        UUID messageId = messageFixture.message().getId();
+        UUID authorId = authorFixture.user().getId();
+        em.clear();
+
+        Message foundMessage = messageRepository.findWithAuthor(messageId)
+                .orElseThrow(AssertionError::new);
+
+        PersistenceUnitUtil persistenceUnitUtil = getPersistenceUnitUtil();
+        assertThat(persistenceUnitUtil.isLoaded(foundMessage, "author")).isTrue();
+        assertThat(foundMessage.getId()).isEqualTo(messageId);
+        assertThat(foundMessage.getAuthor().getId()).isEqualTo(authorId);
+    }
+
+    @Test
+    @DisplayName("작성자 포함 메시지 조회 성공 - 메시지가 없으면 빈 결과를 반환한다")
+    void findWithAuthor_returnsEmpty_whenMessageDoesNotExist() {
+        AuthorFixture authorFixture = saveAuthorFixture("existingUser", "existing-user@gmail.com");
+        ChannelFixture channelFixture = savePublicChannelFixture("existingChannel");
+        MessageFixture messageFixture = saveMessageFixture(
+                authorFixture.user(),
+                channelFixture.channel(),
+                "existing message"
+        );
+        UUID missingMessageId;
+        do {
+            missingMessageId = UUID.randomUUID();
+        } while (missingMessageId.equals(messageFixture.message().getId()));
+        em.clear();
+
+        Optional<Message> result = messageRepository.findWithAuthor(missingMessageId);
+
+        assertThat(result).isEmpty();
+    }
+
 
     @Test
     @DisplayName("채널 최신 메시지 조회 성공 - 채널의 가장 최근 메시지 반환")

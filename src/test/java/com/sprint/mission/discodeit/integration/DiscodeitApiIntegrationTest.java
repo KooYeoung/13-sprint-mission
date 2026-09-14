@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicCommand;
 import com.sprint.mission.discodeit.dto.request.channel.ChannelUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PrivateChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.channel.PublicChannelCreateRequest;
@@ -827,24 +828,28 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     @DisplayName("메시지 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
     void messageUpdateAndDelete_flowPersistsUpdatesAndRemovesMessage() throws Exception {
         // given
         // 메시지 생성과 목록 조회는 기존 통합 테스트에서 검증한다.
         // 여기서는 생성된 메시지를 수정하고 삭제하는 API 흐름을 실제 DB와 함께 확인한다.
         String suffix = uniqueSuffix();
-        UUID authorId = createUser("messageUpdateAuthor-" + suffix, "message-update-author-" + suffix + "@gmail.com");
-        UUID channelId = createPublicChannel(
+        String authorUsername = "messageUpdateAuthor-" + suffix;
+        UUID authorId = createUser(authorUsername, "message-update-author-" + suffix + "@gmail.com");
+        Channel channel = channelRepository.saveAndFlush(new Channel(new ChannelCreatePublicCommand(
                 "message-update-channel-" + suffix,
-                "message update channel description"
-        );
-        UUID messageId = createMessage("message before update", channelId, authorId);
+                "message update channel description",
+                ChannelType.PUBLIC
+        )));
+        flushAndClear();
+        MockHttpSession authorSession = loginSession(authorUsername);
+        UUID messageId = createMessage("message before update", channel.getId(), authorId, authorSession);
 
         // when
         // 메시지 내용을 수정한다.
         MessageUpdateRequest updateRequest = new MessageUpdateRequest("message after update");
         mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .session(authorSession)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
@@ -852,7 +857,7 @@ class DiscodeitApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(messageId.toString()))
                 .andExpect(jsonPath("$.content").value(updateRequest.newContent()))
-                .andExpect(jsonPath("$.channelId").value(channelId.toString()))
+                .andExpect(jsonPath("$.channelId").value(channel.getId().toString()))
                 .andExpect(jsonPath("$.author.id").value(authorId.toString()));
 
         flushAndClear();
@@ -862,6 +867,7 @@ class DiscodeitApiIntegrationTest {
         // when
         // 수정한 메시지를 삭제한다.
         mockMvc.perform(delete("/api/messages/{messageId}", messageId)
+                        .session(authorSession)
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
@@ -870,6 +876,51 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         assertThat(messageRepository.findById(messageId)).isEmpty();
         assertThat(messageFileRepository.findAllByMessage_Id(messageId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("메시지 수정, 삭제 인가 실패 - 작성자가 아니면 메시지를 변경할 수 없다")
+    void messageUpdateAndDelete_returnsForbidden_whenRequesterIsNotAuthor() throws Exception {
+        String suffix = uniqueSuffix();
+        String authorUsername = "messageAuthor-" + suffix;
+        UUID authorId = createUser(authorUsername, "message-author-" + suffix + "@gmail.com");
+        String requesterUsername = "messageRequester-" + suffix;
+        createUser(requesterUsername, "message-requester-" + suffix + "@gmail.com");
+        Channel channel = channelRepository.saveAndFlush(new Channel(new ChannelCreatePublicCommand(
+                "message-authorization-channel-" + suffix,
+                "message authorization channel description",
+                ChannelType.PUBLIC
+        )));
+        flushAndClear();
+
+        MockHttpSession authorSession = loginSession(authorUsername);
+        UUID messageId = createMessage("protected message", channel.getId(), authorId, authorSession);
+        MockHttpSession requesterSession = loginSession(requesterUsername);
+        MessageUpdateRequest updateRequest = new MessageUpdateRequest("forbidden message update");
+
+        mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+                        .session(requesterSession)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpectAll(
+                        status().isForbidden(),
+                        jsonPath("$.code").value("AUTH_403")
+                );
+
+        mockMvc.perform(delete("/api/messages/{messageId}", messageId)
+                        .session(requesterSession)
+                        .with(csrf()))
+                .andExpectAll(
+                        status().isForbidden(),
+                        jsonPath("$.code").value("AUTH_403")
+                );
+
+        flushAndClear();
+        Message message = messageRepository.findById(messageId).orElseThrow(AssertionError::new);
+        assertThat(message.getContent()).isEqualTo("protected message");
+        assertThat(message.getAuthor().getId()).isEqualTo(authorId);
     }
 
     @Test
@@ -938,6 +989,16 @@ class DiscodeitApiIntegrationTest {
                 .param("password", password));
     }
 
+    private MockHttpSession loginSession(String username) throws Exception {
+        MvcResult loginResult = performLogin(username, "integrationPassword")
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(username))
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+        return session;
+    }
+
     private ResultActions performRememberMeLogin(String username, String password) throws Exception {
         return performLoginWithRememberMe(username, password, true);
     }
@@ -973,12 +1034,25 @@ class DiscodeitApiIntegrationTest {
     }
 
     private UUID createMessage(String content, UUID channelId, UUID authorId) throws Exception {
-        MessageCreateRequest request = new MessageCreateRequest(content, channelId, authorId);
+        return createMessage(content, channelId, authorId, null);
+    }
 
-        MvcResult result = mockMvc.perform(multipart("/api/messages")
-                        .file(jsonPart("messageCreateRequest", request))
-                        .with(csrf())
-                        .accept(MediaType.APPLICATION_JSON))
+    private UUID createMessage(
+            String content,
+            UUID channelId,
+            UUID authorId,
+            MockHttpSession session
+    ) throws Exception {
+        MessageCreateRequest request = new MessageCreateRequest(content, channelId, authorId);
+        var requestBuilder = multipart("/api/messages")
+                .file(jsonPart("messageCreateRequest", request))
+                .with(csrf())
+                .accept(MediaType.APPLICATION_JSON);
+        if (session != null) {
+            requestBuilder.session(session);
+        }
+
+        MvcResult result = mockMvc.perform(requestBuilder)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andReturn();

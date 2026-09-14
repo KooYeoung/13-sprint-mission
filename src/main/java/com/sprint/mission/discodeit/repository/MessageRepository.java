@@ -34,4 +34,8 @@ public interface MessageRepository extends JpaRepository<Message, UUID> , Messag
     void detachAuthorByAuthorId(@Param("authorId") UUID authorId);
 
     boolean existsByAuthor_Id(UUID authorId);
+
+    @EntityGraph(attributePaths = {"author"})
+    @Query("SELECT m FROM Message m WHERE m.id = :messageId")
+    Optional<Message> findWithAuthor(@Param("messageId") UUID messageId);
 }
