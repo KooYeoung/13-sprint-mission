@@ -699,19 +699,22 @@ class DiscodeitApiIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     @DisplayName("사용자 목록, 수정, 삭제 통합 성공 - 실제 DB에 변경사항 반영")
     void userListUpdateAndDelete_flowPersistsUpdatesAndRemovesUser() throws Exception {
         // given
         // 사용자 관련 주요 API 중 기존 생성 흐름에서 다루지 않은 목록 조회, 수정, 삭제를 한 흐름에서 검증한다.
         // 모든 호출은 실제 Controller, Service, Repository, DB를 거친다.
         String suffix = uniqueSuffix();
-        UUID firstUserId = createUser("userListA-" + suffix, "user-list-a-" + suffix + "@gmail.com");
+        String firstUsername = "userListA-" + suffix;
+        UUID firstUserId = createUser(firstUsername, "user-list-a-" + suffix + "@gmail.com");
         UUID secondUserId = createUser("userListB-" + suffix, "user-list-b-" + suffix + "@gmail.com");
+        flushAndClear();
+        MockHttpSession firstUserSession = loginSession(firstUsername);
 
         // when
         // 사용자 목록 API를 호출한다.
         MvcResult listResult = mockMvc.perform(get("/api/users")
+                        .session(firstUserSession)
                         .accept(MediaType.APPLICATION_JSON))
 
                 // then
@@ -743,6 +746,7 @@ class DiscodeitApiIntegrationTest {
         MvcResult updateResult = mockMvc.perform(multipart("/api/users/{userId}", firstUserId)
                         .file(updateRequestPart)
                         .file(profilePart)
+                        .session(firstUserSession)
                         .with(request -> {
                             request.setMethod("PATCH");
                             return request;
@@ -771,6 +775,7 @@ class DiscodeitApiIntegrationTest {
         // when
         // 수정한 사용자를 삭제한다.
         mockMvc.perform(delete("/api/users/{userId}", firstUserId)
+                        .session(firstUserSession)
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
@@ -779,6 +784,52 @@ class DiscodeitApiIntegrationTest {
         flushAndClear();
         assertThat(userRepository.findById(firstUserId)).isEmpty();
         assertThat(userRepository.findById(secondUserId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("사용자 수정, 삭제 인가 실패 - 다른 사용자의 정보는 변경할 수 없다")
+    void userUpdateAndDelete_returnsForbidden_whenRequesterIsNotOwner() throws Exception {
+        String suffix = uniqueSuffix();
+        String targetUsername = "userTarget-" + suffix;
+        String targetEmail = "user-target-" + suffix + "@gmail.com";
+        UUID targetUserId = createUser(targetUsername, targetEmail);
+        String requesterUsername = "userRequester-" + suffix;
+        createUser(requesterUsername, "user-requester-" + suffix + "@gmail.com");
+        flushAndClear();
+        MockHttpSession requesterSession = loginSession(requesterUsername);
+
+        UserUpdateRequest updateRequest = new UserUpdateRequest(
+                "forbidden-update-" + suffix,
+                "forbiddenPassword",
+                "forbidden-update-" + suffix + "@gmail.com"
+        );
+
+        mockMvc.perform(multipart("/api/users/{userId}", targetUserId)
+                        .file(jsonPart("userUpdateRequest", updateRequest))
+                        .session(requesterSession)
+                        .with(request -> {
+                            request.setMethod("PATCH");
+                            return request;
+                        })
+                        .with(csrf())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpectAll(
+                        status().isForbidden(),
+                        jsonPath("$.code").value("AUTH_403")
+                );
+
+        mockMvc.perform(delete("/api/users/{userId}", targetUserId)
+                        .session(requesterSession)
+                        .with(csrf()))
+                .andExpectAll(
+                        status().isForbidden(),
+                        jsonPath("$.code").value("AUTH_403")
+                );
+
+        flushAndClear();
+        User targetUser = userRepository.findById(targetUserId).orElseThrow(AssertionError::new);
+        assertThat(targetUser.getUsername()).isEqualTo(targetUsername);
+        assertThat(targetUser.getEmail()).isEqualTo(targetEmail);
     }
 
     @Test
