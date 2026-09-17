@@ -274,4 +274,6 @@ T3: 이미 통과한 메서드의 실제 변경 작업 진행
 
 어떤 방법을 선택해도 이미 실행을 시작한 Java 메서드가 자동으로 중간 취소되는 것은 아니다.
 
+동일 Session의 동시 요청과 다중 인스턴스까지 포함한 상세 내용은 [08-session-consistency-and-scaling.md](08-session-consistency-and-scaling.md)에 정리한다.
+
 `@PostAuthorize`는 이미 메서드가 실행된 이후 검사하므로 삭제 같은 파괴적인 쓰기 작업의 해결책으로 단순 적용하면 안 된다.

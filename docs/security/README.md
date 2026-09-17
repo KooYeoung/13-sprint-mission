@@ -24,7 +24,11 @@ HTTP 요청
 | [03-authorization-and-exception.md](03-authorization-and-exception.md) | 인증/인가, authorities, role, 401/403, AuthenticationEntryPoint, AccessDeniedHandler |
 | [04-security-filter-chain.md](04-security-filter-chain.md) | SecurityFilterChain, permitAll, requestMatchers, securityMatcher, 주요 Filter 관계 |
 | [05-security-testing.md](05-security-testing.md) | Security 테스트 범위, Mock 사용자와 실제 인증 테스트의 차이 |
-| [06-deep-dive-notes.md](06-deep-dive-notes.md) | 비동기 SecurityContext, JWT/Refresh Token, CSRF·CORS·XSS, 분산 Session, 권한 변경 등 심화 학습 기록 |
+| [06-deep-dive-notes.md](06-deep-dive-notes.md) | Deep Dive 주제 안내와 현재 프로젝트 적용 여부 |
+| [07-async-security-context.md](07-async-security-context.md) | 비동기 SecurityContext 전파와 권한 판단 시점 |
+| [08-session-consistency-and-scaling.md](08-session-consistency-and-scaling.md) | 권한 회수·TOCTOU·동시 요청·분산 Session |
+| [09-csrf-cors-xss.md](09-csrf-cors-xss.md) | CSRF·CORS·XSS와 Cookie 보안 |
+| [10-jwt-and-refresh-token.md](10-jwt-and-refresh-token.md) | JWT, Refresh Token Rotation·동시성·응답 유실 |
 
 ## 현재 프로젝트와 연결되는 코드
 
@@ -128,15 +132,15 @@ Form Login
 → 실제 통합 테스트
 ```
 
-구두 학습에서 시간을 들여 확인한 다음 내용도 각 주제 문서와 [06-deep-dive-notes.md](06-deep-dive-notes.md)에 빠짐없이 기록한다.
+구두 학습에서 시간을 들여 확인한 다음 내용도 각 주제 문서와 [Deep Dive 안내](06-deep-dive-notes.md)에 빠짐없이 기록한다.
 
-- 여러 Provider의 `null`·예외 처리 순서
-- 현재 Security Filter의 실행 순서
-- 비동기 SecurityContext 전파
-- 같은 Session의 동시 요청과 SecurityContext 공유
-- 권한 회수와 실행 중 요청의 TOCTOU
-- CSRF·CORS·XSS의 관계
-- Spring Session·Redis·스티키 세션
-- Refresh Token Rotation, 동시성, 응답 유실
+- [여러 Provider의 `null`·예외 처리 순서](01-authentication-flow.md)
+- [현재 Security Filter의 실행 순서](04-security-filter-chain.md)
+- [비동기 SecurityContext 전파](07-async-security-context.md)
+- [같은 Session의 동시 요청과 SecurityContext 공유](08-session-consistency-and-scaling.md)
+- [권한 회수와 실행 중 요청의 TOCTOU](08-session-consistency-and-scaling.md)
+- [CSRF·CORS·XSS의 관계](09-csrf-cors-xss.md)
+- [Spring Session·Redis·스티키 세션](08-session-consistency-and-scaling.md)
+- [Refresh Token Rotation, 동시성, 응답 유실](10-jwt-and-refresh-token.md)
 
 이 항목들은 학습 기록으로 보존하되, 현재 프로젝트의 필수 구현과 추후 적용 후보를 섞지 않는다.

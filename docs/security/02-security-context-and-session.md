@@ -141,6 +141,8 @@ Thread-A  Thread-B
 
 인증 상태를 바꿔야 한다면 요청 중 공유 객체를 임의로 수정하기보다 재인증, 세션 무효화, 새로운 SecurityContext 구성 등 의도가 분명한 흐름을 고려한다.
 
+권한 변경과 다중 인스턴스까지 포함한 내용은 [08-session-consistency-and-scaling.md](08-session-consistency-and-scaling.md)에 정리한다.
+
 ---
 
 ## 7. 비동기 처리와 SecurityContext
@@ -169,7 +171,7 @@ Spring Security는 `DelegatingSecurityContextRunnable`, `DelegatingSecurityConte
 
 이 결정은 단순한 Context 전파 방법이 아니라 업무 정책과 권한 변경 빈도에 따라 달라진다.
 
-이 주제는 다음 Java 비동기 학습에서 다시 Deep Dive한다.
+구체적인 전파 도구와 적용 판단 기준은 [07-async-security-context.md](07-async-security-context.md)에 정리한다.
 
 ---
 
@@ -217,4 +219,4 @@ Stateless라고 해서 `SecurityContext`라는 개념 자체가 사라지는 것
 - 스티키 세션: 같은 사용자의 요청을 가능한 한 같은 서버로 전달한다.
 - Spring Session + Redis: `HttpSession` 저장 위치를 여러 서버가 공유하는 Redis로 옮긴다.
 
-두 방식의 구조와 장애·확장성 차이는 [06-deep-dive-notes.md](06-deep-dive-notes.md)에 정리한다. 브라우저에는 기존처럼 Session ID만 두고, SecurityContext 자체를 Cookie에 넣는 방식으로 이해하지 않는다.
+두 방식의 구조와 장애·확장성 차이는 [08-session-consistency-and-scaling.md](08-session-consistency-and-scaling.md)에 정리한다. 브라우저에는 기존처럼 Session ID만 두고, SecurityContext 자체를 Cookie에 넣는 방식으로 이해하지 않는다.
