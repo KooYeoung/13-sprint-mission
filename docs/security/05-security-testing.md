@@ -54,19 +54,51 @@ Security 테스트를 작성할 때 가장 먼저 확인할 것은 "어떤 인�
 
 ---
 
-## 4. 403 테스트가 확인하는 것
+## 4. 403 테스트는 차단 위치를 함께 확인한다
+
+403은 인증된 사용자가 필요한 권한을 갖지 못했을 때 발생한다. 다만 어디에서 권한을 검사했는지에 따라 Controller 도달 여부가 달라진다.
+
+### URL 인가에서 거부
 
 ```text
-인증 O
-필요 권한 X
-→ 인가 실패
-→ Controller에 도달하지 않음
+ROLE_USER
+→ /actuator/health
+→ AuthorizationFilter의 hasRole("ADMIN") 불충족
+→ Controller 이전 차단
 → 403
 ```
 
-401과 403 테스트를 분리하면 **인증과 인가가 별개로 동작한다**는 사실도 확인할 수 있다.
+### Service Method Security에서 거부
 
-현재 프로젝트는 `@WithMockUser(roles = "USER")`와 `@WithMockUser(roles = "ADMIN")`을 사용해 Actuator와 채널 관리 권한 등을 검증한다.
+```text
+ROLE_USER
+→ POST /api/channels/public
+→ URL의 authenticated() 통과
+→ Controller 도달
+→ Service 프록시의 @PreAuthorize 검사
+→ Service 본문 실행 전 차단
+→ 403
+```
+
+따라서 403 테스트에서는 상태 코드뿐 아니라 다음도 확인한다.
+
+- URL 인가인지 Method Security 인가인지
+- Service 메서드 본문이 실행됐는지
+- 저장·삭제 같은 부수 효과가 발생하지 않았는지
+- 프로젝트의 `AccessDeniedHandler`가 `AUTH_403` 응답을 만들었는지
+
+현재 `SecurityAuthorizationIntegrationTest`는 다음을 검증한다.
+
+| 시나리오 | 결과 |
+| --- | --- |
+| 미인증 사용자의 보호 API 요청 | 401 |
+| `ROLE_USER`의 Actuator 접근 | 403 |
+| `ROLE_ADMIN`의 Actuator 접근 | 성공 |
+| `ROLE_USER`의 공개 채널 생성 | 403 |
+| `ROLE_CHANNEL_MANAGER`의 공개 채널 생성 | 성공 |
+| `ROLE_ADMIN`의 공개 채널 생성 | Role Hierarchy로 성공 |
+
+`DiscodeitApiIntegrationTest#privateChannelAndReadStatus_flowCreatesAndUpdatesParticipantReadStatuses`는 `ROLE_USER`의 비공개 채널 생성과 참여자별 ReadStatus 저장을 실제 DB까지 검증한다.
 
 ---
 
@@ -107,6 +139,18 @@ username/password
 
 예를 들어 `UserDetailsService` 사용자 조회, PasswordEncoder 설정, 비밀번호 값, Provider 구성에 문제가 있어도 `@WithMockUser` 인가 테스트는 통과할 수 있다.
 
+현재 프로젝트는 실제 인증 흐름도 `DiscodeitApiIntegrationTest`에서 별도로 검증한다.
+
+- 실제 사용자 생성 후 username/password 로그인
+- 인증 성공 후 HTTP Session 생성
+- 같은 Session으로 `/api/auth/me` 접근
+- 로그아웃 후 Session과 Cookie 만료
+- 잘못된 비밀번호와 존재하지 않는 사용자에 동일한 401 응답
+- 같은 계정의 두 번째 로그인 시 이전 Session 만료
+- Remember-Me 자동 로그인
+
+따라서 이 저장소에서는 `@WithMockUser` 테스트와 실제 로그인 테스트가 서로 다른 책임을 맡는다.
+
 ---
 
 ## 6. 테스트 종류별 선택
@@ -132,6 +176,8 @@ Web MVC와 Security 설정의 일부를 좁은 범위에서 확인하고 싶을 
 
 다만 `@WebMvcTest`가 자동으로 "Security만" 올리는 것은 아니다. Web MVC 계층 중심의 Slice이며 테스트 목적에 필요한 Security 설정을 함께 구성해야 한다.
 
+현재 `ChannelControllerTest`는 `@AutoConfigureMockMvc(addFilters = false)`를 사용하고 `ChannelService`도 Mock으로 대체한다. 이 테스트는 요청 검증, DTO 변환과 Controller 응답을 확인하지만, Filter 인가나 실제 Service 프록시의 `@PreAuthorize`를 증명하지 않는다.
+
 ### 통합 테스트
 
 실제 Spring Bean과 Security 설정, DB까지 함께 연결되는 흐름이 관심사라면 `@SpringBootTest` 범위가 필요할 수 있다.
@@ -146,6 +192,8 @@ Web MVC와 Security 설정의 일부를 좁은 범위에서 확인하고 싶을 
 ```
 
 따라서 단순 MockMvc Controller 테스트보다 넓은 범위에서 현재 애플리케이션의 Security 설정과 권한 정책을 검증한다.
+
+Service의 `@PreAuthorize`가 실제 Spring AOP 프록시를 통해 적용되는지 확인하려면 현재 프로젝트처럼 통합 테스트에서 Controller부터 Service 프록시까지 연결해 검증하는 것이 적절하다.
 
 ---
 

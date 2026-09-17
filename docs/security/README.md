@@ -2,6 +2,8 @@
 
 이 디렉터리는 `정구영-sprint9`에서 실제로 적용한 Spring Security 코드와 구두 점검 과정에서 확인한 내용을 다시 설명할 수 있도록 정리한 문서다.
 
+2026년 9월 16일 구두 학습에서 다룬 내용은 버리지 않고 모두 기록한다. 다만 실제 프로젝트를 설명하는 데 필요한 핵심 흐름과, 문제 상황을 가정해 확장한 Deep Dive를 구분한다.
+
 단순히 클래스와 메서드 이름을 외우는 것보다 다음 흐름을 이해하는 것을 목표로 한다.
 
 ```text
@@ -22,7 +24,7 @@ HTTP 요청
 | [03-authorization-and-exception.md](03-authorization-and-exception.md) | 인증/인가, authorities, role, 401/403, AuthenticationEntryPoint, AccessDeniedHandler |
 | [04-security-filter-chain.md](04-security-filter-chain.md) | SecurityFilterChain, permitAll, requestMatchers, securityMatcher, 주요 Filter 관계 |
 | [05-security-testing.md](05-security-testing.md) | Security 테스트 범위, Mock 사용자와 실제 인증 테스트의 차이 |
-| [06-deep-dive-notes.md](06-deep-dive-notes.md) | 비동기 SecurityContext, JWT/Refresh Token, 권한 변경 등 추후 심화할 주제 |
+| [06-deep-dive-notes.md](06-deep-dive-notes.md) | 비동기 SecurityContext, JWT/Refresh Token, CSRF·CORS·XSS, 분산 Session, 권한 변경 등 심화 학습 기록 |
 
 ## 현재 프로젝트와 연결되는 코드
 
@@ -43,6 +45,29 @@ HTTP 요청
   - `BCryptPasswordEncoder` 사용
 - `src/test/java/com/sprint/mission/discodeit/security/SecurityAuthorizationIntegrationTest.java`
   - 미인증 401, 권한 부족 403, 관리자 접근, Role Hierarchy 검증
+- `src/test/java/com/sprint/mission/discodeit/integration/DiscodeitApiIntegrationTest.java`
+  - 실제 username/password 로그인, Session 복원, 로그아웃, Remember-Me 검증
+  - `ROLE_USER`의 비공개 채널 생성 성공과 ReadStatus 저장 검증
+- `src/main/java/com/sprint/mission/discodeit/service/basic/BasicChannelService.java`
+  - 공개 채널은 CHANNEL_MANAGER 이상, 비공개 채널은 인증된 USER도 생성 가능
+- `src/main/java/com/sprint/mission/discodeit/service/basic/UserRoleManager.java`
+  - 역할 변경 시 대상 사용자의 활성 Session 만료
+
+## 현재 프로젝트의 채널 생성 권한
+
+`BasicChannelService#save`의 실제 규칙은 다음과 같다.
+
+```java
+@PreAuthorize("hasRole('CHANNEL_MANAGER') or #command.isPrivate()")
+```
+
+| 요청 사용자 | 공개 채널 | 비공개 채널 |
+| --- | --- | --- |
+| `ROLE_USER` | 403 | 생성 가능 |
+| `ROLE_CHANNEL_MANAGER` | 생성 가능 | 생성 가능 |
+| `ROLE_ADMIN` | Role Hierarchy로 생성 가능 | 생성 가능 |
+
+공개 채널 생성에서 `ROLE_USER`는 URL의 `authenticated()`까지는 통과한다. Controller가 Service를 호출하는 시점에 Method Security 프록시가 `@PreAuthorize`를 검사하고, 조건을 만족하지 못하면 Service 메서드 본문 실행 전에 403을 반환한다.
 
 ## 이번 학습에서 교정한 핵심 오해
 
@@ -88,8 +113,30 @@ Form Login을 시도할 때 만들어지는 인증 전 `Authentication`과, 로�
 → 인증은 되었지만 요청한 작업에 필요한 권한이 없음
 ```
 
-## 이번 주 학습 범위에서 일부러 깊게 다루지 않는 내용
+## 핵심 학습과 Deep Dive의 구분
 
-현재 `SecurityConfig`에는 CSRF, Remember Me, Session Registry, Role Hierarchy 같은 설정도 포함되어 있다. 이번 문서에서는 인증·인가 기본 흐름을 먼저 설명할 수 있는 수준으로 정리하고, 구현 내부 세부사항은 필요한 시점에 별도 Deep Dive로 확장한다.
+핵심 학습 범위는 다음 흐름이다.
 
-JWT와 Java 비동기는 다음 학습 범위와 연결되므로 [06-deep-dive-notes.md](06-deep-dive-notes.md)에 현재까지 확인한 질문과 개념만 남긴다.
+```text
+Form Login
+→ AuthenticationManager / Provider
+→ UserDetailsService / PasswordEncoder
+→ SecurityContext / Session
+→ Authorization
+→ 401 / 403
+→ URL 인가와 @PreAuthorize 구분
+→ 실제 통합 테스트
+```
+
+구두 학습에서 시간을 들여 확인한 다음 내용도 각 주제 문서와 [06-deep-dive-notes.md](06-deep-dive-notes.md)에 빠짐없이 기록한다.
+
+- 여러 Provider의 `null`·예외 처리 순서
+- 현재 Security Filter의 실행 순서
+- 비동기 SecurityContext 전파
+- 같은 Session의 동시 요청과 SecurityContext 공유
+- 권한 회수와 실행 중 요청의 TOCTOU
+- CSRF·CORS·XSS의 관계
+- Spring Session·Redis·스티키 세션
+- Refresh Token Rotation, 동시성, 응답 유실
+
+이 항목들은 학습 기록으로 보존하되, 현재 프로젝트의 필수 구현과 추후 적용 후보를 섞지 않는다.

@@ -129,6 +129,8 @@ if (authentication != null && authentication.isAuthenticated()) {
 
 각 스레드의 ThreadLocal은 서로 별개지만, 세션에서 가져온 `SecurityContext` 인스턴스는 공유될 가능성이 있으므로 요청 처리 중 인증 객체를 임의로 수정하는 방식은 주의해야 한다.
 
+즉 Thread-A와 Thread-B의 `SecurityContextHolder` 저장 공간은 분리되어 있어도, 두 저장 공간이 같은 Session의 `SecurityContext` 참조를 가리킬 수 있다. 한 요청에서 공유 객체의 Authentication을 직접 변경하면 다른 동시 요청에 영향을 줄 수 있다.
+
 ```text
 HttpSession
    ↓
@@ -156,6 +158,17 @@ Thread-A  Thread-B
 
 비동기 작업에서 현재 사용자 인증 정보가 필요하다면 SecurityContext 전파 전략을 별도로 확인해야 한다.
 
+Spring Security는 `DelegatingSecurityContextRunnable`, `DelegatingSecurityContextCallable`, `DelegatingSecurityContextExecutor`, `DelegatingSecurityContextAsyncTaskExecutor` 같은 위임 객체를 제공한다. 이 객체들은 명시적으로 지정했거나 구성·제출 과정에서 캡처한 SecurityContext를 비동기 실행 스레드에 설정하고, 실행 뒤 정리하는 책임을 감싼다. 정확한 캡처 시점은 사용하는 생성자와 위임 객체 구성에 따라 확인해야 한다.
+
+다만 비동기 작업에 사용자 ID만 필요하다면 ID를 명시적으로 전달하는 편이 책임과 테스트 범위가 작다. 사용자 권한까지 필요하다면 다음 정책을 먼저 결정한다.
+
+```text
+요청 시점 권한으로 작업을 확정할 것인가?
+실제 실행 시점의 최신 권한을 다시 확인할 것인가?
+```
+
+이 결정은 단순한 Context 전파 방법이 아니라 업무 정책과 권한 변경 빈도에 따라 달라진다.
+
 이 주제는 다음 Java 비동기 학습에서 다시 Deep Dive한다.
 
 ---
@@ -175,6 +188,8 @@ POST /api/auth/logout
 
 코드에서는 `invalidateHttpSession(true)`와 `deleteCookies("JSESSIONID")`를 사용한다.
 
+Spring Security의 기본 로그아웃 처리에는 현재 요청의 `SecurityContextHolder`를 정리하는 처리도 포함된다. Session 무효화, Cookie 삭제, 현재 Thread의 Context 정리는 서로 다른 대상에 대한 작업이다.
+
 ---
 
 ## 9. Session 방식과 Stateless 방식의 차이
@@ -191,3 +206,15 @@ Stateless 인증
 ```
 
 Stateless라고 해서 `SecurityContext`라는 개념 자체가 사라지는 것은 아니다. 차이는 인증 상태를 다음 요청까지 서버 세션에 보존하는지 여부다.
+
+
+---
+
+## 10. 다중 인스턴스에서 Session 유지
+
+애플리케이션 서버가 여러 대일 때 각 서버 메모리에만 Session을 저장하면, 다음 요청이 다른 서버로 전달될 때 기존 Session을 찾지 못할 수 있다.
+
+- 스티키 세션: 같은 사용자의 요청을 가능한 한 같은 서버로 전달한다.
+- Spring Session + Redis: `HttpSession` 저장 위치를 여러 서버가 공유하는 Redis로 옮긴다.
+
+두 방식의 구조와 장애·확장성 차이는 [06-deep-dive-notes.md](06-deep-dive-notes.md)에 정리한다. 브라우저에는 기존처럼 Session ID만 두고, SecurityContext 자체를 Cookie에 넣는 방식으로 이해하지 않는다.

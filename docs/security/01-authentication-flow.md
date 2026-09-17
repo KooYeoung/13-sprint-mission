@@ -80,6 +80,33 @@ provider.authenticate(authentication)
 
 여러 Provider가 같은 타입을 지원할 수도 있다. Provider가 인증을 성공하면 그 결과를 사용하고, 처리하지 못해 `null`을 반환하면 다음 Provider를 시도할 수 있다.
 
+### 여러 Provider가 같은 타입을 지원할 때
+
+`ProviderManager`의 진행 규칙은 다음처럼 구분한다.
+
+```text
+supports() == false
+→ 해당 Provider를 건너뜀
+
+authenticate()가 null 반환
+→ 현재 Provider가 결과를 만들지 못함
+→ 다음 지원 Provider 시도
+
+authenticate()가 Authentication 반환
+→ 인증 성공
+→ 뒤 Provider는 실행하지 않음
+
+authenticate()가 일반 AuthenticationException 발생
+→ 실패 예외를 기억하고 다음 지원 Provider를 시도할 수 있음
+→ 모두 실패하면 마지막 실패 예외를 다시 던짐
+
+AccountStatusException 또는 InternalAuthenticationServiceException
+→ 계정 상태나 내부 서비스 문제
+→ 즉시 중단하고 예외 전파
+```
+
+따라서 “Provider에서 예외가 나면 항상 즉시 다음 Provider로 넘어간다”거나 “항상 AuthenticationEntryPoint가 처리한다”고 단정하지 않는다. Form Login 중 최종 인증 실패가 Filter로 돌아오면 현재 프로젝트의 `LoginFailureHandler`가 401 응답을 만든다.
+
 현재 프로젝트는 별도의 커스텀 `AuthenticationProvider`를 구현하지 않고 `UserDetailsService`와 `PasswordEncoder`를 제공하여 username/password 인증 흐름과 연결한다.
 
 ---
@@ -189,6 +216,8 @@ authenticated
 → true
 ```
 
+인증 성공 뒤에는 자격 증명을 계속 보관할 이유가 없다. `ProviderManager`는 성공 결과가 `CredentialsContainer`를 구현한 경우 `eraseCredentials()`를 호출해 비밀번호 같은 민감정보를 제거할 수 있다. 목적은 민감정보가 SecurityContext, Session, 로그나 디버깅 정보에 오래 남는 범위를 줄이는 것이다.
+
 현재 `DiscodeitUserDetails#getAuthorities()`는 사용자 Role 앞에 `ROLE_`을 붙여 `SimpleGrantedAuthority`를 반환한다.
 
 ---
@@ -202,6 +231,19 @@ authenticated
 따라서 인증 실패 응답에서는 사용자 존재 여부가 불필요하게 노출되지 않도록 고려해야 한다.
 
 현재 프로젝트에서는 `LoginFailureHandler`가 Form Login 인증 실패 응답을 담당한다.
+
+현재 구현에서 `LoginFailureHandler`는 `UserLoginFailedException` 형식의 401 JSON을 직접 작성한다. 보호 API의 미인증 요청을 처리하는 `AuthenticationEntryPoint`에 다시 위임하는 구조가 아니다.
+
+```text
+POST /api/auth/login에서 인증 실패
+→ LoginFailureHandler
+
+로그인하지 않은 사용자의 보호 API 요청
+→ AuthenticationEntryPoint
+
+로그인했지만 권한 부족
+→ AccessDeniedHandler
+```
 
 ---
 

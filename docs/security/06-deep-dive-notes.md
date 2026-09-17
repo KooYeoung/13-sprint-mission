@@ -1,19 +1,19 @@
-# Spring Security Deep Dive 후보
+# Spring Security Deep Dive 기록
 
-이 문서는 이번 주 기본 인증·인가 학습을 진행하면서 자연스럽게 확장된 질문을 보관한다.
+이 문서는 2026년 9월 16일 구두 학습에서 실제로 다룬 확장 주제를 보관한다.
 
-현재 단계에서 모든 문제를 완성해서 해결하는 것이 목적은 아니다.
+시간을 들여 확인한 내용이므로 문서에서 제외하지 않는다. 다만 아래 내용은 현재 Discodeit 코드에 모두 구현됐다는 뜻이 아니다. 프로젝트에서 확인된 동작은 각 문서에서 따로 표시하고, 이 문서에서는 이후 설계·검증 후보를 정리한다.
 
 ```text
 기본 흐름 이해
 → 실제 프로젝트 적용
 → 테스트
 → 구두 설명
-→ 문서화
-→ 이후 Deep Dive
+→ Deep Dive 기록
+→ 필요할 때 재현·구현
 ```
 
-새로운 문제가 보이더라도 현재 학습 목표를 막지 않는다면 다음 학습 후보로 기록하고 기본 범위를 먼저 완료한다.
+핵심 학습 범위와 심화 내용을 구분하는 목적은 학습 기록을 버리는 것이 아니라, 현재 미션의 완료 조건과 이후 탐구 대상을 혼동하지 않기 위해서다.
 
 ---
 
@@ -21,25 +21,42 @@
 
 ### 확인한 문제
 
-`SecurityContextHolder`는 기본적으로 현재 실행 스레드와 SecurityContext를 연결한다.
+`SecurityContextHolder`의 기본 전략은 현재 실행 Thread와 `SecurityContext`를 연결한다.
 
-따라서 다음처럼 다른 스레드로 넘어가는 코드에서는 기존 인증 정보가 자동으로 전달된다고 가정하면 안 된다.
+따라서 다른 Thread에서 실행되는 `@Async`, `CompletableFuture`, 별도 `Executor` 작업은 요청 Thread의 인증 정보를 자동으로 사용할 수 있다고 가정하면 안 된다.
 
 ```text
 요청 Thread-A
 → SecurityContext 있음
 
-@Async / CompletableFuture
-→ Thread-B
-→ 기존 SecurityContext가 자동으로 따라오는가?
+비동기 Thread-B
+→ 별도 전파가 없으면 요청의 SecurityContext 없음
 ```
 
-### 다음 학습 질문
+### 전파가 정말 필요한 경우
 
-- `CompletableFuture`는 어느 Thread에서 실행되는가?
-- 전용 `Executor`를 사용하면 SecurityContext는 어떻게 되는가?
-- Spring Security에서 비동기 Context 전파를 지원하는 방법은 무엇인가?
-- Thread Pool의 Thread 재사용과 ThreadLocal 정리는 어떻게 연결되는가?
+Spring Security는 다음과 같은 래퍼를 제공한다.
+
+- `DelegatingSecurityContextRunnable`
+- `DelegatingSecurityContextCallable`
+- `DelegatingSecurityContextExecutor`
+- `DelegatingSecurityContextAsyncTaskExecutor`
+
+이들은 명시적으로 지정했거나 구성·제출 과정에서 캡처한 SecurityContext를 작업 실행 전에 설정하고, 실행이 끝나면 정리하는 책임을 묶는다. 정확한 캡처 시점은 사용하는 생성자와 위임 객체 구성에 따라 확인해야 한다. 직접 ThreadLocal에 값을 넣고 지우는 방식보다 누락 위험을 줄일 수 있다.
+
+단, Context를 전달한다고 문제가 끝나는 것은 아니다. 제출 시점의 권한을 사용할지, 실제 실행 시점에 DB에서 최신 권한을 다시 확인할지는 업무 정책으로 결정해야 한다.
+
+### ID만 전달할지 Context를 전달할지
+
+비동기 작업에 사용자 ID만 필요하다면 ID를 명시적으로 인자로 전달하는 편이 의존성과 관리 범위가 작다.
+
+SecurityContext 전체 전파는 다음과 같이 실제 인증 정보가 필요한 경우에 고려한다.
+
+- 하위 호출이 현재 `Authentication`을 요구한다.
+- 감사 정보가 현재 Principal과 Authority를 필요로 한다.
+- Method Security가 비동기 Thread에서도 동작해야 한다.
+
+권한 변경 가능성이 중요한 작업이라면 전달된 Authority만 신뢰하지 않고 실행 시점에 최신 권한이나 업무 상태를 다시 확인할 수 있다.
 
 이 주제는 Java 비동기 수업과 기존 Findex의 `CompletableFuture + 전용 Executor` 경험에 연결한다.
 
@@ -230,7 +247,7 @@ JWT 발급 뒤 DB에서 사용자가 탈퇴하거나 `enabled=false`로 바뀌�
 
 ---
 
-## 10. 세션 권한 변경과 정합성
+## 10. 세션 권한 변경과 실행 중 요청
 
 세션 사용자가 로그인한 뒤 DB의 Role이 바뀌어도 기존 Session의 Authentication 권한이 자동으로 최신화된다고 가정하면 안 된다.
 
@@ -240,17 +257,103 @@ JWT 발급 뒤 DB에서 사용자가 탈퇴하거나 `enabled=false`로 바뀌�
 - 중요 작업 직전에 최신 권한 재확인
 - 권한 Version 관리
 
-또한 이미 `@PreAuthorize`를 통과해 실행 중인 요청은 권한을 회수했다고 자동으로 중간 취소되지 않는다.
+현재 프로젝트의 `UserRoleManager`는 Role 변경 뒤 `SessionRegistry`에서 대상 사용자의 활성 Session을 찾아 `expireNow()`로 만료시킨다. 이는 다음 요청부터 새 인증을 요구하게 하는 전략이다.
 
-이 문제는 인증·인가를 넘어 동시성, 데이터 정합성, 업무 정책과 연결되는 Deep Dive 주제다.
+다만 이미 `@PreAuthorize`를 통과해 실행 중인 요청은 권한을 회수했다고 자동으로 중간 취소되지 않는다. 실행 중 요청까지 보호해야 하는 중요 작업은 실제 변경 직전에 DB 상태를 재확인하거나, 권한 조건을 포함한 조건부 UPDATE, 필요한 범위의 비관적 락 등을 업무 규칙에 맞게 검토한다.
+
+이 문제는 검사 시점과 사용 시점이 달라지는 TOCTOU 문제이며, 인증·인가뿐 아니라 동시성, 데이터 정합성, 트랜잭션 정책과 연결된다.
 
 ---
 
-## 11. 이번 단계에서 멈추는 기준
+## 11. 동일 세션의 동시 요청과 객체 공유
 
-이번 주의 완료 조건은 위 Deep Dive 문제를 전부 구현하는 것이 아니다.
+같은 HTTP Session에서 동시에 처리되는 요청은 Session에 저장된 같은 `SecurityContext` 참조를 공유할 수 있다.
 
-먼저 다음을 자료 없이 설명할 수 있으면 기본 학습을 완료한다.
+ThreadLocal은 각 Thread가 Context에 접근하는 위치를 분리하지만, 그 안에 넣는 Context 객체 자체가 언제나 새 객체라는 뜻은 아니다.
+
+따라서 한 요청에서 기존 `Authentication`이나 `SecurityContext`를 직접 변경하면 같은 세션의 다른 동시 요청에 영향을 줄 수 있다. 요청별로 임시 인증 변경이 필요하다면 기존 공유 객체를 제자리에서 수정하지 말고 새 `SecurityContext`를 만들어 요청 범위에 설정하는 방식을 검토한다.
+
+---
+
+## 12. CSRF·CORS·XSS의 관계
+
+### CSRF
+
+세션 쿠키는 브라우저가 대상 서버 요청에 자동으로 첨부한다. 공격자는 피해자의 비밀번호나 Session ID를 몰라도 피해자의 브라우저가 인증 쿠키를 보내게 만들 수 있으므로, 상태 변경 요청에는 쿠키만으로는 알 수 없는 CSRF Token을 추가로 검증한다.
+
+현재 프로젝트는 `CookieCsrfTokenRepository.withHttpOnlyFalse()`를 사용한다. 클라이언트가 `XSRF-TOKEN` 쿠키 값을 읽어 `X-XSRF-TOKEN` 요청 Header로 보내는 방식이다. Token이 없거나 서버가 기대한 값과 다르면 `CsrfFilter`에서 403으로 거부되며, 로그인 요청이라면 `UsernamePasswordAuthenticationFilter`까지 도달하지 않는다.
+
+쿠키 값은 클라이언트가 바꿀 수 있으므로, 쿠키에 값이 존재한다는 사실만으로 검증이 끝나는 것이 아니다. 현재의 Cookie 기반 Repository는 CSRF Cookie에서 불러온 기대값과 Header의 요청값을 비교한다. Session에 기대값을 저장하는 `HttpSessionCsrfTokenRepository`와 저장 위치를 혼동하지 않는다.
+
+### CORS
+
+CORS는 브라우저에서 다른 Origin의 Script가 요청과 응답을 다루는 범위를 제한한다. 특히 응답 읽기와 Preflight 승인에 관여한다.
+
+CORS가 거부됐다는 사실만으로 CSRF 공격이 막혔다고 판단하면 안 된다. 일부 Cross-Origin 요청은 전송될 수 있고 브라우저가 응답만 Script에 공개하지 않을 수 있기 때문이다. CSRF 방어는 CSRF Token과 SameSite 등 별도 수단으로 설계한다.
+
+### XSS
+
+XSS로 신뢰하는 Origin에서 공격자 Script가 실행되면 그 Script는 페이지의 CSRF Token을 읽거나 정상 코드처럼 API를 호출할 수 있다. 현재처럼 `XSRF-TOKEN`을 JavaScript가 읽어야 해서 HttpOnly를 끈 구조에서는 XSS가 Token까지 읽을 수 있다.
+
+Session Cookie에 HttpOnly를 설정하면 JavaScript가 Cookie 값을 직접 훔치는 것은 어렵게 하지만, 브라우저는 같은 사이트 요청에 해당 Cookie를 자동 첨부할 수 있다. 따라서 HttpOnly만으로 XSS가 피해자 권한의 요청을 실행하는 것까지 막지는 못한다.
+
+### Cookie 속성 구분
+
+| 속성 | 핵심 역할 |
+|---|---|
+| `HttpOnly` | JavaScript의 Cookie 값 직접 읽기를 제한한다. |
+| `Secure` | HTTPS 연결에서만 Cookie를 전송하도록 한다. |
+| `SameSite` | Cross-Site 상황에서 Cookie 전송 범위를 제한한다. `Strict`, `Lax`, `None`의 동작이 다르다. |
+
+`SameSite`의 Site 개념은 CORS의 Origin과 같지 않다. 세 속성은 서로 대체 관계가 아니며 HTTPS, CSP, 출력 인코딩, 입력 처리, CSRF Token 등과 함께 방어 계층을 구성한다.
+
+---
+
+## 13. 다중 인스턴스의 Session 관리
+
+### Sticky Session
+
+Sticky Session은 특정 사용자의 후속 요청을 같은 애플리케이션 인스턴스로 라우팅하는 방식이다. “고유한 종류의 세션”을 새로 만드는 것이 아니다.
+
+서버 로컬 메모리에 Session을 둘 수 있다는 장점이 있지만, 해당 인스턴스 장애, 배포, 증설·축소, 라우팅 변경 시 Session 연속성이 깨질 수 있고 특정 서버에 부하가 몰릴 수 있다.
+
+### Spring Session과 Redis
+
+Spring Session은 애플리케이션이 사용하는 `HttpSession` 저장소를 Redis 같은 공유 저장소로 교체할 수 있게 한다.
+
+```text
+브라우저
+→ Session ID Cookie
+
+애플리케이션 A / B
+→ 같은 Session ID로 공유 저장소 조회
+
+Redis
+→ Session 속성
+→ SecurityContext
+```
+
+브라우저에는 기존처럼 Session ID만 두고, SecurityContext와 인증 정보는 서버 측 Session 속성으로 유지한다. 어느 애플리케이션 인스턴스가 요청을 받아도 같은 Redis Session을 조회할 수 있다.
+
+대신 Redis 가용성, 네트워크 비용, Session TTL, 직렬화 호환성, 저장 데이터 보호, 장애 시 로그인 영향까지 운영 범위에 포함된다.
+
+---
+
+## 14. Provider와 Filter 순서 기록 위치
+
+여러 `AuthenticationProvider`의 `supports`, `null`, 성공 결과, 예외 처리 순서는 [01-authentication-flow.md](./01-authentication-flow.md)에 정리했다.
+
+현재 프로젝트에서 활성화된 Security Filter의 전체 순서와 `ExceptionTranslationFilter`가 뒤쪽 Filter의 예외를 처리하는 구조는 [04-security-filter-chain.md](./04-security-filter-chain.md)에 정리했다.
+
+이 두 주제도 구두 학습에서 시간을 들여 확인했으므로 문서에 남기되, 암기보다는 책임과 분기 기준을 설명하는 데 초점을 둔다.
+
+---
+
+## 15. 현재 단계의 완료 기준
+
+위 Deep Dive 문제를 모두 현재 미션에 구현하는 것이 완료 조건은 아니다.
+
+먼저 다음 핵심 흐름을 자료 없이 설명하고 현재 프로젝트의 테스트로 연결할 수 있어야 한다.
 
 ```text
 Form Login 최초 인증
@@ -258,8 +361,8 @@ Form Login 최초 인증
 → UserDetailsService / PasswordEncoder
 → SecurityContext / Session
 → 다음 요청에서 인증 상태 복원
-→ Authorization
+→ URL / Method Authorization
 → 401 / 403
 ```
 
-JWT Rotation, 멱등성, 비동기 Context 전파 같은 내용은 실제 다음 미션이나 문제가 생겼을 때 하나씩 재현하고 검증한다.
+Deep Dive 내용은 학습 기록에서 제외하지 않는다. 다음 미션이나 실제 문제가 생기면 해당 절을 출발점으로 삼아 재현하고 검증한다.

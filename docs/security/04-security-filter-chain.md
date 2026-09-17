@@ -55,39 +55,79 @@ GET /public
 
 ---
 
-## 3. 주요 Filter 관계
+## 3. 현재 설정의 Filter 실행 순서
 
-모든 Security Filter 이름과 정확한 전체 순서를 암기하는 것보다 이번 학습에서는 다음 관계를 설명할 수 있는 것을 목표로 한다.
+Spring Security는 Filter마다 고정된 등록 순서를 가지고 있고, 그중 현재 설정에서 활성화된 Filter만 실제 `SecurityFilterChain`에 들어간다.
+
+현재 프로젝트는 Form Login, CSRF, Logout, 동시 Session 제한, Remember-Me와 요청 인가를 활성화한다. 이 설정을 기준으로 이해해야 할 실행 순서는 다음과 같다.
 
 ```text
-SecurityContext 로드/설정
-        ↓
-필요한 Authentication Filter
-        ↓
-AnonymousAuthenticationFilter
-        ↓
-ExceptionTranslationFilter
-        ↓
-AuthorizationFilter
-        ↓
-Controller
+1. DisableEncodeUrlFilter
+2. WebAsyncManagerIntegrationFilter
+3. SecurityContextHolderFilter
+4. HeaderWriterFilter
+5. CsrfFilter
+6. LogoutFilter
+7. UsernamePasswordAuthenticationFilter
+8. DefaultLoginPageGeneratingFilter
+9. DefaultLogoutPageGeneratingFilter
+10. ConcurrentSessionFilter
+11. RequestCacheAwareFilter
+12. SecurityContextHolderAwareRequestFilter
+13. RememberMeAuthenticationFilter
+14. AnonymousAuthenticationFilter
+15. SessionManagementFilter
+16. ExceptionTranslationFilter
+17. AuthorizationFilter
 ```
 
-### AnonymousAuthenticationFilter
+HTTP Basic, Bearer Token, OAuth2 Login, CORS 등을 설정하면 해당 기능의 Filter가 Spring Security의 정해진 위치에 추가된다. 반대로 설정하지 않은 Filter는 실행되지 않는다.
 
-앞선 인증 처리 이후에도 정상적인 Authentication이 없다면 익명 사용자 객체를 설정할 수 있다.
+프레임워크 버전이나 설정 변경 뒤 실제 구성된 목록을 확인할 때는 다음 로그를 기준으로 검증한다.
 
-다른 인증 Filter가 이 Filter에게 인증을 "위임"하는 구조로 이해하지 않는다.
+```yaml
+logging:
+  level:
+    org.springframework.security.web.FilterChainProxy: DEBUG
+```
 
-### AuthorizationFilter
+Filter 순서를 외울 때는 이름만 나열하기보다 현재 요청에서 실제로 필요한 관계를 함께 본다.
 
-현재 `Authentication`과 요청의 인가 규칙을 바탕으로 접근 가능 여부를 판단한다.
+### 로그인 요청
 
-### ExceptionTranslationFilter
+```text
+CsrfFilter
+→ UsernamePasswordAuthenticationFilter
+→ AuthenticationManager
+→ 인증 성공/실패 Handler
+```
 
-뒤쪽 인가 처리 등에서 발생한 Spring Security 예외를 받아 `AuthenticationEntryPoint` 또는 `AccessDeniedHandler`와 연결한다.
+CSRF Token이 필요한 POST 로그인 요청에서 Token이 없거나 올바르지 않으면 `CsrfFilter`에서 먼저 403이 발생하므로 username/password 인증까지 도달하지 않는다.
 
-즉 `ExceptionTranslationFilter`가 `AuthorizationFilter`에게 권한 판단을 위임한다기보다, Filter Chain 뒤에서 발생한 예외를 웹 응답으로 변환할 수 있도록 감싸는 관계로 이해한다.
+### 세션 사용자의 일반 요청
+
+```text
+SecurityContextHolderFilter
+→ Session에서 기존 SecurityContext 사용
+→ RememberMeAuthenticationFilter
+→ AnonymousAuthenticationFilter
+→ ExceptionTranslationFilter
+→ AuthorizationFilter
+→ Controller
+```
+
+### 예외 변환 관계
+
+`ExceptionTranslationFilter`는 비밀번호를 비교하거나 권한을 직접 계산하지 않는다. 뒤에서 발생한 `AuthenticationException` 또는 `AccessDeniedException`을 `AuthenticationEntryPoint`나 `AccessDeniedHandler`에 연결한다.
+
+```text
+ExceptionTranslationFilter
+  └─ 다음 Filter/Servlet 실행
+       └─ AuthorizationFilter 또는 Method Security에서 예외
+  ← 예외를 받아 401/403 처리와 연결
+```
+
+`ExceptionTranslationFilter`가 `AuthorizationFilter`보다 앞에 있는 이유는 뒤쪽 호출을 감싸고, 되돌아오는 예외를 처리해야 하기 때문이다.
 
 ---
 
@@ -195,3 +235,26 @@ ADMIN 필요
 ```
 
 추가로 Method Security가 활성화되어 있으므로 일부 세부 권한은 Controller 진입 이후 Service 메서드 수준에서도 검사할 수 있다.
+
+
+---
+
+## 9. URL 인가와 Method Security의 실행 위치
+
+현재 채널 생성 URL은 `.anyRequest().authenticated()`의 적용을 받는다. 따라서 로그인한 `ROLE_USER`는 Filter Chain의 URL 인가를 통과할 수 있다.
+
+```text
+POST /api/channels/public
+→ Filter Chain의 authenticated() 통과
+→ DispatcherServlet
+→ ChannelController#createPublic
+→ BasicChannelService 프록시
+→ @PreAuthorize 검사
+→ ROLE_USER + 공개 채널이므로 거부
+→ Service 본문과 Repository 저장은 실행되지 않음
+→ 403
+```
+
+반대로 같은 `ROLE_USER`가 비공개 채널 생성 Command를 전달하면 `#command.isPrivate()`가 참이므로 Service 본문이 실행된다.
+
+따라서 “Security에서 403이 발생했다”는 결과만으로 Controller 이전에서 차단됐다고 단정하지 않는다. URL 규칙인지, Method Security 규칙인지 먼저 구분한다.

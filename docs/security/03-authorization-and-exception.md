@@ -69,6 +69,39 @@ ROLE_USER
 
 ---
 
+## 3-1. 현재 프로젝트의 채널 생성 권한
+
+채널 생성은 URL 단계에서 세부 Role을 판단하지 않는다. `SecurityConfig`의 `.anyRequest().authenticated()`로 로그인 여부를 먼저 확인하고, 실제 공개·비공개 생성 조건은 Service의 Method Security에서 판단한다.
+
+```java
+@PreAuthorize("hasRole('CHANNEL_MANAGER') or #command.isPrivate()")
+public ChannelDto save(ChannelCreateCommand command)
+```
+
+| 사용자 | 요청 | 결과 |
+| --- | --- | --- |
+| `ROLE_USER` | 공개 채널 생성 | 403 |
+| `ROLE_USER` | 비공개 채널 생성 | 성공 |
+| `ROLE_CHANNEL_MANAGER` | 공개 채널 생성 | 성공 |
+| `ROLE_ADMIN` | 공개 채널 생성 | Role Hierarchy로 성공 |
+
+`ROLE_USER`의 공개 채널 생성 흐름은 다음과 같다.
+
+```text
+SecurityFilterChain
+→ authenticated() 통과
+→ Controller 도달
+→ Service 프록시의 @PreAuthorize
+→ 조건 불충족
+→ Service 메서드 본문 실행 전 AccessDeniedException
+→ AccessDeniedHandler
+→ 403
+```
+
+따라서 모든 403을 “Controller 이전 차단”으로 설명하면 안 된다. URL 인가에서 발생한 403과 Method Security에서 발생한 403은 차단 위치가 다르다.
+
+---
+
 ## 4. authenticated와 권한 검사의 차이
 
 ```java
@@ -214,6 +247,8 @@ DB에서 ADMIN 권한 회수
 
 일반적인 요청마다 항상 DB의 최신 권한을 다시 조회하면 즉시 반영은 쉽지만 모든 요청의 DB 의존성과 비용이 증가한다.
 
+현재 프로젝트는 역할 변경 시 `UserRoleManager`가 `SessionRegistry`에서 대상 사용자의 활성 Session을 찾고 `expireNow()`를 호출하는 방식을 선택했다. 다른 사용자의 Session은 유지하며, 이 동작은 `DiscodeitApiIntegrationTest#updateUserRole_expiresOnlyTargetUserSession`에서 검증한다.
+
 ---
 
 ## 10. PreAuthorize와 실행 중 권한 변경
@@ -229,5 +264,14 @@ T3: 이미 통과한 메서드의 실제 변경 작업 진행
 세션을 T2에서 만료하더라도 T1에서 이미 인가를 통과해 실행 중인 요청이 자동으로 중간 취소된다고 볼 수 없다.
 
 정말로 권한 회수 즉시 중요한 쓰기 작업까지 차단해야 한다면 변경 직전에 최신 권한을 다시 확인하는 등 별도의 정합성 전략이 필요할 수 있다.
+
+이 문제는 검사 시점과 사용 시점 사이에 상태가 달라지는 TOCTOU 문제로 볼 수 있다. 업무상 즉시 차단이 필요하다면 다음 후보를 비교한다.
+
+- 쓰기 직전에 DB의 최신 권한을 다시 조회
+- 권한 조건을 포함한 조건부 UPDATE를 실행하고 변경 행 수로 성공 여부 판단
+- 대상 Row를 비관적 락으로 조회한 뒤 같은 Transaction 안에서 권한과 상태를 확인
+- 이후 요청 차단을 위해 기존 Session 만료
+
+어떤 방법을 선택해도 이미 실행을 시작한 Java 메서드가 자동으로 중간 취소되는 것은 아니다.
 
 `@PostAuthorize`는 이미 메서드가 실행된 이후 검사하므로 삭제 같은 파괴적인 쓰기 작업의 해결책으로 단순 적용하면 안 된다.
