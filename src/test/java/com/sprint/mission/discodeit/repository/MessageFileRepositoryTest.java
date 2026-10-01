@@ -1661,7 +1661,7 @@ class MessageFileRepositoryTest {
     // 그래서 BinaryContent도 실제 row로 저장해야 native insert의 file_id 필터링을 검증할 수 있다.
     private BinaryContent saveBinaryContent(String originalFileName, String contentType, long size) {
         return binaryContentRepository.saveAndFlush(
-                new BinaryContent(originalFileName, contentType, size)
+                 BinaryContent.createProcessing(originalFileName, contentType, size)
         );
     }
 

@@ -381,7 +381,7 @@ class UserRepositoryTest {
     }
 
     private BinaryContent saveProfile() {
-        return binaryContentRepository.saveAndFlush(new BinaryContent("profile.png", "image/png", 1_024L));
+        return binaryContentRepository.saveAndFlush( BinaryContent.createProcessing("profile.png", "image/png", 1_024L));
     }
 
     private UserFixture saveUserWithProfile(UserCreateCommand command) {

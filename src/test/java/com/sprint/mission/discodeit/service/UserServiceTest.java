@@ -217,7 +217,7 @@ class UserServiceTest {
 
             // BinaryContentService가 파일 저장 후 반환할 프로필 엔티티를 준비한다.
             // 이 객체가 실제 User 생성자에 전달되어 저장되는지 ArgumentCaptor로 확인한다.
-            BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
+            BinaryContent profile =  BinaryContent.createProcessing("filename", "contentType", 1000L);
 
             UserDto expectedDto = createExpectedDto(userId, command, true);
 
@@ -693,14 +693,14 @@ class UserServiceTest {
 
             // 기존 프로필과 새 프로필의 id가 달라야 기존 프로필 삭제 분기가 실행된다.
             UUID oldProfileId = UUID.randomUUID();
-            BinaryContent oldProfile = new BinaryContent("file", "contentType", 1000L);
+            BinaryContent oldProfile =  BinaryContent.createProcessing("file", "contentType", 1000L);
             ReflectionTestUtils.setField(oldProfile, "id", oldProfileId);
 
             User user = new User(command, oldProfile);
 
             MockMultipartFile newFile = new MockMultipartFile("file", "test.jpg", "image/jpeg", "test".getBytes());
             UUID newProfileId = UUID.randomUUID();
-            BinaryContent newProfileContent = new BinaryContent(newFile.getOriginalFilename(), newFile.getContentType(), newFile.getSize());
+            BinaryContent newProfileContent = BinaryContent.createProcessing(newFile.getOriginalFilename(), newFile.getContentType(), newFile.getSize());
             ReflectionTestUtils.setField(newProfileContent, "id", newProfileId);
 
             UserUpdateCommand updateCommand = createUpdateCommand();
@@ -755,7 +755,7 @@ class UserServiceTest {
             // 기존 프로필 이미지를 가진 사용자를 준비한다.
             // binaryContentService.create(null)가 Optional.empty()를 반환하면 서비스는 이 기존 프로필을 그대로 사용한다.
             UUID profileId = UUID.randomUUID();
-            BinaryContent profile = new BinaryContent("file", "contentType", 1000L);
+            BinaryContent profile = BinaryContent.createProcessing("file", "contentType", 1000L);
             ReflectionTestUtils.setField(profile, "id", profileId);
 
             User user = new User(command, profile);
@@ -1005,7 +1005,7 @@ class UserServiceTest {
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
 
-            BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
+            BinaryContent profile = BinaryContent.createProcessing("filename", "contentType", 1000L);
             User user = new User(command, profile);
             ReflectionTestUtils.setField(user, "id", userId);
 

@@ -1886,7 +1886,7 @@ class ReadStatusRepositoryTest {
 
     private User saveUserWithProfile(UserCreateCommand command, String originalFileName) {
         BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent(originalFileName, "originFileContent", 1_000L)
+                 BinaryContent.createProcessing(originalFileName, "originFileContent", 1_000L)
         );
 
         return userRepository.saveAndFlush(new User(command, savedProfile));
