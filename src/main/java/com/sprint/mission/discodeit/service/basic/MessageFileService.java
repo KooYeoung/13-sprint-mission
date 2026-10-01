@@ -28,12 +28,11 @@ public class MessageFileService {
     public List<MessageFile> save(Message message, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) return List.of();
 
-        List<UUID> fileIds = new ArrayList<>();
-
-        for (MultipartFile file : files) {
-            Optional<BinaryContent> binaryContent = binaryContentService.create(file);
-            binaryContent.ifPresent(b -> fileIds.add(b.getId()));
-        }
+        List<UUID> fileIds = files.stream()
+                .map(binaryContentService::create)
+                .filter(Optional::isPresent)
+                .map(content -> content.get().getId())
+                .toList();
 
         if (fileIds.isEmpty()) return List.of();
 
@@ -81,7 +80,7 @@ public class MessageFileService {
         return messageFileRepository.findAllByMessageIdIn(messageIds);
     }
 
-    private @NonNull List<BinaryContent> convertToBinaryContents(List<MessageFile> messageFiles) {
+    private List<BinaryContent> convertToBinaryContents(List<MessageFile> messageFiles) {
         return messageFiles
                 .stream()
                 .map(MessageFile::getBinaryContent)
