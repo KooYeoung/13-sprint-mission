@@ -17,6 +17,7 @@ import com.sprint.mission.discodeit.mapper.PageResponseMapper;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class BasicMessageService implements MessageService {
     private final MessageRepository messageRepository;
@@ -61,6 +63,8 @@ public class BasicMessageService implements MessageService {
         List<MessageFile> savedMessageFiles = messageFileService.save(savedMessage, files);
 
         eventPublisher.publishEvent(getMessageCreatedEvent(channel, author, savedMessage));
+        log.debug("메시지 생성 이벤트를 발행했습니다. messageId={}, channelId={}, authorId={}",
+                savedMessage.getId(), channel.getId(), author.getId());
 
         return messageMapper.toDto(savedMessage, savedMessageFiles);
     }

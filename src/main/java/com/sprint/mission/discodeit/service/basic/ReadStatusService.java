@@ -45,6 +45,8 @@ public class ReadStatusService {
         int insertedRowsCount = readStatusRepository.bulkInsert(channel.getId(), distinctUserIds, readAt, channel.isPrivate());
 
         if (insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
+        log.debug("채널 참여자의 읽음 상태 생성을 요청했습니다. channelId={}, participantCount={}, notificationEnabled={}",
+                channel.getId(), insertedRowsCount, channel.isPrivate());
     }
 
     @PreAuthorize("#command.userId() == authentication.principal.userDto.id "
@@ -94,10 +96,16 @@ public class ReadStatusService {
     @PreAuthorize("@readStatusGuard.isOwner(#readStatusId, authentication.principal.userDto.id)")
     public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
         ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
+        Boolean previousEnabled = readStatus.getNotificationEnabled();
 
         readStatus.updateInfo(command);
 
-        return readStatusMapper.toDto(readStatusRepository.save(readStatus));
+        ReadStatusDto updated = readStatusMapper.toDto(readStatusRepository.save(readStatus));
+        if (!Objects.equals(previousEnabled, readStatus.getNotificationEnabled())) {
+            log.info("채널 알림 설정 변경을 요청했습니다. readStatusId={}, userId={}, channelId={}, previousEnabled={}, newEnabled={}",
+                    readStatusId, readStatus.getUserId(), readStatus.getChannelId(), previousEnabled, readStatus.getNotificationEnabled());
+        }
+        return updated;
     }
 
     public void delete(UUID id) {

@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
+import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.command.notification.NotificationCreateCommand;
 import com.sprint.mission.discodeit.dto.response.NotificationDto;
 import com.sprint.mission.discodeit.entity.Notification;
@@ -9,6 +10,7 @@ import com.sprint.mission.discodeit.repository.NotificationRepository;
 import com.sprint.mission.discodeit.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 public class BasicNotificationService implements NotificationService {
     private final NotificationRepository notificationRepository;
@@ -36,18 +39,23 @@ public class BasicNotificationService implements NotificationService {
                 .toList();
 
         if (createdNotifications.isEmpty()) {
+            log.debug("알림 수신자가 없어 저장을 생략합니다.");
             return;
         }
 
         notificationRepository.saveAll(createdNotifications);
+        log.debug("알림 저장 요청을 처리했습니다. notificationCount={}", createdNotifications.size());
     }
 
     @Override
+    @LogAction(value = "알림 확인 및 삭제", idName = "notificationId", idParamIndex = 0)
     @PreAuthorize("@notificationGuard.isOwner(#notificationId, authentication.principal.userDto.id)")
     public void delete(UUID notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new NotificationNotFoundException(notificationId));
         notificationRepository.delete(notification);
+        log.debug("알림 삭제 요청을 처리했습니다. notificationId={}, receiverId={}",
+                notificationId, notification.getReceiverId());
     }
 
 
@@ -58,9 +66,11 @@ public class BasicNotificationService implements NotificationService {
 
         UUID userId = userDetails.getUserDto().id();
 
-        return notificationRepository.findAllByReceiverId(userId)
+        List<NotificationDto> notifications = notificationRepository.findAllByReceiverId(userId)
                 .stream()
                 .map(notificationMapper::toDto)
                 .toList();
+        log.debug("사용자 알림 목록을 조회했습니다. userId={}, notificationCount={}", userId, notifications.size());
+        return notifications;
     }
 }
