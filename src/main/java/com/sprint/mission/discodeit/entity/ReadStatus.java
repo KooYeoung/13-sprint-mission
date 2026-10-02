@@ -32,14 +32,23 @@ public class ReadStatus extends UpdatableEntity {
     @Column(name = "last_read_at", nullable = false)
     private Instant lastReadAt;
 
+    @Column(name = "notification_enabled", nullable = false)
+    private Boolean notificationEnabled;
+
     public ReadStatus(Channel channel, User user, ReadStatusCreateCommand command) {
+        this(channel, user, command.readAt());
+    }
+
+    public ReadStatus(Channel channel, User user, Instant lastReadAt) {
         this.user = user;
         this.channel = channel;
-        this.lastReadAt = command.readAt();
+        this.lastReadAt = lastReadAt;
+        this.notificationEnabled = channel.isPrivate();
     }
 
     public void updateInfo(ReadStatusUpdateCommand command) {
         this.lastReadAt = command.readAt();
+        this.notificationEnabled = command.newNotificationEnabled();
     }
 
     public UUID getUserId() {

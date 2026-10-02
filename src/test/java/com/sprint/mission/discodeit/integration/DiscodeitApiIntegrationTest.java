@@ -474,7 +474,7 @@ class DiscodeitApiIntegrationTest {
         // when
         // 읽음 상태의 lastReadAt을 실제 API로 수정한다.
         Instant newLastReadAt = Instant.parse("2026-07-28T02:30:30Z");
-        ReadStatusUpdateRequest updateRequest = new ReadStatusUpdateRequest(newLastReadAt);
+        ReadStatusUpdateRequest updateRequest = new ReadStatusUpdateRequest(newLastReadAt, true);
         mockMvc.perform(patch("/api/readStatuses/{readStatusId}", readStatusId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + firstUserAccessToken)
                         .with(csrf())

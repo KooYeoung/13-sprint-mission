@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -34,10 +35,14 @@ public class ReadStatusService {
     public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
         if (userIds == null) throw new UserNotFoundException();
 
-        List<UUID> distinctUserIds = userIds.stream().distinct().toList();
+        List<UUID> distinctUserIds = userIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
         if (distinctUserIds.isEmpty()) throw new UserNotFoundException();
 
-        int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), distinctUserIds, readAt);
+        int insertedRowsCount = readStatusRepository.bulkInsert(channel.getId(), distinctUserIds, readAt, channel.isPrivate());
 
         if (insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
     }
@@ -86,6 +91,7 @@ public class ReadStatusService {
                 .toList();
     }
 
+    @PreAuthorize("@readStatusGuard.isOwner(#readStatusId, authentication.principal.userDto.id)")
     public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
         ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
 
@@ -103,6 +109,13 @@ public class ReadStatusService {
         if (!readStatusRepository.existsByUser_Id(userId)) return;
 
         readStatusRepository.deleteByUser_Id(userId);
+    }
+
+    public List<UUID> findNotificationRecipientIds(UUID channelId, UUID excludedUserId) {
+        return readStatusRepository.findNotificationEnabledByChannelIdExcludingUserId(channelId, excludedUserId)
+                .stream()
+                .map(ReadStatus::getUserId)
+                .toList();
     }
 
     private ReadStatus getReadStatusRequireThrow(UUID id) {

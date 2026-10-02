@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest(showSql = false)
 @Import(value = {QuerydslTestConfig.class, JpaAuditingTestConfig.class, P6SpySqlFormatter.class})
-// burkInsert(...) native query는 PostgreSQL의 gen_random_uuid()를 사용한다.
+// bulkInsert(...) native query는 PostgreSQL의 gen_random_uuid()를 사용한다.
 // @DataJpaTest는 embedded H2로 Repository SQL을 검증하므로,
 // 테스트 DB에서 같은 함수 이름을 호출할 수 있도록 H2 alias를 등록한다.
 // 운영 쿼리를 H2 전용 random_uuid()로 바꾸지 않고도 native insert SQL의 동작을 검증하기 위한 테스트 전용 호환 설정이다.
@@ -532,12 +532,12 @@ class ReadStatusRepositoryTest {
 
     @Test
     @DisplayName("읽음 상태 벌크 생성 성공 - 존재하는 사용자 ID 목록으로 ReadStatus 생성")
-    void burkInsert_insertsReadStatusesForUsers_whenUserIdsExist() {
+    void bulkInsert_insertsReadStatusesForUsers_whenUserIdsExist() {
         // given
-        // 이 테스트의 대상은 ReadStatusRepository.burkInsert(...) native query다.
+        // 이 테스트의 대상은 ReadStatusRepository.bulkInsert(...) native query다.
         // 기존처럼 ReadStatus를 직접 new 해서 save(...)하면 Repository의 벌크 insert SQL을 검증하지 못한다.
         // 따라서 users와 channel만 실제 DB에 저장한 뒤,
-        // readStatusRepository.burkInsert(...)를 직접 호출해 read_statuses row가 생성되는지 확인한다.
+        // readStatusRepository.bulkInsert(...)를 직접 호출해 read_statuses row가 생성되는지 확인한다.
         UserCreateCommand userCreateCommand = userCreateCommand();
         UserCreateCommand otherUserCreateCommand = userCreateCommand(
                 "otherUser",
@@ -566,7 +566,7 @@ class ReadStatusRepositoryTest {
         // 실제 사용자 생성 흐름에서는 User와 함께 존재하는 데이터이므로 실제 row로 구성한다.
 
         // targetChannel은 bulk insert 대상 채널이고, otherChannel은 대조군 채널이다.
-        // burkInsert(...)에 targetChannelId만 전달했으므로 otherChannel에는 ReadStatus가 생성되면 안 된다.
+        // bulkInsert(...)에 targetChannelId만 전달했으므로 otherChannel에는 ReadStatus가 생성되면 안 된다.
         Channel savedTargetChannel = saveChannel(targetChannelCreateCommand);
         Channel savedOtherChannel = saveChannel(otherChannelCreateCommand);
 
@@ -589,15 +589,15 @@ class ReadStatusRepositoryTest {
         assertThat(savedOtherChannelId).isNotEqualTo(savedTargetChannelId);
 
         // bulk insert 실행 전에는 targetChannel과 otherChannel 모두 ReadStatus가 없어야 한다.
-        // 이 사전 검증이 있어야 이후 조회 결과 2건이 burkInsert(...)가 새로 만든 row라는 점이 분명해진다.
+        // 이 사전 검증이 있어야 이후 조회 결과 2건이 bulkInsert(...)가 새로 만든 row라는 점이 분명해진다.
         assertThat(readStatusRepository.findByChannelId(savedTargetChannelId)).isEmpty();
         assertThat(readStatusRepository.findByChannelId(savedOtherChannelId)).isEmpty();
 
         // when
         // targetChannel에 대해 userIdsToInsert에 포함된 기존 사용자 2명의 ReadStatus를 native query로 생성한다.
-        // burkInsert(...)는 insert into ... select ... from users where u.id in (:userIds) 형태이므로,
+        // bulkInsert(...)는 insert into ... select ... from users where u.id in (:userIds) 형태이므로,
         // DB에 실제로 존재하는 사용자 id만 ReadStatus 생성 대상이 된다.
-        int insertedRowsCount = readStatusRepository.burkInsert(savedTargetChannelId, userIdsToInsert, readAt);
+        int insertedRowsCount = readStatusRepository.bulkInsert(savedTargetChannelId, userIdsToInsert, readAt, false);
 
         // @Modifying(flushAutomatically = true)로 insert SQL은 flush되지만,
         // native DML 이후 영속성 컨텍스트에 남은 상태가 조회 검증에 영향을 주지 않도록 비운다.
@@ -623,7 +623,7 @@ class ReadStatusRepositoryTest {
                 .extracting(ReadStatus::getId)
                 .doesNotContainNull();
 
-        // last_read_at은 burkInsert(...)에 전달한 readAt 값으로 저장되어야 한다.
+        // last_read_at은 bulkInsert(...)에 전달한 readAt 값으로 저장되어야 한다.
         // H2의 timestamp(6) 정밀도 때문에 Instant의 나노초 값은 미세하게 달라질 수 있어 오차를 허용한다.
         assertThat(readStatuses)
                 .allSatisfy(readStatus ->
@@ -643,10 +643,10 @@ class ReadStatusRepositoryTest {
 
     @Test
     @DisplayName("읽음 상태 벌크 생성 성공 - 존재하지 않는 사용자 ID는 생성 대상에서 제외")
-    void burkInsert_insertsOnlyExistingUsers_whenSomeUserIdsDoNotExist() {
+    void bulkInsert_insertsOnlyExistingUsers_whenSomeUserIdsDoNotExist() {
         // given
-        // 이 테스트의 대상은 ReadStatusRepository.burkInsert(...) native query의 필터링 조건이다.
-        // burkInsert(...)는 전달받은 userIds를 그대로 insert 값으로 쓰는 방식이 아니라,
+        // 이 테스트의 대상은 ReadStatusRepository.bulkInsert(...) native query의 필터링 조건이다.
+        // bulkInsert(...)는 전달받은 userIds를 그대로 insert 값으로 쓰는 방식이 아니라,
         // users 테이블에서 "실제로 존재하는 사용자"를 select 한 결과만 read_statuses에 insert한다.
         // 따라서 요청 목록 안에 DB에 없는 UUID가 섞여 있어도,
         // 존재하는 사용자에 대해서만 ReadStatus가 생성되어야 한다.
@@ -698,7 +698,7 @@ class ReadStatusRepositoryTest {
 
         // 테스트 fixture가 의도대로 구성됐는지 확인한다.
         // 여기서 id가 null이거나 대조군이 요청 목록에 잘못 포함되면,
-        // 실패 원인이 burkInsert(...)의 필터링인지 given 구성 오류인지 구분하기 어렵다.
+        // 실패 원인이 bulkInsert(...)의 필터링인지 given 구성 오류인지 구분하기 어렵다.
         assertThat(savedUserId).isNotNull();
         assertThat(savedOtherUserId).isNotNull();
         assertThat(savedExcludedUserId).isNotNull();
@@ -713,14 +713,14 @@ class ReadStatusRepositoryTest {
 
         // bulk insert 실행 전에는 어느 채널에도 ReadStatus가 없어야 한다.
         // 이 사전 검증이 있어야 아래에서 조회되는 2건이 테스트 준비 과정에서 생긴 row가 아니라
-        // burkInsert(...)가 새로 생성한 row라는 점을 확인할 수 있다.
+        // bulkInsert(...)가 새로 생성한 row라는 점을 확인할 수 있다.
         assertThat(readStatusRepository.findByChannelId(savedTargetChannelId)).isEmpty();
         assertThat(readStatusRepository.findByChannelId(savedOtherChannelId)).isEmpty();
 
         // when
         // 요청 목록에는 savedUserId, savedOtherUserId, notSavedUserId 세 개가 들어 있다.
         // 하지만 notSavedUserId는 users 테이블에 존재하지 않으므로 실제 insert 대상은 앞의 두 사용자뿐이어야 한다.
-        int insertedRowsCount = readStatusRepository.burkInsert(savedTargetChannelId, userIdsToInsert, readAt);
+        int insertedRowsCount = readStatusRepository.bulkInsert(savedTargetChannelId, userIdsToInsert, readAt, false);
 
         // native DML 이후에는 영속성 컨텍스트를 비워, 아래 검증이 DB에 실제 반영된 row를 기준으로 수행되게 한다.
         em.clear();
@@ -750,7 +750,7 @@ class ReadStatusRepositoryTest {
                 .extracting(ReadStatus::getId)
                 .doesNotContainNull();
 
-        // last_read_at은 burkInsert(...)에 전달한 readAt 값으로 저장되어야 한다.
+        // last_read_at은 bulkInsert(...)에 전달한 readAt 값으로 저장되어야 한다.
         // H2 timestamp 정밀도 차이로 Instant 나노초가 미세하게 달라질 수 있어 작은 오차를 허용한다.
         assertThat(readStatuses)
                 .allSatisfy(readStatus ->
@@ -840,8 +840,8 @@ class ReadStatusRepositoryTest {
         // native bulk insert로 두 채널에 같은 사용자 3명의 ReadStatus를 생성한다.
         // targetChannel 3건, otherChannel 3건을 모두 저장해 둔 뒤 targetChannel만 조회하면,
         // findByChannelId(...)의 channel_id 조건이 정확히 적용되는지 확인할 수 있다.
-        int targetInsertedRowsCount = readStatusRepository.burkInsert(savedTargetChannelId, userIdsToInsert, readAt);
-        int otherInsertedRowsCount = readStatusRepository.burkInsert(savedOtherChannelId, userIdsToInsert, otherChannelReadAt);
+        int targetInsertedRowsCount = readStatusRepository.bulkInsert(savedTargetChannelId, userIdsToInsert, readAt, false);
+        int otherInsertedRowsCount = readStatusRepository.bulkInsert(savedOtherChannelId, userIdsToInsert, otherChannelReadAt, false);
 
         assertThat(targetInsertedRowsCount).isEqualTo(3);
         assertThat(otherInsertedRowsCount).isEqualTo(3);
@@ -967,8 +967,8 @@ class ReadStatusRepositoryTest {
         assertThat(savedChannelWithReadStatusesId).isNotEqualTo(savedEmptyChannelId);
 
         // 대조군 채널에만 ReadStatus를 생성한다.
-        // 이때 burkInsert(...)는 insert into ... select ... 형태라 사용자 2명에 대해 row 2건을 만든다.
-        int insertedRowsCount = readStatusRepository.burkInsert(savedChannelWithReadStatusesId, userIdsToInsert, readAt);
+        // 이때 bulkInsert(...)는 insert into ... select ... 형태라 사용자 2명에 대해 row 2건을 만든다.
+        int insertedRowsCount = readStatusRepository.bulkInsert(savedChannelWithReadStatusesId, userIdsToInsert, readAt, false);
 
         assertThat(insertedRowsCount).isEqualTo(2);
 
@@ -1063,11 +1063,11 @@ class ReadStatusRepositoryTest {
         assertThat(savedExcludedChannelId).isNotIn(channelIdsToFind);
 
         // 포함 채널 2개와 제외 채널 1개에 각각 ReadStatus 2건씩 생성한다.
-        // burkInsert(...)는 채널별로 insert into ... select ... SQL을 한 번 실행하고,
+        // bulkInsert(...)는 채널별로 insert into ... select ... SQL을 한 번 실행하고,
         // users 테이블에서 userIdsToInsert에 해당하는 사용자 2명을 선택해 row 2건을 만든다.
-        int firstIncludedInsertedRowsCount = readStatusRepository.burkInsert(savedFirstIncludedChannelId, userIdsToInsert, readAt);
-        int secondIncludedInsertedRowsCount = readStatusRepository.burkInsert(savedSecondIncludedChannelId, userIdsToInsert, readAt);
-        int excludedInsertedRowsCount = readStatusRepository.burkInsert(savedExcludedChannelId, userIdsToInsert, readAt);
+        int firstIncludedInsertedRowsCount = readStatusRepository.bulkInsert(savedFirstIncludedChannelId, userIdsToInsert, readAt, false);
+        int secondIncludedInsertedRowsCount = readStatusRepository.bulkInsert(savedSecondIncludedChannelId, userIdsToInsert, readAt, false);
+        int excludedInsertedRowsCount = readStatusRepository.bulkInsert(savedExcludedChannelId, userIdsToInsert, readAt, false);
 
         assertThat(firstIncludedInsertedRowsCount).isEqualTo(2);
         assertThat(secondIncludedInsertedRowsCount).isEqualTo(2);
@@ -1172,8 +1172,8 @@ class ReadStatusRepositoryTest {
         assertThat(savedEmptyChannelId).isNotEqualTo(savedTargetChannelId);
 
         // targetChannel에만 ReadStatus 2건을 생성한다.
-        // burkInsert(...)는 insert into ... select ... 형태라 userIdsToInsert에 해당하는 기존 사용자 2명만 insert 대상이 된다.
-        int insertedRowsCount = readStatusRepository.burkInsert(savedTargetChannelId, userIdsToInsert, readAt);
+        // bulkInsert(...)는 insert into ... select ... 형태라 userIdsToInsert에 해당하는 기존 사용자 2명만 insert 대상이 된다.
+        int insertedRowsCount = readStatusRepository.bulkInsert(savedTargetChannelId, userIdsToInsert, readAt, false);
 
         assertThat(insertedRowsCount).isEqualTo(2);
 
@@ -1261,7 +1261,7 @@ class ReadStatusRepositoryTest {
 
         // targetChannel에만 ReadStatus 2건을 생성한다.
         // emptyChannel에는 ReadStatus를 만들지 않아야 existsByChannel_Id(emptyChannelId)가 false가 되는 조건을 만들 수 있다.
-        int insertedRowsCount = readStatusRepository.burkInsert(savedTargetChannelId, userIdsToInsert, readAt);
+        int insertedRowsCount = readStatusRepository.bulkInsert(savedTargetChannelId, userIdsToInsert, readAt, false);
 
         assertThat(insertedRowsCount).isEqualTo(2);
 
@@ -1905,4 +1905,28 @@ class ReadStatusRepositoryTest {
     private PersistenceUnitUtil getPersistenceUnitUtil() {
         return em.getEntityManagerFactory().getPersistenceUnitUtil();
     }
+    @Test
+    void notificationRecipients_excludesSenderDisabledUsersAndOtherChannels() {
+        Channel channel = channelRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.channel(ChannelType.PUBLIC));
+        Channel otherChannel = channelRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.channel(ChannelType.PUBLIC));
+        User sender = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        User receiver = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        User disabled = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        User other = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        Instant now = Instant.now();
+        assertThat(readStatusRepository.bulkInsert(channel.getId(), List.of(sender.getId(), receiver.getId()), now, true)).isEqualTo(2);
+        assertThat(readStatusRepository.bulkInsert(channel.getId(), List.of(disabled.getId()), now, false)).isEqualTo(1);
+        readStatusRepository.bulkInsert(otherChannel.getId(), List.of(other.getId()), now, true);
+        em.flush();
+        em.clear();
+
+        assertThat(readStatusRepository.findNotificationEnabledByChannelIdExcludingUserId(channel.getId(), sender.getId()))
+                .extracting(ReadStatus::getUserId).containsExactly(receiver.getId());
+        assertThat(readStatusRepository.findByUserId(disabled.getId())).singleElement()
+                .satisfies(status -> assertThat(status.getNotificationEnabled()).isFalse());
+        assertThat(readStatusRepository.findByUserId(receiver.getId())).singleElement()
+                .satisfies(status -> assertThat(status.getNotificationEnabled()).isTrue());
+        assertThat(readStatusRepository.findNotificationEnabledByChannelIdExcludingUserId(UUID.randomUUID(), sender.getId())).isEmpty();
+    }
+
 }

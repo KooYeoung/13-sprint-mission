@@ -79,7 +79,8 @@ class ReadStatusControllerTest {
                 updatedAt,
                 userId,
                 channelId,
-                responseLastReadAt
+                responseLastReadAt,
+                false
         );
 
         // Controller 내부에서 request.toCommand()가 새 command 인스턴스를 만들기 때문에
@@ -185,7 +186,8 @@ class ReadStatusControllerTest {
                 firstUpdatedAt,
                 userId,
                 channelId,
-                firstLastReadAt
+                firstLastReadAt,
+                false
         );
 
         // 같은 사용자에게 여러 채널의 읽음 상태가 있을 수 있으므로 두 번째 row를 함께 반환한다.
@@ -200,7 +202,8 @@ class ReadStatusControllerTest {
                 secondUpdatedAt,
                 userId,
                 otherChannelId,
-                secondLastReadAt
+                secondLastReadAt,
+                true
         );
 
         List<ReadStatusDto> readStatuses = List.of(firstReadStatus, secondReadStatus);
@@ -254,7 +257,7 @@ class ReadStatusControllerTest {
         UUID channelId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Instant lastReadAt = Instant.parse("2026-07-28T01:30:30Z");
-        ReadStatusUpdateRequest request = new ReadStatusUpdateRequest(lastReadAt);
+        ReadStatusUpdateRequest request = new ReadStatusUpdateRequest(lastReadAt, true);
 
         // Service가 반환할 수정 결과 DTO를 실제 record로 구성한다.
         // Controller 슬라이스 테스트의 관심사는 수정 로직이 아니라
@@ -268,7 +271,8 @@ class ReadStatusControllerTest {
                 updatedAt,
                 userId,
                 channelId,
-                newLastReadAt
+                newLastReadAt,
+                true
         );
 
         // Controller 내부에서 request.toCommand()가 새 command 인스턴스를 만들기 때문에
@@ -302,6 +306,7 @@ class ReadStatusControllerTest {
         verify(readStatusService).update(readStatusIdArgumentCaptor.capture(), readStatusUpdateCommandArgumentCaptor.capture());
         assertThat(readStatusIdArgumentCaptor.getValue()).isEqualTo(readStatusId);
         assertThat(readStatusUpdateCommandArgumentCaptor.getValue().readAt()).isEqualTo(lastReadAt);
+        assertThat(readStatusUpdateCommandArgumentCaptor.getValue().newNotificationEnabled()).isTrue();
     }
 
 }
