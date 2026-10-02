@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.dto.request.user.UserRoleUpdateRequest;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.repository.NotificationRepository;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.security.JwtAuthenticationFilter;
 import com.sprint.mission.discodeit.security.JwtInformation;
@@ -92,6 +93,9 @@ class JwtAuthenticationIntegrationTest {
     UserRepository userRepository;
 
     @Autowired
+    NotificationRepository notificationRepository;
+
+    @Autowired
     PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -128,6 +132,7 @@ class JwtAuthenticationIntegrationTest {
     void deleteCreatedUsers() {
         createdUserIds.forEach(jwtRegistry::invalidateJwtInformationByUserId);
         // 실제 HTTP 요청은 별도 트랜잭션이므로 테스트 롤백 대신 생성한 사용자만 정리한다.
+        createdUserIds.forEach(id -> notificationRepository.deleteAll(notificationRepository.findAllByReceiverId(id)));
         userRepository.deleteAllById(createdUserIds);
     }
 

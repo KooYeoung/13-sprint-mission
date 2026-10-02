@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -28,5 +29,12 @@ public class UserReader {
     public User getByUsername(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(UserLoginFailedException::new);
+    }
+
+    public User getReferenceUser(UUID userId) {
+        if (!isUserExist(userId)) {
+            throw new UserNotFoundException(userId);
+        }
+        return userRepository.getReferenceById(userId);
     }
 }

@@ -28,9 +28,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.sprint.mission.discodeit.events.MessageCreatedEvent;
+import com.sprint.mission.discodeit.entity.ChannelType;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
@@ -55,6 +58,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MessageServiceTest {
+
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     BasicMessageService messageService;
@@ -1274,6 +1280,26 @@ class MessageServiceTest {
 
     private SliceImpl<Message> createMessageSlice(List<Message> messages, Pageable pageable, boolean hasNext) {
         return new SliceImpl<>(messages, pageable, hasNext);
+    }
+
+    @Test
+    void save_publishesChannelAuthorAndSavedContent() {
+        User author = com.sprint.mission.discodeit.support.NotificationTestFixtures.identified(
+                com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        Channel channel = com.sprint.mission.discodeit.support.NotificationTestFixtures.identified(
+                com.sprint.mission.discodeit.support.NotificationTestFixtures.channel(ChannelType.PUBLIC));
+        MessageCreateCommand command = new MessageCreateCommand("event content", author.getId(), channel.getId());
+        given(channelReader.getChannel(channel.getId())).willReturn(channel);
+        given(userReader.getUser(author.getId())).willReturn(author);
+        given(messageRepository.save(any(Message.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(messageFileService.save(any(Message.class), eq(List.of()))).willReturn(List.of());
+
+        messageService.save(command, List.of());
+
+        ArgumentCaptor<MessageCreatedEvent> event = ArgumentCaptor.forClass(MessageCreatedEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue()).isEqualTo(new MessageCreatedEvent(channel.getId(), author.getId(),
+                channel.getName(), author.getUsername(), command.content()));
     }
 
 }

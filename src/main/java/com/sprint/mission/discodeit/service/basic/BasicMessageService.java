@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.events.MessageCreatedEvent;
 import com.sprint.mission.discodeit.exception.message.MessageNotFoundException;
 import com.sprint.mission.discodeit.mapper.MessageMapper;
 import com.sprint.mission.discodeit.mapper.PageResponseMapper;
@@ -17,6 +18,7 @@ import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,6 +41,7 @@ public class BasicMessageService implements MessageService {
     private final ChannelReader channelReader;
     private final MessageMapper messageMapper;
     private final PageResponseMapper<MessageDto> messageDtoPageResponseMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @LogAction(value = "메시지 생성")
     @Override
@@ -56,6 +59,8 @@ public class BasicMessageService implements MessageService {
 
         Message savedMessage = messageRepository.save(new Message(author, channel, command));
         List<MessageFile> savedMessageFiles = messageFileService.save(savedMessage, files);
+
+        eventPublisher.publishEvent(getMessageCreatedEvent(channel, author, savedMessage));
 
         return messageMapper.toDto(savedMessage, savedMessageFiles);
     }
@@ -173,5 +178,16 @@ public class BasicMessageService implements MessageService {
 
         return messageRepository.findAllByCondition(condition);
     }
+
+    private MessageCreatedEvent getMessageCreatedEvent(Channel channel, User author, Message savedMessage) {
+        return MessageCreatedEvent.of(
+                channel.getId(),
+                author.getId(),
+                channel.getName(),
+                author.getUsername(),
+                savedMessage.getContent()
+        );
+    }
+
 
 }

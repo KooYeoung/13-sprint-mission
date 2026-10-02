@@ -61,6 +61,7 @@ class BinaryContentUploadApiIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired JwtRegistry jwtRegistry;
     @Autowired UserRepository userRepository;
+    @Autowired NotificationRepository notificationRepository;
     @Autowired ChannelRepository channelRepository;
     @Autowired MessageRepository messageRepository;
     @Autowired MessageFileRepository messageFileRepository;
@@ -88,6 +89,7 @@ class BinaryContentUploadApiIntegrationTest {
                 createdChannelIds.forEach(readStatusRepository::deleteByChannel_Id);
                 createdUserIds.forEach(readStatusRepository::deleteByUser_Id);
                 channelRepository.deleteAllById(createdChannelIds);
+                createdUserIds.forEach(id -> notificationRepository.deleteAll(notificationRepository.findAllByReceiverId(id)));
                 userRepository.deleteAllById(createdUserIds);
                 binaryContentRepository.deleteAllById(createdBinaryContentIds);
             });
