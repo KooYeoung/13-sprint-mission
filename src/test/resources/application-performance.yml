@@ -1,0 +1,52 @@
+server:
+  address: 127.0.0.1
+  port: 18080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:k6-performance;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        show_sql: false
+  servlet:
+    multipart:
+      file-size-threshold: 0B
+decorator:
+  datasource:
+    enabled: false
+logging:
+  level:
+    root: warn
+    com.sprint.mission.discodeit: warn
+    org.springframework.security: warn
+    org.hibernate.SQL: off
+    org.hibernate.orm.jdbc.batch: off
+    org.hibernate.orm.jdbc.bind: off
+    p6spy: off
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  observations:
+    annotations:
+      enabled: true
+discodeit:
+  storage:
+    type: local
+    local:
+      root-path: build/k6-uploads/${random.uuid}
+      simulated-upload-delay: 3s
+  async:
+    notification:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 32
+      keep-alive: 60s
+    file-upload:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 4
+      keep-alive: 60s
