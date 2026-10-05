@@ -10,14 +10,19 @@ public record NotificationCreateCommand(
         String title,
         String content
 ) {
+    public NotificationCreateCommand {
+        title = truncateNotificationText(title);
+        content = truncateNotificationText(content);
+    }
+
     public NotificationCreateCommand(UUID receiverId, NotificationContent notificationContent) {
         this(List.of(receiverId), notificationContent);
     }
 
     public NotificationCreateCommand(List<UUID> receiverIds, NotificationContent notificationContent) {
         this(receiverIds,
-                truncateNotificationText(notificationContent.title()),
-                truncateNotificationText(notificationContent.content()));
+                notificationContent.title(),
+                notificationContent.content());
     }
 
     private static String truncateNotificationText(String value) {

@@ -20,7 +20,8 @@ class NotificationCreateCommandTest {
 
         for (NotificationCreateCommand command : List.of(
                 new NotificationCreateCommand(receiver, content),
-                new NotificationCreateCommand(List.of(receiver), content))) {
+                new NotificationCreateCommand(List.of(receiver), content),
+                new NotificationCreateCommand(List.of(receiver), source, source))) {
             assertThat(command.receiverIds()).containsExactly(receiver);
             assertThat(command.title()).isEqualTo(expected);
             assertThat(command.content()).isEqualTo(expected);
