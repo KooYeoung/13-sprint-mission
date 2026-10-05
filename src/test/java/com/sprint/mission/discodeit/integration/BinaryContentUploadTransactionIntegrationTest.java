@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sprint.mission.discodeit.support.AsyncTestSupport.awaitIdle;
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,6 +51,7 @@ class BinaryContentUploadTransactionIntegrationTest {
     @Autowired BinaryContentRepository repository;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoBean BinaryContentStorage storage;
+    @Autowired ThreadPoolTaskExecutor fileUploadExecutor;
 
     private TransactionTemplate transaction;
     private final List<UUID> createdIds = new ArrayList<>();
@@ -59,6 +63,7 @@ class BinaryContentUploadTransactionIntegrationTest {
 
     @AfterEach
     void deleteCommittedMetadata() {
+        awaitIdle(fileUploadExecutor);
         transaction.executeWithoutResult(status -> repository.deleteAllById(createdIds));
     }
 
@@ -87,6 +92,7 @@ class BinaryContentUploadTransactionIntegrationTest {
             return content.getId();
         });
 
+        await().untilAsserted(() -> assertThat(reload(id).getStatus()).isEqualTo(BinaryContentStatus.SUCCESS));
         verify(storage).put(eq(id), any(BinaryContentUpload.class));
         BinaryContent saved = reload(id);
         assertThat(saved.getStatus()).isEqualTo(BinaryContentStatus.SUCCESS);
@@ -105,8 +111,8 @@ class BinaryContentUploadTransactionIntegrationTest {
         // AFTER_COMMIT 후처리 예외는 이미 완료된 메타데이터 커밋을 되돌리지 않는다.
         UUID id = transaction.execute(status -> createFile().getId());
 
+        await().untilAsserted(() -> assertThat(reload(id).getStatus()).isEqualTo(BinaryContentStatus.FAIL));
         verify(storage).put(eq(id), any(BinaryContentUpload.class));
-        assertThat(reload(id).getStatus()).isEqualTo(BinaryContentStatus.FAIL);
     }
 
     @Test

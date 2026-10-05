@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -37,6 +38,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.sprint.mission.discodeit.support.AsyncTestSupport.awaitIdle;
+import static org.awaitility.Awaitility.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -68,6 +71,8 @@ class BinaryContentUploadApiIntegrationTest {
     @Autowired BinaryContentRepository binaryContentRepository;
     @Autowired ReadStatusRepository readStatusRepository;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired ThreadPoolTaskExecutor fileUploadExecutor;
+    @Autowired ThreadPoolTaskExecutor notificationExecutor;
 
     private TransactionTemplate transaction;
     private final List<UUID> createdUserIds = new ArrayList<>();
@@ -82,6 +87,7 @@ class BinaryContentUploadApiIntegrationTest {
 
     @AfterEach
     void cleanCommittedFixtures() throws Exception {
+        awaitIdle(fileUploadExecutor, notificationExecutor);
         try {
             transaction.executeWithoutResult(status -> {
                 createdMessageIds.forEach(messageFileRepository::deleteByMessage_Id);
@@ -224,6 +230,7 @@ class BinaryContentUploadApiIntegrationTest {
         UUID attachmentId = uuidAt(messageCreateBody, "/attachments/0/id");
         createdMessageIds.add(messageId);
         createdBinaryContentIds.add(attachmentId);
+        awaitUpload(attachmentId);
 
         // 실제 DB에 Message, MessageFile, BinaryContent가 저장됐는지 확인한다.
         transaction.executeWithoutResult(status -> {
@@ -294,6 +301,7 @@ class BinaryContentUploadApiIntegrationTest {
     }
 
     private void assertUploadedAndDownloadable(UUID id, MockMultipartFile file, String token) throws Exception {
+        awaitUpload(id);
         assertThat(binaryContentRepository.findById(id).orElseThrow().getStatus())
                 .isEqualTo(BinaryContentStatus.SUCCESS);
         assertThat(Files.readAllBytes(uploadRoot.resolve(id.toString()))).containsExactly(file.getBytes());
@@ -315,6 +323,11 @@ class BinaryContentUploadApiIntegrationTest {
         String token = readBody(result).path("accessToken").asText();
         assertThat(token).isNotBlank();
         return token;
+    }
+
+    private void awaitUpload(UUID id) {
+        await().untilAsserted(() ->
+                assertThat(binaryContentRepository.findById(id).orElseThrow().getStatus()).isEqualTo(BinaryContentStatus.SUCCESS));
     }
 
     private MockMultipartFile jsonPart(String name, Object value) throws Exception {

@@ -98,6 +98,7 @@ discodeit:
     # 파일 저장 방식과 경로를 환경변수로 설정
     type: ${STORAGE_TYPE:local}
     local:
+      simulated-upload-delay: 0ms
       root-path: ${STORAGE_LOCAL_ROOT_PATH:.discodeit/storage}
     s3:
       region: ${AWS_S3_REGION}

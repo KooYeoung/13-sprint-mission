@@ -34,10 +34,12 @@ import java.util.UUID;
 public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     private final Path root;
+    private final long simulatedUploadDelayMillis;
     private final StorageTransactionManager transactionManager;
 
     public LocalBinaryContentStorage(LocalProperties local, StorageTransactionManager transactionManager) {
         this.root = Paths.get(local.rootPath());
+        this.simulatedUploadDelayMillis = local.simulatedUploadDelay().toMillis();
         this.transactionManager = transactionManager;
     }
 
@@ -52,15 +54,11 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
 
     @Override
     public UUID put(UUID fileId, BinaryContentUpload upload) {
-
         Path savePath = resolvePath(fileId);
         boolean fileCreated = false;
-        try {
-
-            try (
-                    OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-                    InputStream is = upload.inputStream()
-            ) {
+        try (InputStream is = upload.inputStream()) {
+            if (simulatedUploadDelayMillis > 0) Thread.sleep(simulatedUploadDelayMillis);
+            try (OutputStream os = Files.newOutputStream(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
                 fileCreated = true;
                 is.transferTo(os);
             }
@@ -71,7 +69,10 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
             );
 
             return fileId;
-        } catch (IOException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FileSaveFailedException(fileId, "업로드 비교용 지연 중 작업이 중단되었습니다.", e);
+        } catch (IOException | RuntimeException e) {
             if (fileCreated) {
                 try {
                     Files.deleteIfExists(savePath);
