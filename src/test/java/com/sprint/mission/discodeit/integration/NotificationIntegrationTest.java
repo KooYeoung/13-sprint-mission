@@ -16,6 +16,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sprint.mission.discodeit.support.AsyncTestSupport.awaitIdle;
+import static org.awaitility.Awaitility.await;
 import static com.sprint.mission.discodeit.support.NotificationTestFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -59,6 +62,7 @@ class NotificationIntegrationTest {
     @Autowired JwtTokenProvider tokens;
     @Autowired JwtRegistry jwtRegistry;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired ThreadPoolTaskExecutor notificationExecutor;
 
     private TransactionTemplate transaction;
     private User sender;
@@ -87,6 +91,7 @@ class NotificationIntegrationTest {
 
     @AfterEach
     void cleanCommittedData() {
+        awaitIdle(notificationExecutor);
         SecurityContextHolder.clearContext();
         List<UUID> userIds = List.of(sender.getId(), receiver.getId(), disabled.getId(), outsider.getId());
         userIds.forEach(jwtRegistry::invalidateJwtInformationByUserId);
@@ -111,6 +116,7 @@ class NotificationIntegrationTest {
         });
 
         // 새 트랜잭션에서 재조회하므로 커밋 후 별도 저장까지 검증한다.
+        if (!rollback) await().untilAsserted(() -> assertThat(notifications.count()).isEqualTo(1));
         transaction.executeWithoutResult(status -> {
             assertThat(messages.existsById(messageId)).isEqualTo(!rollback);
             if (rollback) {
@@ -133,6 +139,7 @@ class NotificationIntegrationTest {
             assertThat(notifications.count()).isZero();
             if (rollback) status.setRollbackOnly();
         });
+        if (!rollback) await().untilAsserted(() -> assertThat(notifications.count()).isEqualTo(1));
         transaction.executeWithoutResult(status -> {
             assertThat(users.findById(receiver.getId()).orElseThrow().getRole())
                     .isEqualTo(rollback ? Role.USER : Role.CHANNEL_MANAGER);

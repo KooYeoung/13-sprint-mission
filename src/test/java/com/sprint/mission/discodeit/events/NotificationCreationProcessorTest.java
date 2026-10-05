@@ -18,10 +18,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class NotificationCreationEventListenerTest {
+class NotificationCreationProcessorTest {
     @Mock ReadStatusService readStatusService;
     @Mock NotificationService notificationService;
-    @InjectMocks NotificationCreationEventListener listener;
+    @InjectMocks NotificationCreationProcessor listener;
 
     @Test
     void message_createsNotificationsForRecipientsReturnedByReadStatusService() {
