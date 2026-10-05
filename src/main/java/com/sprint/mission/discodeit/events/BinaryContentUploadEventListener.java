@@ -22,23 +22,23 @@ public class BinaryContentUploadEventListener {
             processor.upload(event);
         } catch (TaskRejectedException rejection) {
             log.error("실행기가 업로드 작업을 거부했습니다. binaryContentId={}", event.binaryContentId(), rejection);
-            closeStream(event);
+            deleteTemporaryUpload(event);
             processor.recordFailure(event.binaryContentId(), rejection);
         }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
-    public void closeUploadStreamAfterRollback(BinaryContentCreatedEvent event) {
-        closeStream(event);
+    public void deleteTemporaryUploadAfterRollback(BinaryContentCreatedEvent event) {
+        deleteTemporaryUpload(event);
     }
 
-    private void closeStream(BinaryContentCreatedEvent event) {
+    private void deleteTemporaryUpload(BinaryContentCreatedEvent event) {
         try {
-            event.contentUpload().inputStream().close();
-            log.debug("실행하지 않는 업로드 스트림을 닫았습니다. binaryContentId={}", event.binaryContentId());
+            event.contentUpload().close();
+            log.debug("실행하지 않는 업로드의 임시 파일을 삭제했습니다. binaryContentId={}", event.binaryContentId());
         } catch (IOException | RuntimeException e) {
             log.warn(
-                    "실행하지 않는 업로드 스트림 정리에 실패했습니다. binaryContentId={}",
+                    "실행하지 않는 업로드의 임시 파일 삭제에 실패했습니다. binaryContentId={}",
                     event.binaryContentId(),
                     e
             );

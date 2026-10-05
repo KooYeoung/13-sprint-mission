@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.entity.BinaryContentStatus;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.events.MessageCreatedEvent;
+import com.sprint.mission.discodeit.events.BinaryContentCreatedEvent;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
@@ -23,6 +24,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -50,6 +53,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
         "discodeit.async.notification.queue-capacity=0"
 })
 @ActiveProfiles("test")
+@RecordApplicationEvents
 @ExtendWith(OutputCaptureExtension.class)
 class AsyncEventExecutionIntegrationTest {
     @Autowired BinaryContentService service;
@@ -58,6 +62,7 @@ class AsyncEventExecutionIntegrationTest {
     @Autowired ThreadPoolTaskExecutor notificationExecutor;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ApplicationEventPublisher events;
+    @Autowired ApplicationEvents recordedEvents;
     @Autowired UserRepository users;
     @Autowired UserRoleManager roles;
     @MockitoBean BinaryContentStorage storage;
@@ -72,7 +77,7 @@ class AsyncEventExecutionIntegrationTest {
     }
 
     @Test
-    void rejectedUploadClosesStreamAndCommitsFailWhileRollbackClosesSynchronously() throws Exception {
+    void rejectedUploadCommitsFailAndDeletesTemporaryFilesIncludingRollback() throws Exception {
         var release = occupy(fileUploadExecutor);
         try {
             var stream = new TrackingStream();
@@ -88,6 +93,9 @@ class AsyncEventExecutionIntegrationTest {
             });
             assertThat(repository.findById(rolledBack)).isEmpty();
             assertThat(rollbackStream.closed).isTrue();
+            assertThat(recordedEvents.stream(BinaryContentCreatedEvent.class).toList())
+                    .hasSize(2)
+                    .allSatisfy(event -> assertThat(event.contentUpload().temporaryFile()).doesNotExist());
             verifyNoInteractions(storage);
         } finally { release.countDown(); }
     }
@@ -103,6 +111,9 @@ class AsyncEventExecutionIntegrationTest {
         UUID id = service.create(file(stream)).orElseThrow().getId();
         await().untilAsserted(() -> assertThat(repository.findById(id).orElseThrow().getStatus()).isEqualTo(BinaryContentStatus.FAIL));
         assertThat(stream.closed).isTrue();
+        awaitIdle(fileUploadExecutor);
+        assertThat(recordedEvents.stream(BinaryContentCreatedEvent.class).findFirst().orElseThrow()
+                .contentUpload().temporaryFile()).doesNotExist();
     }
 
     @Test

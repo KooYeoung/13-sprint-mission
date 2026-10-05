@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,7 +46,17 @@ public class BinaryContentService {
                 file.getSize()
         ));
 
-        eventPublisher.publishEvent(new BinaryContentCreatedEvent(binaryContent.getId(), BinaryContentUpload.from(file)));
+        BinaryContentUpload upload = BinaryContentUpload.from(file);
+        try {
+            eventPublisher.publishEvent(new BinaryContentCreatedEvent(binaryContent.getId(), upload));
+        } catch (RuntimeException failure) {
+            try {
+                upload.close();
+            } catch (IOException | RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
 
         log.debug("바이너리 파일 생성 이벤트를 발행했습니다. 커밋 후 업로드를 실행합니다. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);

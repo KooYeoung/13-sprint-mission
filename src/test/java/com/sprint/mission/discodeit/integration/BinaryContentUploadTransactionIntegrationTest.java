@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.integration;
 
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.BinaryContentStatus;
+import com.sprint.mission.discodeit.events.BinaryContentCreatedEvent;
 import com.sprint.mission.discodeit.exception.storage.FileSaveFailedException;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStatusUpdater;
@@ -17,6 +18,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -24,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +48,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
         "discodeit.storage.type=local"
 })
 @ActiveProfiles("test")
+@RecordApplicationEvents
 @DisplayName("바이너리 파일 업로드 트랜잭션 통합 테스트")
 class BinaryContentUploadTransactionIntegrationTest {
     @Autowired BinaryContentService service;
@@ -52,6 +57,7 @@ class BinaryContentUploadTransactionIntegrationTest {
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoBean BinaryContentStorage storage;
     @Autowired ThreadPoolTaskExecutor fileUploadExecutor;
+    @Autowired ApplicationEvents events;
 
     private TransactionTemplate transaction;
     private final List<UUID> createdIds = new ArrayList<>();
@@ -116,8 +122,8 @@ class BinaryContentUploadTransactionIntegrationTest {
     }
 
     @Test
-    @DisplayName("메인 트랜잭션을 롤백하면 메타데이터와 업로드 없이 스트림만 정리한다")
-    void create_closesStreamWithoutUploadingAfterRollback() {
+    @DisplayName("메인 트랜잭션을 롤백하면 업로드 없이 임시 파일을 삭제한다")
+    void create_deletesTemporaryFileWithoutUploadingAfterRollback() {
         TrackingInputStream stream = new TrackingInputStream();
         MockMultipartFile file = new MockMultipartFile("file", "file.txt", "text/plain", new byte[]{1}) {
             @Override
@@ -126,16 +132,21 @@ class BinaryContentUploadTransactionIntegrationTest {
             }
         };
         AtomicReference<UUID> id = new AtomicReference<>();
+        AtomicReference<Path> temporaryFile = new AtomicReference<>();
 
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             id.set(service.create(file).orElseThrow().getId());
             createdIds.add(id.get());
-            assertThat(stream.closed).isFalse();
+            temporaryFile.set(events.stream(BinaryContentCreatedEvent.class).findFirst().orElseThrow()
+                    .contentUpload().temporaryFile());
+            assertThat(temporaryFile.get()).exists();
+            assertThat(stream.closed).isTrue();
             throw new IllegalStateException("메인 작업 실패");
         })).isInstanceOf(IllegalStateException.class).hasMessage("메인 작업 실패");
 
         assertThat(repository.findById(id.get())).isEmpty();
         assertThat(stream.closed).isTrue();
+        assertThat(temporaryFile.get()).doesNotExist();
         verifyNoInteractions(storage);
     }
 

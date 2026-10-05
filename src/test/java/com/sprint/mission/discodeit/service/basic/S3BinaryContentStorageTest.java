@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +32,8 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
@@ -47,6 +50,7 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class S3BinaryContentStorageTest {
+    @TempDir Path temporaryDirectory;
 
     private static final String BUCKET = "discodeit-test-bucket";
     private static final String REGION = "ap-northeast-2";
@@ -80,7 +84,7 @@ class S3BinaryContentStorageTest {
         UUID fileId = UUID.randomUUID();
         byte[] bytes = "upload-content".getBytes();
         BinaryContentUpload upload = new BinaryContentUpload(
-                new ByteArrayInputStream(bytes),
+                Files.write(temporaryDirectory.resolve("upload"), bytes),
                 "text/plain",
                 bytes.length
         );

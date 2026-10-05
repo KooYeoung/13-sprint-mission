@@ -7,6 +7,7 @@ import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
+import com.sprint.mission.discodeit.storage.BinaryContentUpload;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("바이너리 파일 생성 서비스 단위 테스트")
@@ -66,7 +69,7 @@ class BinaryContentServiceTest {
         assertThat(event.binaryContentId()).isEqualTo(id);
         assertThat(event.contentUpload().contentType()).isEqualTo("text/plain");
         assertThat(event.contentUpload().contentLength()).isEqualTo(file.getSize());
-        try (InputStream stream = event.contentUpload().inputStream()) {
+        try (BinaryContentUpload upload = event.contentUpload(); InputStream stream = upload.inputStream()) {
             assertThat(stream.readAllBytes()).containsExactly(file.getBytes());
         }
         verifyNoInteractions(storage);
@@ -79,6 +82,24 @@ class BinaryContentServiceTest {
         assertThat(service.create(new MockMultipartFile("file", new byte[0]))).isEmpty();
 
         verifyNoInteractions(repository, eventPublisher, storage);
+    }
+
+    @Test
+    void create_deletesTemporaryFileWhenEventPublicationFails() {
+        var failure = new IllegalStateException("이벤트 발행 실패");
+        var capturedUpload = new AtomicReference<BinaryContentUpload>();
+        given(repository.save(any(BinaryContent.class))).willAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            BinaryContentCreatedEvent event = invocation.getArgument(0);
+            capturedUpload.set(event.contentUpload());
+            assertThat(event.contentUpload().temporaryFile()).exists();
+            throw failure;
+        }).when(eventPublisher).publishEvent(any(BinaryContentCreatedEvent.class));
+
+        assertThatThrownBy(() -> service.create(new MockMultipartFile("file", new byte[]{1})))
+                .isSameAs(failure);
+        assertThat(capturedUpload.get().temporaryFile()).doesNotExist();
+        verifyNoInteractions(storage);
     }
 
     @Test

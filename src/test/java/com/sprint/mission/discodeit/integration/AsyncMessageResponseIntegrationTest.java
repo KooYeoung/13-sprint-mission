@@ -68,13 +68,16 @@ class AsyncMessageResponseIntegrationTest {
         var release = new CountDownLatch(1);
         var requestId = new AtomicReference<String>();
         var bytes = new AtomicReference<byte[]>();
+        var uploadedFile = new AtomicReference<BinaryContentUpload>();
         given(storage.put(any(), any())).willAnswer(invocation -> {
             assertThat(Thread.currentThread().getName()).startsWith("file-upload");
             assertThat(SecurityContextHolder.getContext().getAuthentication().getName()).isEqualTo("http-author");
             requestId.set(MDC.get("requestId"));
+            uploadedFile.set(invocation.getArgument(1));
             started.countDown();
+            // HTTP 응답과 요청 자원 정리가 끝난 뒤에도 새 스트림을 열 수 있어야 한다.
+            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
             try (var stream = invocation.<BinaryContentUpload>getArgument(1).inputStream()) {
-                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
                 bytes.set(stream.readAllBytes());
             }
             return invocation.getArgument(0);
@@ -88,9 +91,12 @@ class AsyncMessageResponseIntegrationTest {
             assertThat(response.headers().firstValue("Discodeit-Request-ID")).contains(requestId.get());
             UUID fileId = UUID.fromString(mapper.readTree(response.body()).path("attachments").get(0).path("id").asText());
             assertThat(binaries.findById(fileId).orElseThrow().getStatus()).isEqualTo(BinaryContentStatus.PROCESSING);
+            assertThat(uploadedFile.get().temporaryFile()).exists();
             release.countDown();
             await().untilAsserted(() -> assertThat(binaries.findById(fileId).orElseThrow().getStatus()).isEqualTo(BinaryContentStatus.SUCCESS));
             assertThat(bytes.get()).isEqualTo("body".getBytes(StandardCharsets.UTF_8));
+            awaitIdle(fileUploadExecutor);
+            assertThat(uploadedFile.get().temporaryFile()).doesNotExist();
         } finally {
             release.countDown();
             sender.shutdownNow();

@@ -6,7 +6,6 @@ import com.sprint.mission.discodeit.storage.type.LocalProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,34 +19,36 @@ class LocalBinaryContentStorageTest {
     @TempDir Path root;
 
     @Test
-    void interruptedDelayClosesStreamAndPreservesInterrupt() {
+    void interruptedDelayPreservesInterruptWithoutWritingDestination() throws IOException {
         var storage = storage(Duration.ofSeconds(3));
-        var stream = new TrackingStream();
+        var upload = upload();
+        UUID id = UUID.randomUUID();
         try {
             Thread.currentThread().interrupt();
-            assertThatThrownBy(() -> storage.put(UUID.randomUUID(), upload(stream)))
+            assertThatThrownBy(() -> storage.put(id, upload))
                     .isInstanceOf(FileSaveFailedException.class).hasCauseInstanceOf(InterruptedException.class);
-            assertThat(stream.closed).isTrue();
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(root.resolve(id.toString())).doesNotExist();
+            assertThat(upload.temporaryFile()).exists();
         } finally { Thread.interrupted(); }
     }
 
     @Test
-    void failureOpeningDestinationClosesInputAndPreservesExistingFile() throws Exception {
+    void failureOpeningDestinationPreservesExistingFile() throws Exception {
         UUID id = UUID.randomUUID();
         Files.write(root.resolve(id.toString()), new byte[]{9});
-        var stream = new TrackingStream();
-        assertThatThrownBy(() -> storage(Duration.ZERO).put(id, upload(stream))).isInstanceOf(FileSaveFailedException.class);
-        assertThat(stream.closed).isTrue();
+        var upload = upload();
+        assertThatThrownBy(() -> storage(Duration.ZERO).put(id, upload)).isInstanceOf(FileSaveFailedException.class);
+        assertThat(upload.temporaryFile()).exists();
         assertThat(Files.readAllBytes(root.resolve(id.toString()))).containsExactly((byte) 9);
     }
 
     @Test
-    void successfulUploadClosesStreamAndPersistsBytes() throws Exception {
+    void successfulUploadPersistsBytesAndLeavesTemporaryFileForCallerCleanup() throws Exception {
         UUID id = UUID.randomUUID();
-        var stream = new TrackingStream();
-        storage(Duration.ZERO).put(id, upload(stream));
-        assertThat(stream.closed).isTrue();
+        var upload = upload();
+        storage(Duration.ZERO).put(id, upload);
+        assertThat(upload.temporaryFile()).exists();
         assertThat(Files.readAllBytes(root.resolve(id.toString()))).containsExactly(1, 2, 3);
     }
 
@@ -55,11 +56,8 @@ class LocalBinaryContentStorageTest {
         return new LocalBinaryContentStorage(new LocalProperties(root.toString(), delay), mock(StorageTransactionManager.class));
     }
 
-    private BinaryContentUpload upload(TrackingStream stream) { return new BinaryContentUpload(stream, "text/plain", 3); }
-
-    private static class TrackingStream extends ByteArrayInputStream {
-        boolean closed;
-        TrackingStream() { super(new byte[]{1, 2, 3}); }
-        @Override public void close() throws IOException { closed = true; super.close(); }
+    private BinaryContentUpload upload() throws IOException {
+        Path file = Files.write(root.resolve("source"), new byte[]{1, 2, 3});
+        return new BinaryContentUpload(file, "text/plain", 3);
     }
 }
