@@ -40,6 +40,21 @@ class UserRepositoryTest {
     EntityManager em;
 
     @Test
+    @DisplayName("역할에 해당하는 사용자 ID만 조회한다")
+    void findUserIdsByRole_excludesOtherRolesAndReturnsEmptyWhenNoMatch() {
+        assertThat(userRepository.findUserIdsByRole(Role.ADMIN)).isEmpty();
+        User admin = new User(new UserCreateCommand("admin", "password", "admin@roles.test"), null);
+        admin.updateRole(new UserRoleUpdateCommand(Role.ADMIN));
+        User manager = new User(new UserCreateCommand("manager", "password", "manager@roles.test"), null);
+        manager.updateRole(new UserRoleUpdateCommand(Role.CHANNEL_MANAGER));
+        User user = new User(new UserCreateCommand("user", "password", "user@roles.test"), null);
+        userRepository.saveAllAndFlush(List.of(admin, manager, user));
+        em.clear();
+
+        assertThat(userRepository.findUserIdsByRole(Role.ADMIN)).containsExactly(admin.getId());
+    }
+
+    @Test
     @DisplayName("사용자명 존재 여부 조회 성공 - 존재하는 사용자명이면 true 반환")
     void existsByUsername_returnsTrue_whenUsernameExists() {
         // given

@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -16,6 +17,10 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class UserReader {
     private final UserRepository userRepository;
+
+    public List<UUID> findUserIdsByRole(Role role) {
+        return userRepository.findUserIdsByRole(role);
+    }
 
     public boolean isUserExist(UUID userId) {
         return userRepository.existsById(userId);

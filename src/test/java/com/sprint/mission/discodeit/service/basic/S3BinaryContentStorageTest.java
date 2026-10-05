@@ -3,6 +3,9 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
 import com.sprint.mission.discodeit.service.TransactionalStorageAction;
+import com.sprint.mission.discodeit.service.NotificationService;
+import com.sprint.mission.discodeit.entity.Role;
+import com.sprint.mission.discodeit.exception.storage.FileSaveFailedException;
 import com.sprint.mission.discodeit.storage.BinaryContentUpload;
 import com.sprint.mission.discodeit.storage.DownloadResult;
 import com.sprint.mission.discodeit.storage.RedirectDownloadResult;
@@ -32,6 +35,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -47,10 +51,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class S3BinaryContentStorageTest {
     @TempDir Path temporaryDirectory;
+    @Mock UserReader userReader;
+    @Mock NotificationService notificationService;
 
     private static final String BUCKET = "discodeit-test-bucket";
     private static final String REGION = "ap-northeast-2";
@@ -75,7 +83,7 @@ class S3BinaryContentStorageTest {
                 "http://localhost:9090",
                 PRESIGNED_URL_EXPIRATION
         );
-        storage = new S3BinaryContentStorage(s3Client, s3Presigner, props, transactionManager);
+        storage = new S3BinaryContentStorage(s3Client, s3Presigner, props, transactionManager, userReader, notificationService);
     }
 
     @Test
@@ -107,6 +115,30 @@ class S3BinaryContentStorageTest {
 
         actionCaptor.getValue().execute();
         verify(s3Client).deleteObject(anyDeleteObjectRequestConsumer());
+    }
+
+    @Test
+    void recoveryPreservesOriginalFailureWhenNotificationFails() {
+        UUID id = UUID.randomUUID();
+        var upload = new BinaryContentUpload(temporaryDirectory.resolve("upload"), "text/plain", 1);
+        var failure = new FileSaveFailedException(id, "업로드 실패", new IOException("원본 오류"));
+        var notificationFailure = new IllegalStateException("알림 저장 실패");
+        given(userReader.findUserIdsByRole(Role.ADMIN)).willReturn(List.of(UUID.randomUUID()));
+        doThrow(notificationFailure).when(notificationService).createAll(any());
+
+        assertThatThrownBy(() -> storage.recover(failure, id, upload)).isSameAs(failure);
+        assertThat(failure.getSuppressed()).containsExactly(notificationFailure);
+    }
+
+    @Test
+    void recoveryWithoutAdministratorsStillPropagatesUploadFailure() {
+        UUID id = UUID.randomUUID();
+        var upload = new BinaryContentUpload(temporaryDirectory.resolve("upload"), "text/plain", 1);
+        var failure = new FileSaveFailedException(id, "업로드 실패", new IOException("원본 오류"));
+        given(userReader.findUserIdsByRole(Role.ADMIN)).willReturn(List.of());
+
+        assertThatThrownBy(() -> storage.recover(failure, id, upload)).isSameAs(failure);
+        verifyNoInteractions(notificationService);
     }
 
     @Test
