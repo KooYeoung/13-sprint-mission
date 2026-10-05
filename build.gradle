@@ -93,11 +93,13 @@ dependencies {
 	testImplementation 'com.adobe.testing:s3mock-testcontainers:4.11.0'
 	testImplementation 'org.testcontainers:postgresql'
 
-
 	// JJWT - JWT 생성·서명·검증 라이브러리
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	implementation 'org.springframework.retry:spring-retry'
 
 }
 
