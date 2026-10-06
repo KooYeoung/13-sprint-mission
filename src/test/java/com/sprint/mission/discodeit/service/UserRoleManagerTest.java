@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
@@ -115,12 +116,13 @@ class UserRoleManagerTest {
     }
 
     @Test
-    void updateRole_doesNotPublishWhenRoleIsUnchanged() {
+    void updateRole_invalidatesUserCacheWithoutNotificationWhenRoleIsUnchanged() {
         User user = createUser();
         UUID userId = UUID.randomUUID();
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         userRoleManager.updateRole(userId, new UserRoleUpdateCommand(Role.USER));
-        then(eventPublisher).shouldHaveNoInteractions();
+        then(eventPublisher).should().publishEvent(new UserCacheClearEvent(userId));
+        then(eventPublisher).should(org.mockito.Mockito.never()).publishEvent(org.mockito.ArgumentMatchers.any(RoleUpdatedEvent.class));
     }
 
     private User createUser() {

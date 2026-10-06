@@ -15,6 +15,7 @@ import com.sprint.mission.discodeit.service.RefreshTokenCookieManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +42,8 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("실제 토큰 서비스·Provider·Registry 동시 갱신 컴포넌트 테스트")
 class TokenRefreshConcurrencyTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     DiscodeitUserDetailsService userDetailsService;
@@ -55,7 +58,7 @@ class TokenRefreshConcurrencyTest {
         JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
                 "concurrency-test-secret-with-at-least-32-bytes", Duration.ofMinutes(10),
                 Duration.ofDays(14), "concurrency-test"), Clock.fixed(now, ZoneOffset.UTC));
-        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider);
+        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider, eventPublisher);
         TokenServiceImpl service = new TokenServiceImpl(provider, userDetailsService, cookieManager, registry);
         OffsetDateTime dateTime = now.atOffset(ZoneOffset.UTC);
         UserDto user = new UserDto(UUID.randomUUID(), "concurrent-user", "user@example.com",

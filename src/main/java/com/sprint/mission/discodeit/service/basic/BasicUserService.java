@@ -6,6 +6,7 @@ import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.exception.user.UserEmailDuplicatedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.exception.user.UserUsernameDuplicatedException;
@@ -15,6 +16,7 @@ import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -35,7 +39,9 @@ public class BasicUserService implements UserService {
     private final ReadStatusService readStatusService;
     private final MessageService messageService;
     private final UserMapper userMapper;
+    private final UserReader userReader;
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @LogAction(value = "사용자 생성")
     @Override
@@ -52,18 +58,20 @@ public class BasicUserService implements UserService {
     @Transactional(readOnly = true)
     @Override
     public UserDto findById(UUID userId) {
-        User user = getUserRequireThrow(userId);
-
-        return userMapper.toDto(user);
+        return userReader.findUserDto(userId)
+                .map(UserMapper::toRequestTimeZone)
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 
     @Transactional(readOnly = true)
     @Override
     public List<UserDto> findAll() {
-        return userRepository.findAll()
-                .stream()
-                .map(userMapper::toDto)
-                .toList();
+        List<UUID> userIds = userRepository.findAllIds();
+        Map<UUID, UserDto> users = userReader.findUserDtosByIds(userIds);
+        return userIds.stream()
+                .map(users::get)
+                .filter(Objects::nonNull)
+                .map(UserMapper::toRequestTimeZone).toList();
     }
 
     @LogAction(value = "사용자 수정")
@@ -85,8 +93,11 @@ public class BasicUserService implements UserService {
             binaryContentService.delete(oldImage);
         }
 
+        eventPublisher.publishEvent(new UserCacheClearEvent(userId));
+
         return userMapper.toDto(updatedUser);
     }
+
 
     @LogAction(value = "사용자 삭제", idName = "userId", idParamIndex = 0)
     @Override
@@ -102,6 +113,7 @@ public class BasicUserService implements UserService {
         if (user.isProfileImageExist()) {
             binaryContentService.delete(user.getProfile());
         }
+        eventPublisher.publishEvent(new UserCacheClearEvent(userId));
     }
 
     private void validateCreatableUser(UserCreateCommand command) {
@@ -151,4 +163,5 @@ public class BasicUserService implements UserService {
                 command.email()
         );
     }
+
 }

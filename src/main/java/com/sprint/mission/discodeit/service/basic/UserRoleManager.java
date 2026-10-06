@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.events.RoleUpdatedEvent;
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
@@ -34,6 +35,7 @@ public class UserRoleManager {
         publishRoleUpdateEvent(command, user);
         user.updateRole(command);
         jwtRegistry.invalidateJwtInformationByUserId(userId);
+        eventPublisher.publishEvent(new UserCacheClearEvent(userId));
         return userMapper.toDto(user);
     }
 
@@ -45,5 +47,6 @@ public class UserRoleManager {
         eventPublisher.publishEvent(new RoleUpdatedEvent(user.getId(), user.getRole(), command.newRole()));
         log.debug("권한 변경 이벤트를 발행했습니다. userId={}, previousRole={}, newRole={}",
                 user.getId(), user.getRole(), command.newRole());
+
     }
 }

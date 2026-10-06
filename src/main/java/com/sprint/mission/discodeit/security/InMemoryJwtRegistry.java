@@ -1,8 +1,10 @@
 package com.sprint.mission.discodeit.security;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.exception.jwt.TokenRenewalFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +22,8 @@ public class InMemoryJwtRegistry implements JwtRegistry{
     private final int maxActiveJwtCount = 1;
 
     private final JwtTokenProvider jwtTokenProvider;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public void registerJwtInformation(JwtInformation jwtInformation) {
@@ -101,10 +105,16 @@ public class InMemoryJwtRegistry implements JwtRegistry{
     @Override
     public void clearExpiredJwtInformation() {
         // 등록·로테이션과 같은 사용자별 잠금 안에서 검사와 삭제를 완료한다.
+        Set<UUID> changedUserIds = new HashSet<>();
         origin.keySet().forEach(userId -> origin.computeIfPresent(userId, (key, queue) -> {
-            queue.removeIf(info -> jwtTokenProvider.validateToken(info.refreshToken()).isEmpty());
+            boolean isRemoved = queue.removeIf(info -> jwtTokenProvider.validateToken(info.refreshToken()).isEmpty());
+            if (isRemoved) {
+                changedUserIds.add(userId);
+            }
             return queue.isEmpty() ? null : queue;
         }));
+
+        changedUserIds.forEach(userId -> eventPublisher.publishEvent(new UserCacheClearEvent(userId)));
     }
 
 }

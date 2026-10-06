@@ -12,6 +12,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
+    @Query("select u.id from User u")
+    List<UUID> findAllIds();
+
     boolean existsByUsername(String username);
 
     boolean existsByEmail(String email);
@@ -21,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @EntityGraph(attributePaths = {"profile"})
     Optional<User> findById(UUID id);
+
+    @EntityGraph(attributePaths = {"profile"})
+    List<User> findByIdIn(List<UUID> ids);
 
     @EntityGraph(attributePaths = {"profile"})
     Optional<User> findByUsername(String username);

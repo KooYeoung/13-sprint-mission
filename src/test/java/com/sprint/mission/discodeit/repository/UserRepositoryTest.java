@@ -40,6 +40,40 @@ class UserRepositoryTest {
     EntityManager em;
 
     @Test
+    @DisplayName("요청한 사용자만 일괄 조회하며 프로필도 함께 로딩한다")
+    void findByIdIn_fetchesProfilesAndIncludesUsersWithoutProfile() {
+        UserFixture first = saveUserWithProfile(new UserCreateCommand("batch-first", "password", "first@batch.test"));
+        UserFixture second = saveUserWithProfile(new UserCreateCommand("batch-second", "password", "second@batch.test"));
+        User withoutProfile = saveUser(new UserCreateCommand("batch-no-profile", "password", "none@batch.test"));
+        saveUser(new UserCreateCommand("batch-excluded", "password", "excluded@batch.test"));
+        em.clear();
+
+        List<User> found = userRepository.findByIdIn(List.of(
+                first.user().getId(), second.user().getId(), withoutProfile.getId(), UUID.randomUUID()));
+
+        assertThat(found).extracting(User::getId)
+                .containsExactlyInAnyOrder(first.user().getId(), second.user().getId(), withoutProfile.getId());
+        assertThat(found).allSatisfy(user -> assertThat(getPersistenceUnitUtil().isLoaded(user, "profile")).isTrue());
+        em.clear();
+        assertThat(found).extracting(User::getProfileId)
+                .containsExactlyInAnyOrder(first.profile().getId(), second.profile().getId(), null);
+    }
+
+    @Test
+    void findAllIds_reflectsCreatedAndDeletedUsers() {
+        User first = userRepository.save(new User(new UserCreateCommand("first", "password", "first@test.local"), null));
+        User second = userRepository.save(new User(new UserCreateCommand("second", "password", "second@test.local"), null));
+        em.flush();
+        em.clear();
+
+        assertThat(userRepository.findAllIds()).containsExactlyInAnyOrder(first.getId(), second.getId());
+        userRepository.deleteById(first.getId());
+        em.flush();
+        em.clear();
+        assertThat(userRepository.findAllIds()).containsExactly(second.getId());
+    }
+
+    @Test
     @DisplayName("역할에 해당하는 사용자 ID만 조회한다")
     void findUserIdsByRole_excludesOtherRolesAndReturnsEmptyWhenNoMatch() {
         assertThat(userRepository.findUserIdsByRole(Role.ADMIN)).isEmpty();

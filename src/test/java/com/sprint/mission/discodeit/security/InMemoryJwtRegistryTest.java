@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.security;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.exception.jwt.TokenRenewalFailedException;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,6 +32,8 @@ import static org.mockito.BDDMockito.given;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("인메모리 JWT 레지스트리 단위 테스트")
 class InMemoryJwtRegistryTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     JwtTokenProvider jwtTokenProvider;
@@ -38,7 +42,7 @@ class InMemoryJwtRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new InMemoryJwtRegistry(jwtTokenProvider);
+        registry = new InMemoryJwtRegistry(jwtTokenProvider, eventPublisher);
     }
 
     @Test
@@ -232,6 +236,8 @@ class InMemoryJwtRegistryTest {
 
         assertActive(expired, false);
         assertActive(valid, true);
+        org.mockito.Mockito.verify(eventPublisher).publishEvent(new UserCacheClearEvent(expired.userDto().id()));
+        org.mockito.Mockito.verifyNoMoreInteractions(eventPublisher);
     }
 
     @Test

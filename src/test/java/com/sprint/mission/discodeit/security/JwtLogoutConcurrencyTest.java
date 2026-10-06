@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("실제 로그아웃 핸들러와 JWT 레지스트리의 동시성 테스트")
 class JwtLogoutConcurrencyTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     RefreshTokenCookieManager cookieManager;
@@ -47,8 +50,8 @@ class JwtLogoutConcurrencyTest {
     @DisplayName("이전 로그아웃의 검증 도중 완료된 새 로그인이나 갱신의 토큰 쌍을 유지한다")
     void logout_preservesTokensReplacedDuringValidation(TokenReplacement replacement) throws Exception {
         // 핸들러와 레지스트리 사이의 동시 실행이 관심사이므로 두 객체 모두 실제 구현을 사용한다.
-        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(jwtTokenProvider);
-        JwtLogoutHandler handler = new JwtLogoutHandler(cookieManager, registry, jwtTokenProvider);
+        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(jwtTokenProvider, eventPublisher);
+        JwtLogoutHandler handler = new JwtLogoutHandler(cookieManager, registry, jwtTokenProvider, eventPublisher);
         OffsetDateTime now = OffsetDateTime.parse("2026-09-27T00:00:00Z");
         UserDto user = new UserDto(UUID.randomUUID(), "logout-user", "logout@example.com", null,
                 true, Role.USER, now, now);
