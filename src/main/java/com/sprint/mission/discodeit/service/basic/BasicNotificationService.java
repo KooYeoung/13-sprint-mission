@@ -1,9 +1,11 @@
 package com.sprint.mission.discodeit.service.basic;
 
 import com.sprint.mission.discodeit.aspect.LogAction;
+import com.sprint.mission.discodeit.config.CacheConfig;
 import com.sprint.mission.discodeit.dto.command.notification.NotificationCreateCommand;
 import com.sprint.mission.discodeit.dto.response.NotificationDto;
 import com.sprint.mission.discodeit.entity.Notification;
+import com.sprint.mission.discodeit.events.NotificationCacheClearEvent;
 import com.sprint.mission.discodeit.exception.notification.NotificationNotFoundException;
 import com.sprint.mission.discodeit.mapper.NotificationMapper;
 import com.sprint.mission.discodeit.repository.NotificationRepository;
@@ -11,6 +13,8 @@ import com.sprint.mission.discodeit.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -29,6 +33,7 @@ public class BasicNotificationService implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
     private final UserReader userReader;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public void createAll(NotificationCreateCommand command) {
@@ -45,6 +50,9 @@ public class BasicNotificationService implements NotificationService {
 
         notificationRepository.saveAll(createdNotifications);
         log.debug("알림 저장 요청을 처리했습니다. notificationCount={}", createdNotifications.size());
+
+        createdNotifications
+                .forEach(noti -> eventPublisher.publishEvent(new NotificationCacheClearEvent(noti.getReceiverId())));
     }
 
     @Override
@@ -56,9 +64,14 @@ public class BasicNotificationService implements NotificationService {
         notificationRepository.delete(notification);
         log.debug("알림 삭제 요청을 처리했습니다. notificationId={}, receiverId={}",
                 notificationId, notification.getReceiverId());
+
+        eventPublisher.publishEvent(new NotificationCacheClearEvent(notification.getReceiverId()));
     }
 
 
+    @Cacheable(cacheNames = CacheConfig.USERS_BY_NOTIFICATIONS,
+            keyGenerator = "currentUserIdKeyGenerator"
+    )
     @Transactional(readOnly = true)
     @Override
     public List<NotificationDto> findAllForCurrentUser() {
