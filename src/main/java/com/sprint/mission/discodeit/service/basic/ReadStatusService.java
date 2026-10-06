@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.User;
@@ -63,6 +64,12 @@ public class ReadStatusService {
     @Transactional(readOnly = true)
     public List<ReadStatus> findAllByChannelId(UUID channelId) {
         return readStatusRepository.findByChannelId(channelId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChannelParticipantIds> findParticipantIdsByChannelIds(List<UUID> channelIds) {
+        if (channelIds.isEmpty()) return List.of();
+        return readStatusRepository.findParticipantIdsByChannelIdIn(channelIds);
     }
 
     @Transactional(readOnly = true)

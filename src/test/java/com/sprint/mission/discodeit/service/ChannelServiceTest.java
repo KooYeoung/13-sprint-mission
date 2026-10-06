@@ -4,6 +4,8 @@ import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePrivateComm
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePublicCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import com.sprint.mission.discodeit.dto.repository.ChannelSummary;
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
+import com.sprint.mission.discodeit.service.basic.ChannelReader;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Channel;
@@ -33,6 +35,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,7 +44,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,6 +59,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ChannelServiceTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock ChannelReader channelReader;
+
 
     @InjectMocks
     BasicChannelService channelService;
@@ -209,89 +217,37 @@ class ChannelServiceTest {
     @Nested
     @DisplayName("채널 단건 조회")
     class FindChannelTest {
-
         @Test
-        @DisplayName("채널 단건 조회 성공")
-        void findById_returnsChannelDto_whenChannelExists() {
-            // given
-            // findById()는 Channel 엔티티 전체가 아니라 ChannelSummary 조회 결과를 기반으로 DTO를 만든다.
-            // 따라서 repository가 반환할 ChannelSummary와 mapper가 반환할 ChannelDto를 준비한다.
-            UUID channelId = UUID.randomUUID();
-            ChannelSummary channelSummary = createChannelSummary(channelId, ChannelType.PUBLIC);
-            ChannelDto channelDto = createChannelDto(channelSummary);
+        void findById_combinesSummaryAndCurrentParticipants() {
+            UUID id = UUID.randomUUID();
+            ChannelSummary summary = createChannelSummary(id, ChannelType.PUBLIC);
+            ChannelDto expected = createChannelDto(summary);
+            UserDto participant = new UserDto(UUID.randomUUID(), "member", "member@test.local",
+                    null, false, Role.USER, null, null);
+            given(channelReader.findChannelSummary(id)).willReturn(Optional.of(summary));
+            given(readStatusService.findParticipantIdsByChannelIds(List.of(id)))
+                    .willReturn(List.of(new ChannelParticipantIds(id, participant.id())));
+            given(userReader.findUserDtosByIds(List.of(participant.id())))
+                    .willReturn(Map.of(participant.id(), participant));
+            given(channelMapper.toDtoWithParticipants(summary, List.of(participant))).willReturn(expected);
 
-            // 단건 조회 결과에도 참여자 정보가 포함되어야 하므로,
-            // 같은 channelId로 조회한 ReadStatus 목록이 mapper에 그대로 전달되는지 확인한다.
-            List<ReadStatus> readStatuses = List.of(mock(ReadStatus.class));
-
-            given(channelRepository.findByDetail(channelId)).willReturn(Optional.of(channelSummary));
-            given(readStatusService.findAllByChannelId(channelId)).willReturn(readStatuses);
-
-            // any()로 느슨하게 받으면 잘못된 ChannelSummary나 ReadStatus가 전달되어도 테스트가 통과할 수 있다.
-            // 그래서 실제로 기대하는 인자 조합에 대해서만 DTO를 반환하도록 설정한다.
-            given(channelMapper.toDto(channelSummary, readStatuses)).willReturn(channelDto);
-
-            // when
-            // 서비스의 채널 단건 조회 로직을 실행한다.
-            ChannelDto result = channelService.findById(channelId);
-
-            // then
-            // mapper가 변환한 DTO가 서비스의 최종 반환값인지 검증한다.
-            assertThat(result).isEqualTo(channelDto);
-
-            // 조회 순서도 서비스 계약의 일부로 확인한다.
-            // 채널이 존재할 때만 ReadStatus를 조회하고, 둘을 합쳐 mapper로 변환해야 한다.
-            InOrder inOrder = inOrder(channelRepository, readStatusService, channelMapper);
-            inOrder.verify(channelRepository).findByDetail(channelId);
-            inOrder.verify(readStatusService).findAllByChannelId(channelId);
-            inOrder.verify(channelMapper).toDto(channelSummary, readStatuses);
-
-            // findById()는 조회 전용 로직이므로 다른 협력 객체를 사용하지 않아야 한다.
-            verifyNoMoreInteractions(channelRepository, readStatusService, channelMapper);
-            verifyNoInteractions(messageService, userReader, messageReader);
-
+            assertThat(channelService.findById(id)).isEqualTo(expected);
         }
 
         @Test
-        @DisplayName("채널 단건 조회 실패 - 존재하지 않는 채널")
-        void findById_throwsChannelNotFoundException_whenChannelDoesNotExist() {
-            // given
-            // 조회할 channelId는 있지만, repository가 ChannelSummary를 찾지 못하는 상황을 만든다.
-            UUID channelId = UUID.randomUUID();
-
-            given(channelRepository.findByDetail(channelId)).willReturn(Optional.empty());
-
-            // when & then
-            // findByDetail(...) 결과가 비어 있으면 서비스는 ChannelNotFoundException을 던져야 한다.
-            assertThatThrownBy(() -> channelService.findById(channelId))
-                    .isInstanceOf(ChannelNotFoundException.class);
-
-            // channelId로 단건 상세 조회를 시도했는지 확인한다.
-            verify(channelRepository).findByDetail(channelId);
-
-            // 채널이 없으면 참여자 읽음 상태 조회와 DTO 변환은 실행되면 안 된다.
-            verify(readStatusService, never()).findAllByChannelId(any(UUID.class));
-            verify(channelMapper, never()).toDto(any(ChannelSummary.class), anyList());
-
-            // 위에서 검증한 호출 외에 findById() 실패 흐름에서 추가 협력이 없었는지 확인한다.
-            verifyNoMoreInteractions(channelRepository, readStatusService, channelMapper);
-            verifyNoInteractions(messageService, userReader, messageReader);
+        void findById_stopsWhenChannelDoesNotExist() {
+            UUID id = UUID.randomUUID();
+            given(channelReader.findChannelSummary(id)).willReturn(Optional.empty());
+            assertThatThrownBy(() -> channelService.findById(id)).isInstanceOf(ChannelNotFoundException.class);
+            verifyNoInteractions(readStatusService, userReader, channelMapper);
         }
     }
 
     @Nested
     @DisplayName("사용자별 채널 목록 조회")
     class FindAllChannelTest {
-
-        @BeforeEach
-        void clearPreviousAuthentication() {
-            SecurityContextHolder.clearContext();
-        }
-
         @AfterEach
-        void clearAuthentication() {
-            SecurityContextHolder.clearContext();
-        }
+        void clearAuthentication() { SecurityContextHolder.clearContext(); }
 
         private void authenticate(UUID userId, Role role) {
             UserDto user = new UserDto(userId, "requester", "requester@test.local", null,
@@ -302,187 +258,65 @@ class ChannelServiceTest {
         }
 
         @Test
-        @DisplayName("사용자별 채널 목록 조회 성공")
-        void findAllByUserId_returnsChannelDtos_whenUserExists() {
-            // given
-            // 조회할 사용자가 존재하고, 사용자가 볼 수 있는 채널이 여러 개 있는 상황을 만든다.
-            // 공개 채널과 비공개 채널을 섞어 두면 각 채널별 ReadStatus 매핑이 올바른지 함께 확인할 수 있다.
+        void findAllByUserId_groupsParticipantsPreservesOrderAndOmitsMissingData() {
             UUID userId = UUID.randomUUID();
             authenticate(userId, Role.USER);
-            UUID firstPublicChannelId = UUID.randomUUID();
-            UUID firstPrivateChannelId = UUID.randomUUID();
-            UUID secondPrivateChannelId = UUID.randomUUID();
-            UUID secondPublicChannelId = UUID.randomUUID();
-
-            ChannelSummary firstPublicChannel = createChannelSummary(firstPublicChannelId, ChannelType.PUBLIC);
-            ChannelSummary firstPrivateChannel = createChannelSummary(firstPrivateChannelId, ChannelType.PRIVATE);
-            ChannelSummary secondPrivateChannel = createChannelSummary(secondPrivateChannelId, ChannelType.PRIVATE);
-            ChannelSummary secondPublicChannel = createChannelSummary(secondPublicChannelId, ChannelType.PUBLIC);
-
-            // repository가 반환할 조회 가능한 채널 목록이다.
-            // 서비스는 이 순서를 유지한 채 ChannelDto 목록을 반환해야 한다.
-            List<ChannelSummary> channelSummaries = List.of(
-                    firstPublicChannel,
-                    firstPrivateChannel,
-                    secondPrivateChannel,
-                    secondPublicChannel
-            );
-
-            // 서비스는 ChannelSummary 목록에서 id만 뽑아 ReadStatus 조회에 사용한다.
-            // 이 리스트가 readStatusService.findAllByChannelIds(...)에 그대로 전달되는지 검증한다.
-            List<UUID> channelIds = List.of(
-                    firstPublicChannelId,
-                    firstPrivateChannelId,
-                    secondPrivateChannelId,
-                    secondPublicChannelId
-            );
-
-            // findAllByUserId(...)는 ReadStatus를 channelId 기준으로 그룹핑한다.
-            // 이 테스트에서는 비공개 채널 2개에만 ReadStatus가 있는 상황으로 둔다.
-            ReadStatus firstPrivateReadStatus = createReadStatus(firstPrivateChannelId);
-            ReadStatus secondPrivateReadStatus = createReadStatus(secondPrivateChannelId);
-            List<ReadStatus> readStatuses = List.of(firstPrivateReadStatus, secondPrivateReadStatus);
-
-            // mapper에 전달되어야 하는 채널별 ReadStatus 목록을 명시적으로 준비한다.
-            // 공개 채널에는 ReadStatus가 현재 없다고 가정하고 빈 리스트가 전달되어야 한다.
-            List<ReadStatus> firstPublicReadStatuses = List.of();
-            List<ReadStatus> firstPrivateReadStatuses = List.of(firstPrivateReadStatus);
-            List<ReadStatus> secondPrivateReadStatuses = List.of(secondPrivateReadStatus);
-            List<ReadStatus> secondPublicReadStatuses = List.of();
-
-            // mapper가 반환할 DTO를 미리 준비한다.
-            // 이 테스트의 관심사는 실제 매핑 결과가 아니라 서비스가 mapper 결과를 순서대로 반환하는지다.
-            ChannelDto firstPublicDto = createChannelDto(firstPublicChannel);
-            ChannelDto firstPrivateDto = createChannelDto(firstPrivateChannel);
-            ChannelDto secondPrivateDto = createChannelDto(secondPrivateChannel);
-            ChannelDto secondPublicDto = createChannelDto(secondPublicChannel);
-            List<ChannelDto> expectedDtos = List.of(firstPublicDto, firstPrivateDto, secondPrivateDto, secondPublicDto);
-
+            ChannelSummary first = createChannelSummary(UUID.randomUUID(), ChannelType.PRIVATE);
+            ChannelSummary second = createChannelSummary(UUID.randomUUID(), ChannelType.PUBLIC);
+            UUID missingChannel = UUID.randomUUID();
+            UUID missingUser = UUID.randomUUID();
+            List<UUID> ids = List.of(first.id(), missingChannel, second.id());
+            UserDto participant = new UserDto(userId, "member", "member@test.local", null,
+                    false, Role.USER, null, null);
+            ChannelDto firstDto = createChannelDto(first);
+            ChannelDto secondDto = createChannelDto(second);
+            Map<UUID, ChannelSummary> summaries = new LinkedHashMap<>();
+            summaries.put(second.id(), second);
+            summaries.put(first.id(), first);
             given(userReader.isUserExist(userId)).willReturn(true);
-            given(channelRepository.findVisibleChannels(userId, List.of(ChannelType.PUBLIC))).willReturn(channelSummaries);
-            given(readStatusService.findAllByChannelIds(channelIds)).willReturn(readStatuses);
-            given(channelMapper.toDto(firstPublicChannel, firstPublicReadStatuses)).willReturn(firstPublicDto);
-            given(channelMapper.toDto(firstPrivateChannel, firstPrivateReadStatuses)).willReturn(firstPrivateDto);
-            given(channelMapper.toDto(secondPrivateChannel, secondPrivateReadStatuses)).willReturn(secondPrivateDto);
-            given(channelMapper.toDto(secondPublicChannel, secondPublicReadStatuses)).willReturn(secondPublicDto);
+            given(channelRepository.findVisibleChannelIds(userId, List.of(ChannelType.PUBLIC))).willReturn(ids);
+            given(channelReader.findChannelSummariesByIds(ids)).willReturn(summaries);
+            given(readStatusService.findParticipantIdsByChannelIds(ids)).willReturn(List.of(
+                    new ChannelParticipantIds(first.id(), userId), new ChannelParticipantIds(second.id(), userId),
+                    new ChannelParticipantIds(first.id(), missingUser)));
+            given(userReader.findUserDtosByIds(List.of(userId, missingUser))).willReturn(Map.of(userId, participant));
+            given(channelMapper.toDtoWithParticipants(first, List.of(participant))).willReturn(firstDto);
+            given(channelMapper.toDtoWithParticipants(second, List.of(participant))).willReturn(secondDto);
 
-            // when
-            // 사용자별 채널 목록 조회 로직을 실행한다.
-            List<ChannelDto> result = channelService.findAllByUserId(userId);
-
-            // then
-            // 서비스는 mapper가 만들어준 DTO 목록을 repository 조회 순서대로 반환해야 한다.
-            assertThat(result).isEqualTo(expectedDtos);
-
-            verify(channelRepository).findVisibleChannels(userId, List.of(ChannelType.PUBLIC));
-            verify(readStatusService).findAllByChannelIds(channelIds);
-            verify(channelMapper).toDto(firstPublicChannel, firstPublicReadStatuses);
-            verify(channelMapper).toDto(firstPrivateChannel, firstPrivateReadStatuses);
-            verify(channelMapper).toDto(secondPrivateChannel, secondPrivateReadStatuses);
-            verify(channelMapper).toDto(secondPublicChannel, secondPublicReadStatuses);
+            assertThat(channelService.findAllByUserId(userId)).containsExactly(firstDto, secondDto);
+            verify(userReader).findUserDtosByIds(List.of(userId, missingUser));
         }
 
         @Test
-        @DisplayName("사용자별 채널 목록 조회 성공 - 조회 가능한 채널이 없음")
-        void findAllByUserId_returnsEmptyList_whenVisibleChannelDoesNotExist() {
-            // given
-            // 조회할 사용자는 존재하지만, 사용자가 볼 수 있는 채널 목록은 비어 있는 상황을 만든다.
-            // 이 케이스는 예외가 아니라 "정상적으로 빈 목록을 반환하는 흐름"을 검증한다.
+        void findAllByUserId_returnsEmptyWithoutLoadingParticipants() {
             UUID userId = UUID.randomUUID();
             authenticate(userId, Role.USER);
-            List<ChannelSummary> channelSummaries = List.of();
-            List<UUID> channelIds = List.of();
-
-            // findAllByUserId(...)는 가장 먼저 사용자 존재 여부를 확인한다.
-            // 여기서는 사용자가 존재하는 성공 흐름이므로 true를 반환하게 설정한다.
             given(userReader.isUserExist(userId)).willReturn(true);
+            given(channelRepository.findVisibleChannelIds(userId, List.of(ChannelType.PUBLIC))).willReturn(List.of());
 
-            // 사용자가 존재하면 repository에서 조회 가능한 채널 요약 목록을 가져온다.
-            // 이 테스트에서는 조회 가능한 채널이 없으므로 빈 리스트를 반환한다.
-            given(channelRepository.findVisibleChannels(userId, List.of(ChannelType.PUBLIC))).willReturn(channelSummaries);
-
-            // 서비스는 조회된 ChannelSummary 목록에서 channelId 목록을 만든 뒤 ReadStatus를 조회한다.
-            // channelSummaries가 비어 있으므로 channelIds도 빈 리스트다.
-            // anyList()보다 빈 리스트를 명시하면 "채널이 없어서 빈 id 목록으로 조회한다"는 의도가 더 분명하다.
-            given(readStatusService.findAllByChannelIds(channelIds)).willReturn(List.of());
-
-            // when
-            // 사용자별 채널 목록 조회 로직을 실행한다.
-            List<ChannelDto> channelDtos = channelService.findAllByUserId(userId);
-
-            // then
-            // 조회 가능한 채널이 없으면 서비스는 null이 아니라 빈 리스트를 반환해야 한다.
-            assertThat(channelDtos).isEmpty();
-
-            // 사용자 존재 여부를 확인했는지 검증한다.
-            verify(userReader).isUserExist(userId);
-
-            // 존재하는 사용자이므로 조회 가능한 채널 목록 조회까지 실행되어야 한다.
-            verify(channelRepository).findVisibleChannels(userId, List.of(ChannelType.PUBLIC));
-
-            // 채널 목록이 비어 있어도 현재 서비스 구현은 빈 channelIds로 ReadStatus 조회를 한 번 수행한다.
-            // 이 동작까지 고정하고 싶다면 anyList()보다 channelIds를 직접 검증하는 편이 명확하다.
-            verify(readStatusService).findAllByChannelIds(channelIds);
-
-            // ChannelSummary가 하나도 없으면 DTO로 변환할 대상도 없다.
-            // verify(channelMapper, never()).toDto(...)처럼 특정 메서드만 막을 수도 있지만,
-            // 이 흐름에서는 mapper 자체가 전혀 호출되면 안 되므로 verifyNoInteractions(...)가 더 직접적이다.
-            verifyNoInteractions(channelMapper);
+            assertThat(channelService.findAllByUserId(userId)).isEmpty();
+            verifyNoInteractions(readStatusService, channelMapper);
+            verify(userReader, never()).findUserDtosByIds(any());
         }
 
         @ParameterizedTest
         @EnumSource(value = Role.class, names = {"CHANNEL_MANAGER", "ADMIN"})
-        @DisplayName("관리 역할은 다른 사용자를 기준으로 조회해도 모든 채널 타입을 요청한다")
         void findAllByUserId_includesAllTypes_whenRequesterHasManagementRole(Role role) {
-            UUID targetUserId = UUID.randomUUID();
-            authenticate(UUID.randomUUID(), role);
-            List<ChannelType> types = List.of(ChannelType.PUBLIC, ChannelType.PRIVATE);
-            ChannelSummary summary = createChannelSummary(UUID.randomUUID(), ChannelType.PRIVATE);
-            ChannelDto expected = createChannelDto(summary);
-            given(userReader.isUserExist(targetUserId)).willReturn(true);
-            given(channelRepository.findVisibleChannels(targetUserId, types)).willReturn(List.of(summary));
-            given(readStatusService.findAllByChannelIds(List.of(summary.id()))).willReturn(List.of());
-            given(channelMapper.toDto(summary, List.of())).willReturn(expected);
+            UUID userId = UUID.randomUUID();
+            authenticate(userId, role);
+            given(userReader.isUserExist(userId)).willReturn(true);
 
-            assertThat(channelService.findAllByUserId(targetUserId)).containsExactly(expected);
-
-            verify(channelRepository).findVisibleChannels(targetUserId, types);
+            assertThat(channelService.findAllByUserId(userId)).isEmpty();
+            verify(channelRepository).findVisibleChannelIds(userId, List.of(ChannelType.PUBLIC, ChannelType.PRIVATE));
         }
 
         @Test
-        @DisplayName("사용자별 채널 목록 조회 실패 - 존재하지 않는 사용자")
-        void findAllByUserId_throwsUserNotFoundException_whenUserDoesNotExist() {
-            // given
-            // 조회할 userId는 있지만, UserReader가 해당 사용자를 찾지 못하는 상황을 만든다.
-            // BasicChannelService.findAllByUserId(...)는 가장 먼저 사용자 존재 여부를 확인한다.
-            UUID userId = UUID.randomUUID();
-
-            given(userReader.isUserExist(userId)).willReturn(false);
-
-            // when & then
-            // 사용자가 존재하지 않으면 채널 목록 조회를 진행하지 않고 UserNotFoundException을 던져야 한다.
-            assertThatThrownBy(() -> channelService.findAllByUserId(userId))
-                    .isInstanceOf(UserNotFoundException.class);
-
-            // 사용자 존재 여부를 확인하는 첫 번째 검증이다.
-            // 이 호출 결과가 false이므로 서비스 로직은 여기서 예외로 종료된다.
-            verify(userReader).isUserExist(userId);
-
-            // 학습 포인트:
-            // 이 케이스에서는 사용자가 없으므로 findAllByUserId(...)가 예외를 던지고 즉시 종료되어야 한다.
-            // 따라서 아래 후속 협력 메서드들은 모두 호출되면 안 된다.
-            // - channelRepository.findVisibleChannels(...): 사용자가 볼 수 있는 채널 목록 조회
-            // - readStatusService.findAllByChannelIds(...): 조회된 채널들의 읽음 상태 목록 조회
-            // - channelMapper.toDto(...): 조회 결과를 ChannelDto로 변환
-            //
-            // 이전에 작성했던 방식처럼 각 메서드를 never()로 하나씩 검증할 수도 있다.
-            // verify(channelRepository, never()).findVisibleChannels(any(UUID.class), anyList());
-            // verify(readStatusService, never()).findAllByChannelIds(anyList());
-            // verify(channelMapper, never()).toDto(any(ChannelSummary.class), anyList());
-            //
-            // 다만 지금처럼 후속 협력 객체 자체가 아예 호출되면 안 되는 흐름에서는
-            // verifyNoInteractions(...)로 "이 mock들과는 아무 상호작용도 없었다"를 표현하는 편이 더 간결하고 의도가 분명하다.
-            verifyNoInteractions(channelRepository, readStatusService, channelMapper);
+        void findAllByUserId_stopsWhenUserDoesNotExist() {
+            UUID id = UUID.randomUUID();
+            given(userReader.isUserExist(id)).willReturn(false);
+            assertThatThrownBy(() -> channelService.findAllByUserId(id)).isInstanceOf(UserNotFoundException.class);
+            verifyNoInteractions(channelRepository, channelReader, readStatusService);
+            verify(userReader, never()).findUserDtosByIds(any());
         }
     }
 

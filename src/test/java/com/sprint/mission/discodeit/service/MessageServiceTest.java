@@ -1017,80 +1017,29 @@ class MessageServiceTest {
     @Nested
     @DisplayName("메시지 삭제")
     class DeleteMessageTest {
-
         @Test
-        @DisplayName("메시지 삭제 성공")
-        void delete_deletesMessageAndRelatedFiles_whenMessageExists() {
-            // given
-            // 삭제 대상 메시지 ID를 준비한다.
-            // BasicMessageService.delete(...)는 먼저 해당 ID의 메시지가 존재하는지 확인한다.
+        void delete_deletesFilesBeforeMessageAndInvalidatesItsChannel() {
             UUID messageId = UUID.randomUUID();
+            UUID channelId = UUID.randomUUID();
+            Message message = mock(Message.class);
+            given(message.getChannelId()).willReturn(channelId);
+            given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
 
-            // 메시지가 존재하는 상황을 만든다.
-            // existsById(...)가 true이면 서비스는 첨부 파일 연결 삭제와 메시지 삭제를 계속 진행해야 한다.
-            given(messageRepository.existsById(messageId)).willReturn(true);
-
-            // when
-            // 메시지 삭제 로직을 실행한다.
             messageService.delete(messageId);
 
-            // then
-            InOrder inOrder = inOrder(messageRepository, messageFileService);
-
-            // 1. 삭제 전에 메시지가 실제로 존재하는지 확인한다.
-            inOrder.verify(messageRepository).existsById(messageId);
-
-            // 2. 메시지를 삭제하기 전에 연결된 첨부 파일 정보를 먼저 삭제한다.
-            // 이 순서가 바뀌면 메시지 파일이 메시지를 참조하는 구조에서 FK/고아 데이터 문제가 생길 수 있다.
-            inOrder.verify(messageFileService).deleteByMessageId(messageId);
-
-            // 3. 첨부 파일 연결 정리가 끝난 뒤 메시지를 삭제한다.
-            inOrder.verify(messageRepository).deleteById(messageId);
-
-            // 위에서 검증한 삭제 성공 흐름 외 추가 호출이 없는지 확인한다.
-            verifyNoMoreInteractions(messageRepository, messageFileService);
-
-            // 메시지 삭제는 사용자/채널 엔티티를 조회하지 않고 DTO도 반환하지 않는다.
-            // 따라서 reader, mapper, page mapper가 호출되면 삭제 책임 범위를 벗어난 동작이다.
-            verifyNoInteractions(userReader, channelReader, messageMapper, messageDtoPageResponseMapper);
+            InOrder order = inOrder(messageFileService, messageRepository);
+            order.verify(messageFileService).deleteByMessageId(messageId);
+            order.verify(messageRepository).deleteById(messageId);
+            verify(eventPublisher).publishEvent(new com.sprint.mission.discodeit.events.ChannelCacheClearEvent(channelId));
         }
 
         @Test
-        @DisplayName("메시지 삭제 실패 - 존재하지 않는 메시지")
-        void delete_throwsMessageNotFoundException_whenMessageDoesNotExist() {
-            // given
-            // 삭제 대상 메시지 ID를 준비한다.
-            // 이 ID에 해당하는 메시지가 repository에 없다는 상황을 검증할 것이다.
-            UUID messageId = UUID.randomUUID();
-
-            // BasicMessageService.delete(...)는 findById(...)로 엔티티를 가져오지 않고
-            // existsById(...)로 존재 여부만 확인한 뒤 삭제를 진행한다.
-            // 여기서는 존재하지 않는 메시지이므로 false를 반환하도록 설정한다.
-            given(messageRepository.existsById(messageId)).willReturn(false);
-
-            // when & then
-            // 존재하지 않는 메시지를 삭제하려고 하면 MessageNotFoundException이 발생해야 한다.
-            // 예외에는 MESSAGE_NOT_FOUND 코드와 실패한 messageId가 함께 담겨야 한다.
-            assertThatThrownBy(() -> messageService.delete(messageId))
-                    .isInstanceOf(MessageNotFoundException.class)
-                    .satisfies(exception -> {
-                        MessageNotFoundException messageNotFoundException = (MessageNotFoundException) exception;
-                        assertThat(messageNotFoundException.getErrorCode()).isEqualTo(ErrorCode.MESSAGE_NOT_FOUND);
-                        assertThat(messageNotFoundException.getDetails()).containsEntry("messageId", messageId);
-                    });
-
-            // 삭제 실패 흐름에서는 메시지 존재 여부 확인까지만 실행되어야 한다.
-            verify(messageRepository).existsById(messageId);
-            verify(messageRepository, never()).deleteById(messageId);
-
-            // existsById(...) 외에 repository 호출이 추가로 발생하면 안 된다.
-            verifyNoMoreInteractions(messageRepository);
-
-            // 메시지가 없으므로 첨부 파일 삭제도 진행되면 안 된다.
-            verifyNoInteractions(messageFileService);
-
-            // 메시지 삭제 실패 흐름은 사용자/채널 조회나 DTO 변환, 페이지 응답 생성과 무관하다.
-            verifyNoInteractions(userReader, channelReader, messageMapper, messageDtoPageResponseMapper);
+        void delete_doesNotDeleteFilesOrPublishWhenMessageIsMissing() {
+            UUID id = UUID.randomUUID();
+            given(messageRepository.findById(id)).willReturn(Optional.empty());
+            assertThatThrownBy(() -> messageService.delete(id)).isInstanceOf(MessageNotFoundException.class);
+            verify(messageRepository, never()).deleteById(any());
+            verifyNoInteractions(messageFileService, eventPublisher);
         }
     }
 

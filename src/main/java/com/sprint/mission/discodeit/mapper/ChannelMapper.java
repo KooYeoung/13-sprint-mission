@@ -2,6 +2,7 @@ package com.sprint.mission.discodeit.mapper;
 
 import com.sprint.mission.discodeit.dto.repository.ChannelSummary;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
+import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import org.mapstruct.Mapper;
@@ -29,9 +30,9 @@ public interface ChannelMapper {
     @Mapping(source = "channelSummary.type", target = "type")
     @Mapping(source = "channelSummary.name", target = "name")
     @Mapping(source = "channelSummary.description", target = "description")
-    @Mapping(source = "readStatuses", target = "participants", qualifiedByName = "readStatusesToParticipants")
+    @Mapping(source = "participants", target = "participants", qualifiedByName = "userDtoToRequestTimeZone")
     @Mapping(source = "channelSummary.lastMessageAt", target = "lastMessageAt", qualifiedByName = "toOffsetDateTime")
-    ChannelDto toDto(ChannelSummary channelSummary, List<ReadStatus> readStatuses);
+    ChannelDto toDtoWithParticipants(ChannelSummary channelSummary, List<UserDto> participants);
 
     default ChannelDto toDto(Channel channel, List<ReadStatus> readStatuses) {
         return toDto(channel, null, readStatuses);

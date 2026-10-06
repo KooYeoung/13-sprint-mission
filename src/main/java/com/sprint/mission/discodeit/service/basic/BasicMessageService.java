@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.events.ChannelCacheClearEvent;
 import com.sprint.mission.discodeit.events.MessageCreatedEvent;
 import com.sprint.mission.discodeit.exception.message.MessageNotFoundException;
 import com.sprint.mission.discodeit.mapper.MessageMapper;
@@ -65,6 +66,8 @@ public class BasicMessageService implements MessageService {
         eventPublisher.publishEvent(getMessageCreatedEvent(channel, author, savedMessage));
         log.debug("메시지 생성 이벤트를 발행했습니다. messageId={}, channelId={}, authorId={}",
                 savedMessage.getId(), channel.getId(), author.getId());
+
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channel.getId()));
 
         return messageMapper.toDto(savedMessage, savedMessageFiles);
     }
@@ -126,12 +129,14 @@ public class BasicMessageService implements MessageService {
     @Override
     @PreAuthorize("@messageGuard.isOwner(#messageId, authentication.principal.userDto.id)")
     public void delete(UUID messageId) {
-        if (!messageRepository.existsById(messageId)) throw new MessageNotFoundException(messageId);
+        Message message = getMessageRequireThrow(messageId);
+        UUID channelId = message.getChannelId();
 
         messageFileService.deleteByMessageId(messageId);
 
         messageRepository.deleteById(messageId);
 
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channelId));
     }
 
     @Override

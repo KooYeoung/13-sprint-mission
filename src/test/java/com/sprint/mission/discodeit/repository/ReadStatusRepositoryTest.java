@@ -52,6 +52,24 @@ class ReadStatusRepositoryTest {
     EntityManager em;
 
     @Test
+    void findParticipantIds_loadsOnlyRequestedChannelRelations() {
+        User first = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        User second = userRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.user());
+        Channel target = channelRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.channel(ChannelType.PUBLIC));
+        Channel other = channelRepository.save(com.sprint.mission.discodeit.support.NotificationTestFixtures.channel(ChannelType.PRIVATE));
+        readStatusRepository.save(new ReadStatus(target, first, Instant.EPOCH));
+        readStatusRepository.save(new ReadStatus(target, second, Instant.EPOCH));
+        readStatusRepository.save(new ReadStatus(other, second, Instant.EPOCH));
+        em.flush();
+        em.clear();
+
+        assertThat(readStatusRepository.findParticipantIdsByChannelIdIn(List.of(target.getId())))
+                .containsExactlyInAnyOrder(
+                        new com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds(target.getId(), first.getId()),
+                        new com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds(target.getId(), second.getId()));
+    }
+
+    @Test
     @DisplayName("사용자별 읽음 상태 목록 조회 성공 - User와 Channel을 함께 조회")
     void findByUserId_fetchesUserAndChannel_whenUserHasReadStatuses() {
         // given

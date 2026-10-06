@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository;
 
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
+
+    @Query("""
+        select new com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds(rs.channel.id, rs.user.id)
+        from ReadStatus rs
+        where rs.channel.id in :channelIds
+    """)
+    List<ChannelParticipantIds> findParticipantIdsByChannelIdIn(@Param("channelIds") List<UUID> channelIds);
 
     @EntityGraph(attributePaths = {"user", "channel"})
     @Query("SELECT rs FROM ReadStatus rs WHERE rs.user.id = :userId")

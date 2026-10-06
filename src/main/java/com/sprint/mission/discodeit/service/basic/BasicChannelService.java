@@ -5,12 +5,14 @@ import com.sprint.mission.discodeit.dto.command.channel.ChannelCreateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelCreatePrivateCommand;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import com.sprint.mission.discodeit.dto.repository.ChannelSummary;
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
+import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.dto.response.ChannelDto;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.Message;
-import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.Role;
+import com.sprint.mission.discodeit.events.ChannelCacheClearEvent;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
 import com.sprint.mission.discodeit.exception.channel.PrivateChannelUpdateNotAllowedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
@@ -20,8 +22,8 @@ import com.sprint.mission.discodeit.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.service.ChannelService;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,8 +44,10 @@ public class BasicChannelService implements ChannelService {
     private final ReadStatusService readStatusService;
     private final MessageService messageService;
     private final ChannelMapper channelMapper;
+    private final ChannelReader channelReader;
     private final UserReader userReader;
     private final MessageReader messageReader;
+    private final ApplicationEventPublisher eventPublisher;
 
     @LogAction(value = "채널 생성")
     @PreAuthorize("hasRole('CHANNEL_MANAGER') or @channelGuard.isUserInPrivateChannelParticipants(#command, authentication.principal.userDto.id)")
@@ -52,26 +57,17 @@ public class BasicChannelService implements ChannelService {
         Channel channel = new Channel(command);
         Channel savedChannel = channelRepository.save(channel);
 
-        if (command.isPrivate() && command instanceof ChannelCreatePrivateCommand privateCommand) {
-            readStatusService.saveAll(savedChannel, privateCommand.participantIds(), Instant.now());
-
-            return channelMapper.toDto(
-                    savedChannel,
-                    readStatusService.findAllByChannelId(savedChannel.getId())
-            );
-        }
-
-        return channelMapper.toDto(savedChannel);
+        return getChannelDto(command, savedChannel);
     }
 
     @Transactional(readOnly = true)
     @Override
     public ChannelDto findById(UUID channelId) {
 
-        ChannelSummary channelSummary = channelRepository.findByDetail(channelId)
-                .orElseThrow(()-> new ChannelNotFoundException(channelId));
-
-        return channelMapper.toDto(channelSummary, readStatusService.findAllByChannelId(channelId));
+        ChannelSummary summary = channelReader.findChannelSummary(channelId)
+                .orElseThrow(() -> new ChannelNotFoundException(channelId));
+        return channelMapper.toDtoWithParticipants(summary,
+                findParticipantsByChannelIds(List.of(channelId)).getOrDefault(channelId, List.of()));
     }
 
     @Transactional(readOnly = true)
@@ -89,22 +85,15 @@ public class BasicChannelService implements ChannelService {
             types = List.of(ChannelType.PUBLIC, ChannelType.PRIVATE);
         }
 
-        List<ChannelSummary> channelSummaries = channelRepository.findVisibleChannels(userId, types);
+        List<UUID> channelIds = channelRepository.findVisibleChannelIds(userId, types);
+        Map<UUID, ChannelSummary> summaries = channelReader.findChannelSummariesByIds(channelIds);
+        Map<UUID, List<UserDto>> participants = findParticipantsByChannelIds(channelIds);
 
-        List<UUID> channelIds = channelSummaries
-                .stream()
-                .map(ChannelSummary::id)
-                .toList();
-
-        Map<UUID, List<ReadStatus>> channelIdToReadStatusMap = retrieveReadStatusMapByChannelIds(channelIds);
-
-        return channelSummaries
-                .stream()
-                .map(cs -> channelMapper.toDto(
-                                cs,
-                                channelIdToReadStatusMap.getOrDefault(cs.id(), List.of())
-                        )
-                )
+        return channelIds.stream()
+                .map(summaries::get)
+                .filter(Objects::nonNull)
+                .map(summary -> channelMapper.toDtoWithParticipants(summary,
+                        participants.getOrDefault(summary.id(), List.of())))
                 .toList();
     }
 
@@ -117,6 +106,8 @@ public class BasicChannelService implements ChannelService {
         if (channel.isPrivate()) throw new PrivateChannelUpdateNotAllowedException(channelId);
 
         channel.updateInfo(command);
+
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channelId));
 
         return channelMapper.toDto(
                 channelRepository.save(channel),
@@ -138,6 +129,8 @@ public class BasicChannelService implements ChannelService {
 
         channelRepository.deleteById(channelId);
 
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channelId));
+
     }
 
     private Channel getChannelRequireThrow(UUID channelId) {
@@ -151,10 +144,29 @@ public class BasicChannelService implements ChannelService {
                 .orElse(null);
     }
 
-    private @NonNull Map<UUID, List<ReadStatus>> retrieveReadStatusMapByChannelIds(List<UUID> channelIds) {
-        return readStatusService.findAllByChannelIds(channelIds)
-                .stream()
-                .collect(Collectors.groupingBy(ReadStatus::getChannelId));
+    private Map<UUID, List<UserDto>> findParticipantsByChannelIds(List<UUID> channelIds) {
+        if (channelIds.isEmpty()) return Map.of();
+
+        List<ChannelParticipantIds> memberships = readStatusService.findParticipantIdsByChannelIds(channelIds);
+        List<UUID> userIds = memberships.stream().map(ChannelParticipantIds::userId).distinct().toList();
+        Map<UUID, UserDto> users = userReader.findUserDtosByIds(userIds);
+        return memberships.stream()
+                .filter(membership -> users.containsKey(membership.userId()))
+                .collect(Collectors.groupingBy(ChannelParticipantIds::channelId,
+                        Collectors.mapping(membership -> users.get(membership.userId()), Collectors.toList())));
+    }
+
+    private ChannelDto getChannelDto(ChannelCreateCommand command, Channel savedChannel) {
+        if (command.isPrivate() && command instanceof ChannelCreatePrivateCommand privateCommand) {
+            readStatusService.saveAll(savedChannel, privateCommand.participantIds(), Instant.now());
+
+            return channelMapper.toDto(
+                    savedChannel,
+                    readStatusService.findAllByChannelId(savedChannel.getId())
+            );
+        }
+
+        return channelMapper.toDto(savedChannel);
     }
 
 }
