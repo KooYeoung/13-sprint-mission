@@ -74,6 +74,7 @@ management:
           - health
           - info
           - metrics
+          - caches
           - loggers
 
   info:
