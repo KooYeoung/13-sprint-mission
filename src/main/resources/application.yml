@@ -38,12 +38,22 @@ spring:
       max-request-size: 20MB
 
   cache:
-    cache-names: channels,users,usersByNotifications
+    cache-names:
+      - channels
+      - users
+      - usersByNotifications
     caffeine:
       spec: >
         maximumSize=100,
         expireAfterAccess=600s,
         recordStats
+    redis:
+      enable-statistics: true
+    type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 springdoc:
   api-docs:

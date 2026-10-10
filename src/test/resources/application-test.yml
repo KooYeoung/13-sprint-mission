@@ -3,6 +3,10 @@ server:
   port: 0
 
 spring:
+  cache:
+    # 일반 테스트는 로컬 Redis 연결 없이 실행한다. Redis 통합 테스트에서만 재정의한다.
+    type: caffeine
+
   docker:
     compose:
       # 테스트에서는 PostgreSQL Docker Compose를 실행하지 않음
