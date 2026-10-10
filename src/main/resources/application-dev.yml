@@ -6,7 +6,7 @@ discodeit:
       email: ${ADMIN_USER_EMAIL:admin@discodeit.com}
 
 server:
-  port: 8080
+  port: 0
 
 spring:
   docker:
