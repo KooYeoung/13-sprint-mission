@@ -19,7 +19,7 @@ spring:
       lifecycle-management: start-only
 
       readiness:
-        # PostgreSQL 준비 완료 대기 설정
+        # PostgreSQL·Redis 준비 완료 대기 설정
         timeout: 2m
         tcp:
           connect-timeout: 10s
