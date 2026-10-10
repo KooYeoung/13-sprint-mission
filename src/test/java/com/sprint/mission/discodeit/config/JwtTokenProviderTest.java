@@ -42,7 +42,7 @@ class JwtTokenProviderTest {
     private static final SecretKey SIGNING_KEY =
             Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
     private static final JwtProperties PROPERTIES =
-            new JwtProperties(SECRET, ACCESS_VALIDITY, REFRESH_VALIDITY, ISSUER);
+            new JwtProperties(1, SECRET, ACCESS_VALIDITY, REFRESH_VALIDITY, ISSUER);
 
     private JwtTokenProvider provider;
 

@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.integration;
 
 import com.sprint.mission.discodeit.config.CacheConfig;
+import com.sprint.mission.discodeit.config.JwtProperties;
 import com.sprint.mission.discodeit.dto.command.channel.ChannelUpdateCommand;
 import com.sprint.mission.discodeit.dto.command.message.MessageCreateCommand;
 import com.sprint.mission.discodeit.dto.command.notification.NotificationCreateCommand;
@@ -39,6 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -78,6 +80,8 @@ class CacheIntegrationTest {
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired EntityManagerFactory entityManagerFactory;
     @Autowired JwtRegistry jwtRegistry;
+    @Autowired InMemoryJwtRegistry inMemoryJwtRegistry;
+    @Autowired JwtProperties jwtProperties;
     @Autowired JwtTokenProvider tokens;
     @Autowired JwtLoginSuccessHandler loginHandler;
     @Autowired JwtLogoutHandler logoutHandler;
@@ -328,11 +332,15 @@ class CacheIntegrationTest {
 
     @Test
     void expiredTokenCleanup_refreshesOnlyAffectedUsers() {
-        jwtRegistry.registerJwtInformation(new JwtInformation(principal(owner).getUserDto(), "access", "expired-refresh"));
+        JwtTokenProvider expiredTokens = new JwtTokenProvider(jwtProperties, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        jwtRegistry.registerJwtInformation(new JwtInformation(principal(owner).getUserDto(),
+                expiredTokens.generateAccessToken(owner.getId(), owner.getUsername(), owner.getRole()),
+                expiredTokens.generateRefreshToken(owner.getId(), owner.getUsername())));
         channelService.findAllByUserId(owner.getId());
         UserDto unaffected = cachedUser(manager);
-        assertThat(cachedUser(owner).online()).isTrue();
-        jwtRegistry.clearExpiredJwtInformation();
+        assertThat(cachedUser(owner).online()).isFalse();
+        assertThat(userService.findById(owner.getId()).online()).isFalse();
+        inMemoryJwtRegistry.clearExpiredJwtInformation();
         assertThat(userCache().get(owner.getId())).isNull();
         assertThat(userService.findById(owner.getId()).online()).isFalse();
         assertThat(cachedUser(manager)).isSameAs(unaffected);
@@ -341,7 +349,10 @@ class CacheIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void roleUpdate_refreshesUserAfterJwtInvalidationEvenWhenRoleIsUnchanged(boolean changeRole) {
-        jwtRegistry.registerJwtInformation(new JwtInformation(principal(owner).getUserDto(), "access", "refresh"));
+        jwtRegistry.registerJwtInformation(new JwtInformation(principal(owner).getUserDto(),
+                tokens.generateAccessToken(owner.getId(), owner.getUsername(), owner.getRole()),
+                tokens.generateRefreshToken(owner.getId(), owner.getUsername())));
+        assertThat(userService.findById(owner.getId()).online()).isTrue();
         channelService.findAllByUserId(owner.getId());
         ChannelSummary channel = cachedChannel(first);
         Role role = changeRole ? Role.CHANNEL_MANAGER : Role.USER;

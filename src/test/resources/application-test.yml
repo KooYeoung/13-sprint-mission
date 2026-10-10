@@ -74,6 +74,8 @@ logging:
 discodeit:
   security:
     jwt:
+      registry-type: in-memory
+      max-active-jwt-count: 1
       secret: ${JWT_SECRET:secret-very-to-long-bytes32-has-sufficient-strength}
       access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
       refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}

@@ -56,6 +56,7 @@ class TokenRefreshConcurrencyTest {
     void rotateRefreshToken_returnsOnlyOneSuccessfulPair() throws Exception {
         Instant now = Instant.parse("2026-09-23T00:00:00Z");
         JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
+                1,
                 "concurrency-test-secret-with-at-least-32-bytes", Duration.ofMinutes(10),
                 Duration.ofDays(14), "concurrency-test"), Clock.fixed(now, ZoneOffset.UTC));
         InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider, eventPublisher);

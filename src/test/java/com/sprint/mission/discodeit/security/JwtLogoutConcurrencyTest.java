@@ -57,9 +57,11 @@ class JwtLogoutConcurrencyTest {
                 true, Role.USER, now, now);
         JwtInformation old = new JwtInformation(user, "old-access", "old-refresh");
         JwtInformation current = new JwtInformation(user, "new-access", "new-refresh");
+        given(jwtTokenProvider.getMaxActiveJwtCount()).willReturn(1);
         registry.registerJwtInformation(old);
 
         Claims claims = Jwts.claims().subject(user.username()).build();
+        given(jwtTokenProvider.validateToken(current.refreshToken())).willReturn(Optional.of(claims));
         CountDownLatch validationStarted = new CountDownLatch(1);
         CountDownLatch finishValidation = new CountDownLatch(1);
         given(cookieManager.readRefreshToken()).willReturn(Optional.of(old.refreshToken()));

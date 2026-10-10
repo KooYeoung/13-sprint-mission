@@ -2,6 +2,8 @@ package com.sprint.mission.discodeit.security;
 
 import com.sprint.mission.discodeit.exception.jwt.TokenRenewalFailedException;
 
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 
 public interface JwtRegistry {
@@ -28,5 +30,5 @@ public interface JwtRegistry {
      */
     void rotateJwtInformation(String refreshToken, JwtInformation newJwtInformation);
 
-    void clearExpiredJwtInformation();
+    Set<UUID> findActiveUserIds(Collection<UUID> userIds);
 }

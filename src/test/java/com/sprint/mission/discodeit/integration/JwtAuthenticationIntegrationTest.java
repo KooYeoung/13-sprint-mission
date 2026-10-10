@@ -15,6 +15,7 @@ import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.security.JwtAuthenticationFilter;
 import com.sprint.mission.discodeit.security.JwtInformation;
 import com.sprint.mission.discodeit.security.JwtRegistry;
+import com.sprint.mission.discodeit.security.InMemoryJwtRegistry;
 import com.sprint.mission.discodeit.security.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.Filter;
@@ -80,6 +81,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @DisplayName("실제 서버의 JWT 인증 통합 테스트")
 class JwtAuthenticationIntegrationTest {
+
+    @Autowired InMemoryJwtRegistry inMemoryJwtRegistry;
 
     private static final String RAW_PASSWORD = "jwt-integration-password";
 
@@ -663,8 +666,8 @@ class JwtAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("만료 정리는 리프레시 만료 사용자만 오프라인으로 바꾸고 유효한 로그인은 유지한다")
-    void cleanup_removesExpiredRefreshAndUpdatesOnlineState() throws Exception {
+    @DisplayName("만료 사용자는 정리 전부터 오프라인이며 정리 후에도 유효한 로그인은 유지한다")
+    void cleanup_removesExpiredRefreshWithoutAffectingValidLogin() throws Exception {
         User expiredUser = createUser();
         ResponseEntity<String> validLogin = login(createUser());
         JwtTokenProvider pastProvider = new JwtTokenProvider(jwtProperties, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
@@ -672,9 +675,9 @@ class JwtAuthenticationIntegrationTest {
         jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(expiredUser, true),
                 pastProvider.generateAccessToken(expiredUser.getId(), expiredUser.getUsername(), expiredUser.getRole()),
                 expiredRefresh));
-        assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, true);
+        assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, false);
 
-        jwtRegistry.clearExpiredJwtInformation();
+        inMemoryJwtRegistry.clearExpiredJwtInformation();
 
         assertThat(jwtRegistry.hasActiveJwtInformationByUserId(expiredUser.getId())).isFalse();
         assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, false);

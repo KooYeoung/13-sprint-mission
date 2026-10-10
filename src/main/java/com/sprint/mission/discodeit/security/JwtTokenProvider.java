@@ -132,4 +132,8 @@ public class JwtTokenProvider {
     public Duration getRefreshTokenExpirationTime(){
        return jwtProperties.refreshTokenValidity();
     }
+
+    public Integer getMaxActiveJwtCount(){
+        return jwtProperties.maxActiveJwtCount();
+    }
 }

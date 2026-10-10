@@ -4,6 +4,7 @@ import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.exception.jwt.TokenRenewalFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -11,15 +12,20 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+        prefix = "discodeit.security.jwt",
+        name = "registry-type",
+        havingValue = "in-memory",
+        matchIfMissing = true
+)
 public class InMemoryJwtRegistry implements JwtRegistry{
 
     private final Map<UUID , Queue<JwtInformation>> origin = new ConcurrentHashMap<>();
-
-    private final int maxActiveJwtCount = 1;
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -28,6 +34,7 @@ public class InMemoryJwtRegistry implements JwtRegistry{
     @Override
     public void registerJwtInformation(JwtInformation jwtInformation) {
         UUID userId = jwtInformation.userDto().id();
+        Integer maxActiveJwtCount = jwtTokenProvider.getMaxActiveJwtCount();
         origin.compute(userId, (key, queue) -> {
             if (queue == null) {
                 queue = new ConcurrentLinkedQueue<>();
@@ -60,7 +67,8 @@ public class InMemoryJwtRegistry implements JwtRegistry{
         Queue<JwtInformation> jwtInformations = origin.get(userId);
         if (jwtInformations == null) return false;
 
-        return true;
+       return jwtInformations.stream()
+               .anyMatch(jwtInformation -> jwtTokenProvider.validateToken(jwtInformation.refreshToken()).isPresent());
     }
 
     @Override
@@ -87,6 +95,7 @@ public class InMemoryJwtRegistry implements JwtRegistry{
     @Override
     public void rotateJwtInformation(String refreshToken, JwtInformation newJwtInformation) {
         UUID userId = newJwtInformation.userDto().id();
+        Integer maxActiveJwtCount = jwtTokenProvider.getMaxActiveJwtCount();
         origin.compute(userId, (key, queue) -> {
             if (queue == null || queue.stream().noneMatch(info -> info.refreshToken().equals(refreshToken))) {
                 throw new TokenRenewalFailedException();
@@ -101,8 +110,17 @@ public class InMemoryJwtRegistry implements JwtRegistry{
         });
     }
 
-    @Scheduled(fixedDelay = 1000 * 60 * 5)
     @Override
+    public Set<UUID> findActiveUserIds(Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return Set.of();
+
+       return userIds.stream()
+               .distinct()
+               .filter(this::hasActiveJwtInformationByUserId)
+               .collect(Collectors.toSet());
+    }
+
+    @Scheduled(fixedDelay = 1000 * 60 * 5)
     public void clearExpiredJwtInformation() {
         // 등록·로테이션과 같은 사용자별 잠금 안에서 검사와 삭제를 완료한다.
         Set<UUID> changedUserIds = new HashSet<>();
