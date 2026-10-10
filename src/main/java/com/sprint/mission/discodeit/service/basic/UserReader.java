@@ -8,6 +8,7 @@ import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.mapper.UserMapper;
+import com.sprint.mission.discodeit.security.JwtRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -15,15 +16,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -32,10 +25,10 @@ public class UserReader {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CacheManager cacheManager;
+    private final JwtRegistry jwtRegistry;
 
-    @Cacheable(cacheNames = CacheConfig.USERS, key = "#userId", unless = "#result == null")
     public Optional<UserDto> findUserDto(UUID userId) {
-        return userRepository.findById(userId).map(userMapper::toDto);
+        return Optional.ofNullable(findUserDtosByIds(List.of(userId)).get(userId));
     }
 
     public Map<UUID, UserDto> findUserDtosByIds(Collection<UUID> userIds) {
@@ -52,11 +45,20 @@ public class UserReader {
 
         if (!missingIds.isEmpty()) {
             for (User user : userRepository.findByIdIn(missingIds)) {
-                UserDto dto = userMapper.toDto(user);
+                UserDto dto = userMapper.toDto(user,false);
                 cache.put(dto.id(), dto);
                 users.put(dto.id(), dto);
             }
         }
+
+        if (users.isEmpty()){
+            return Map.of();
+        }
+
+        Set<UUID> activeUserIds = jwtRegistry.findActiveUserIds(users.keySet());
+
+        users.replaceAll((userId, user) -> withOnline(user, activeUserIds.contains(userId)));
+
         return users;
     }
 
@@ -83,5 +85,18 @@ public class UserReader {
             throw new UserNotFoundException(userId);
         }
         return userRepository.getReferenceById(userId);
+    }
+
+    private UserDto withOnline(UserDto user, boolean online) {
+        return new UserDto(
+                user.id(),
+                user.username(),
+                user.email(),
+                user.profile(),
+                online,
+                user.role(),
+                user.createdAt(),
+                user.updatedAt()
+        );
     }
 }

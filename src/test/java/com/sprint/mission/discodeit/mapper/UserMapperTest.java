@@ -7,7 +7,6 @@ import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.security.JwtRegistry;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -21,6 +20,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {UserMapperImpl.class, BinaryContentMapperImpl.class, UserOnlineMapper.class})
@@ -33,21 +33,23 @@ class UserMapperTest {
     @MockitoBean
     JwtRegistry jwtRegistry;
 
-    @Test
-    @DisplayName("사용자 엔티티의 역할을 DTO에 매핑한다")
-    void toDto_mapsUserRole() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("명시한 온라인 상태와 사용자 역할을 별도 레지스트리 조회 없이 매핑한다")
+    void toDto_mapsUserRoleAndExplicitOnlineState(boolean online) {
         User user = new User(
                 new UserCreateCommand("testUser", "encodedPassword", "test@example.com"),
                 null
         );
         user.updateRole(new UserRoleUpdateCommand(Role.CHANNEL_MANAGER));
 
-        UserDto result = userMapper.toDto(user, true);
+        UserDto result = userMapper.toDto(user, online);
 
         assertThat(result.username()).isEqualTo(user.getUsername());
         assertThat(result.email()).isEqualTo(user.getEmail());
-        assertThat(result.online()).isTrue();
+        assertThat(result.online()).isEqualTo(online);
         assertThat(result.role()).isEqualTo(Role.CHANNEL_MANAGER);
+        verifyNoInteractions(jwtRegistry);
     }
 
     @ParameterizedTest
