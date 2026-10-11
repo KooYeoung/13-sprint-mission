@@ -80,6 +80,10 @@ discodeit:
       access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
       refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
       issuer: ${JWT_ISSUER:discodeit}
+    refresh-cookie:
+      http-only: true
+      secure: false
+      same-site: lax
   admin:
     user:
       username: test-admin

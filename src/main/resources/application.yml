@@ -105,11 +105,6 @@ discodeit:
       max-pool-size: 4
       queue-capacity: 4
       keep-alive: 60s
-  security:
-    refresh-cookie:
-      http-only: ${REFRESH_COOKIE_HTTP_ONLY:true}
-      secure: ${REFRESH_COOKIE_SECURE:false}
-      same-site: ${REFRESH_COOKIE_SAME_SITE:lax}
   storage:
     # 파일 저장 방식과 경로를 환경변수로 설정
     type: ${STORAGE_TYPE:local}
