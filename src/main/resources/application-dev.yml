@@ -4,6 +4,14 @@ discodeit:
       username: ${ADMIN_USER_NAME:디스코드잇_관리자}
       password: ${ADMIN_USER_PASSWORD:admin1234}
       email: ${ADMIN_USER_EMAIL:admin@discodeit.com}
+  security:
+    jwt:
+      registry-type: ${JWT_REGISTRY_TYPE:in-memory}
+      max-active-jwt-count: ${JWT_MAX_ACTIVE_JWT_COUNT:1}
+      secret: ${JWT_SECRET:secret-very-to-long-bytes32-has-sufficient-strength}
+      access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
+      refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
+      issuer: ${JWT_ISSUER:discodeit}
 
 server:
   port: 0
