@@ -6,6 +6,7 @@ import com.sprint.mission.discodeit.config.JwtProperties;
 import com.sprint.mission.discodeit.config.RefreshCookieProperties;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.user.UserRoleUpdateRequest;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
@@ -156,6 +157,36 @@ class JwtAuthenticationIntegrationTest {
             assertThat(item.path("username").asText()).isEqualTo(user.getUsername());
             assertThat(item.path("role").asText()).isEqualTo(user.getRole().name());
         });
+    }
+
+    @Test
+    @DisplayName("사용자명 변경 후에도 기존 Access 인증과 Refresh 갱신이 가능하고 새 사용자명으로 로그인한다")
+    void tokens_remainUsableAfterUsernameChanged() throws Exception {
+        User user = createUser();
+        String previousUsername = user.getUsername();
+        ResponseEntity<String> loginResponse = login(user);
+        String previousAccess = accessToken(loginResponse);
+        String previousRefresh = cookie(loginResponse, "REFRESH_TOKEN").getValue();
+
+        user.updateInfo(new UserUpdateCommand("renamed-" + UUID.randomUUID(), null, null), null);
+        user = userRepository.saveAndFlush(user);
+
+        // 기존 토큰은 이전 사용자명을 유지하지만 인증에는 변경되지 않는 user_id를 사용한다.
+        assertThat(jwtTokenProvider.parseClaims(previousAccess).getSubject()).isEqualTo(previousUsername);
+        assertThat(jwtTokenProvider.parseClaims(previousRefresh).getSubject()).isEqualTo(previousUsername);
+        assertThat(getUsers(previousAccess).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> refreshed = refresh(previousRefresh);
+
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode refreshedUser = objectMapper.readTree(refreshed.getBody()).path("userDto");
+        assertThat(refreshedUser.path("id").asText()).isEqualTo(user.getId().toString());
+        assertThat(refreshedUser.path("username").asText()).isEqualTo(user.getUsername());
+        assertTokenClaims(accessToken(refreshed), JwtTokenProvider.TokenType.ACCESS, user);
+        assertTokenClaims(cookie(refreshed, "REFRESH_TOKEN").getValue(), JwtTokenProvider.TokenType.REFRESH, user);
+
+        // 폼 로그인은 계속 사용자명과 비밀번호를 사용한다.
+        assertTokenClaims(accessToken(login(user)), JwtTokenProvider.TokenType.ACCESS, user);
     }
 
     @Test

@@ -68,7 +68,7 @@ class TokenRefreshConcurrencyTest {
         registry.registerJwtInformation(new JwtInformation(user, initial.accessToken(), initial.refreshToken()));
         given(cookieManager.readRefreshToken()).willReturn(Optional.of(initial.refreshToken()));
         CyclicBarrier bothPassedActiveCheck = new CyclicBarrier(2);
-        given(userDetailsService.loadUserByUsername(user.username())).willAnswer(invocation -> {
+        given(userDetailsService.loadUserById(user.id())).willAnswer(invocation -> {
             // 사용자 조회 전에 두 요청 모두 동일한 기존 토큰의 활성 검사를 통과하도록 강제한다.
             bothPassedActiveCheck.await(5, SECONDS);
             return new DiscodeitUserDetails(user, "unused-password");

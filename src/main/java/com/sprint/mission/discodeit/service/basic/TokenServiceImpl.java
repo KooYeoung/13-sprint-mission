@@ -36,7 +36,7 @@ public class TokenServiceImpl implements TokenService {
 
         DiscodeitUserDetails userDetails;
         try {
-            userDetails = (DiscodeitUserDetails) discodeitUserDetailsService.loadUserByUsername(claims.getSubject());
+            userDetails = discodeitUserDetailsService.loadUserById(jwtTokenProvider.getUserId(claims));
         } catch (UsernameNotFoundException e) {
             throw new TokenRenewalFailedException();
         }

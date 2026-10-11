@@ -34,8 +34,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -46,6 +48,7 @@ class JwtAuthenticationFilterTest {
     private static final String ACCESS_TOKEN = "valid-access-token";
     private static final String REFRESH_TOKEN = "valid-refresh-token";
     private static final String USERNAME = "jwt-test-user";
+    private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Mock
     JwtTokenProvider jwtTokenProvider;
@@ -96,7 +99,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("검증된 ACCESS 토큰의 사용자와 권한으로 인증 완료 상태를 등록한다")
+    @DisplayName("토큰의 사용자명이 이전 값이어도 ID로 조회한 현재 사용자와 권한으로 인증한다")
     void doFilter_authenticatesWithValidAccessToken() throws Exception {
         DiscodeitUserDetails userDetails = stubAccessAuthentication();
         request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN);
@@ -113,7 +116,8 @@ class JwtAuthenticationFilterTest {
                 .extracting(GrantedAuthority::getAuthority)
                 .containsExactly("ROLE_USER");
         verify(jwtTokenProvider).validateToken(ACCESS_TOKEN);
-        verify(userDetailsService).loadUserByUsername(USERNAME);
+        verify(userDetailsService).loadUserById(USER_ID);
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
         verify(filterChain).doFilter(request, response);
         verifyNoInteractions(authenticationEntryPoint);
     }
@@ -150,10 +154,11 @@ class JwtAuthenticationFilterTest {
     @Test
     @DisplayName("사용자 조회 실패 시 기존 인증을 정리하고 EntryPoint로 위임한 뒤 요청을 중단한다")
     void doFilter_clearsContextAndStopsChainWhenUserIsMissing() throws Exception {
-        stubValidatedToken(ACCESS_TOKEN, JwtTokenProvider.TokenType.ACCESS);
+        Claims claims = stubValidatedToken(ACCESS_TOKEN, JwtTokenProvider.TokenType.ACCESS);
+        given(jwtTokenProvider.getUserId(claims)).willReturn(USER_ID);
         given(jwtRegistry.hasActiveJwtInformationByAccessToken(ACCESS_TOKEN)).willReturn(true);
         UsernameNotFoundException failure = new UsernameNotFoundException("사용자를 찾을 수 없습니다.");
-        given(userDetailsService.loadUserByUsername(USERNAME)).willThrow(failure);
+        given(userDetailsService.loadUserById(USER_ID)).willThrow(failure);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("previous-user", null, List.of())
         );
@@ -191,7 +196,7 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, reenteringChain);
 
         verify(jwtTokenProvider).validateToken(ACCESS_TOKEN);
-        verify(userDetailsService).loadUserByUsername(USERNAME);
+        verify(userDetailsService).loadUserById(USER_ID);
         verify(filterChain).doFilter(request, response);
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).isSameAs(userDetails);
     }
@@ -206,25 +211,28 @@ class JwtAuthenticationFilterTest {
         assertThat(registration.isEnabled()).isFalse();
     }
 
-    private void stubValidatedToken(String token, JwtTokenProvider.TokenType type) {
+    private Claims stubValidatedToken(String token, JwtTokenProvider.TokenType type) {
         Claims claims = Jwts.claims()
-                .subject(USERNAME)
+                .subject("previous-username")
+                .add(JwtTokenProvider.CLAIM_USER_ID, USER_ID.toString())
                 .add("token_type", type.name())
                 .build();
         given(jwtTokenProvider.validateToken(token)).willReturn(Optional.of(claims));
         given(jwtTokenProvider.getTokenType(claims)).willReturn(type.name());
+        return claims;
     }
 
     private DiscodeitUserDetails stubAccessAuthentication() {
-        stubValidatedToken(ACCESS_TOKEN, JwtTokenProvider.TokenType.ACCESS);
+        Claims claims = stubValidatedToken(ACCESS_TOKEN, JwtTokenProvider.TokenType.ACCESS);
+        given(jwtTokenProvider.getUserId(claims)).willReturn(USER_ID);
         given(jwtRegistry.hasActiveJwtInformationByAccessToken(ACCESS_TOKEN)).willReturn(true);
         OffsetDateTime now = OffsetDateTime.parse("2026-09-21T00:00:00Z");
         UserDto userDto = new UserDto(
-                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                USER_ID,
                 USERNAME, "jwt-test@example.com", null, true, Role.USER, now, now
         );
         DiscodeitUserDetails userDetails = new DiscodeitUserDetails(userDto, "unused-password");
-        given(userDetailsService.loadUserByUsername(USERNAME)).willReturn(userDetails);
+        given(userDetailsService.loadUserById(USER_ID)).willReturn(userDetails);
         return userDetails;
     }
 

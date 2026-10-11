@@ -58,7 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .filter(claims -> accessTokenTypeName().equals(jwtTokenProvider.getTokenType(claims)))
                 .filter(claims -> jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken))
                 .ifPresent(claims ->{
-                    DiscodeitUserDetails userDetails = (DiscodeitUserDetails) discodeitUserDetailsService.loadUserByUsername(claims.getSubject());
+                    DiscodeitUserDetails userDetails = discodeitUserDetailsService.loadUserById(jwtTokenProvider.getUserId(claims));
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             userDetails,

@@ -143,6 +143,12 @@ class JwtTokenProviderTest {
                         signedToken(null, ISSUER, SIGNING_KEY, validExpiration)),
                 Arguments.of("알 수 없는 토큰 타입",
                         signedToken("UNKNOWN", ISSUER, SIGNING_KEY, validExpiration)),
+                Arguments.of("사용자 ID 클레임 누락",
+                        signedToken("REFRESH", ISSUER, SIGNING_KEY, validExpiration, null)),
+                Arguments.of("사용자 ID 클레임 자료형 오류",
+                        signedToken("REFRESH", ISSUER, SIGNING_KEY, validExpiration, 123)),
+                Arguments.of("사용자 ID의 UUID 형식 오류",
+                        signedToken("REFRESH", ISSUER, SIGNING_KEY, validExpiration, "not-a-uuid")),
                 Arguments.of("잘못된 토큰 형식", "not-a-jwt"),
                 Arguments.of("null 입력", (String) null),
                 Arguments.of("빈 입력", ""),
@@ -151,9 +157,13 @@ class JwtTokenProviderTest {
     }
 
     private static String signedToken(String type, String issuer, SecretKey key, Instant expiration) {
+        return signedToken(type, issuer, key, expiration, USER_ID.toString());
+    }
+
+    private static String signedToken(String type, String issuer, SecretKey key, Instant expiration, Object userId) {
         return Jwts.builder()
                 .subject(USERNAME)
-                .claim("user_id", USER_ID.toString())
+                .claim("user_id", userId)
                 .claim("token_type", type)
                 .claim("role", "ACCESS".equals(type) ? "USER" : null)
                 .issuer(issuer)
