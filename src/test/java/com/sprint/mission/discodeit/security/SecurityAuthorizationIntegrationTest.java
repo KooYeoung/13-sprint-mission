@@ -64,7 +64,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+// Actuator 접근 권한 검증이 외부 Redis의 기동 상태에 영향을 받지 않도록 한다.
+@SpringBootTest(properties = "management.health.redis.enabled=false")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
