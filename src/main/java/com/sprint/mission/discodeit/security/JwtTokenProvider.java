@@ -57,7 +57,7 @@ public class JwtTokenProvider {
         try {
             return Optional.of(parseClaims(token));
         } catch (ExpiredJwtException e) {
-            log.warn("[JWT] 만료된 토큰: {}", e.getMessage());
+            log.debug("[JWT] 만료된 토큰: {}", e.getMessage());
         } catch (JwtException | IllegalArgumentException | NullPointerException e) {
             log.warn("[JWT] 유효하지 않은 토큰: {}", e.getMessage());
         }
