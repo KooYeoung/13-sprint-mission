@@ -9,6 +9,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -30,6 +32,7 @@ public class InMemoryJwtRegistry implements JwtRegistry{
     private final JwtTokenProvider jwtTokenProvider;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     @Override
     public void registerJwtInformation(JwtInformation jwtInformation) {
@@ -112,6 +115,28 @@ public class InMemoryJwtRegistry implements JwtRegistry{
                .distinct()
                .filter(this::hasActiveJwtInformationByUserId)
                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<UUID> findUserIdsWithValidAccessToken(Collection<UUID> userIds) {
+        Set<UUID> onlineUserIds = new HashSet<>();
+        Instant now = clock.instant();
+        for (UUID userId : new HashSet<>(userIds)) {
+            Queue<JwtInformation> tokens = origin.get(userId);
+            if (tokens == null) continue;
+
+            boolean hasValidAccessToken = tokens.stream()
+                    // 만료 정리 작업 전이라도 만료된 세션은 제외한다.
+                    .filter(info -> jwtTokenProvider.validateToken(info.refreshToken()).isPresent())
+                    .flatMap(info -> jwtTokenProvider.validateToken(info.accessToken()).stream())
+                    .filter(claims -> JwtTokenProvider.TokenType.ACCESS.name()
+                            .equals(jwtTokenProvider.getTokenType(claims)))
+                    .filter(claims -> userId.equals(jwtTokenProvider.getUserId(claims)))
+                    .anyMatch(claims -> claims.getExpiration() != null
+                            && claims.getExpiration().toInstant().isAfter(now));
+            if (hasValidAccessToken) onlineUserIds.add(userId);
+        }
+        return onlineUserIds;
     }
 
     @Scheduled(fixedDelay = 1000 * 60 * 5)

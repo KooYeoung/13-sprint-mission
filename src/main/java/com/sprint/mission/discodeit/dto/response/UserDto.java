@@ -8,6 +8,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * @param online 등록된 세션에 유효한 Access Token이 하나라도 있는지 여부.
+ *               Access Token 유효기간을 따르는 표시이며 실제 활동 여부를 의미하지 않는다.
+ */
 public record UserDto(
         UUID id,
         String username,

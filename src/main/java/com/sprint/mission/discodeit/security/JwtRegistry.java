@@ -31,4 +31,10 @@ public interface JwtRegistry {
     void rotateJwtInformation(String refreshToken, JwtInformation newJwtInformation);
 
     Set<UUID> findActiveUserIds(Collection<UUID> userIds);
+
+    /**
+     * 등록된 세션에 유효한 Access Token이 하나라도 있는 사용자 ID를 조회한다.
+     * 만료되거나 로그아웃한 세션은 온라인 판정에서 제외한다.
+     */
+    Set<UUID> findUserIdsWithValidAccessToken(Collection<UUID> userIds);
 }

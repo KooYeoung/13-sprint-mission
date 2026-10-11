@@ -37,6 +37,9 @@ import org.testcontainers.containers.GenericContainer;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -281,12 +284,12 @@ class RedisJwtRegistryIntegrationTest {
     }
 
     @Test
-    @DisplayName("Redis JWT가 자연 만료되면 사용자 캐시가 남아 있어도 단건·일괄 조회는 오프라인이다")
-    void userReader_recalculatesOnlineAfterNaturalExpiryWithoutReloadingDatabase() {
+    @DisplayName("Access가 자연 만료되면 Refresh와 사용자 캐시가 남아 있어도 단건·일괄 조회는 오프라인이다")
+    void userReader_recalculatesOnlineAfterAccessExpiryWithoutReloadingDatabase() {
         User user = users.saveAndFlush(user());
         persistedUserIds.add(user.getId());
-        // Redis TIME도 실제로 흐르므로 과거 고정 Clock 대신 현재 시각으로 짧은 토큰을 발급한다.
-        JwtInformation session = information(principal(user).getUserDto(), provider(2, Duration.ofSeconds(3)));
+        JwtInformation session = information(principal(user).getUserDto(),
+                providerIssuedAt(clock.instant(), Duration.ofSeconds(3)));
         registry.registerJwtInformation(session);
         assertThat(userReader.findUserDto(user.getId()).orElseThrow().online()).isTrue();
         assertThat(userReader.findUserDtosByIds(List.of(user.getId())).get(user.getId()).online()).isTrue();
@@ -297,12 +300,81 @@ class RedisJwtRegistryIntegrationTest {
         statistics.clear();
 
         await().pollInterval(Duration.ofMillis(100)).atMost(Duration.ofSeconds(10))
-                .until(() -> !secondRegistry.hasActiveJwtInformationByUserId(user.getId()));
+                .until(() -> tokens.validateToken(session.accessToken()).isEmpty());
+
+        assertThat(userReader.findUserDto(user.getId()).orElseThrow().online()).isFalse();
+        assertThat(userReader.findUserDtosByIds(List.of(user.getId())).get(user.getId()).online()).isFalse();
+        assertThat(secondRegistry.hasActiveJwtInformationByRefreshToken(session.refreshToken())).isTrue();
+        assertExpiresWith(user.getId(), session);
+        assertThat(userCache().get(user.getId(), UserDto.class)).isEqualTo(cached);
+        assertThat(statistics.getPrepareStatementCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("GET 파이프라인은 누락·중복 ID를 구분하고 만료되지 않은 Access가 있는 사용자를 반환한다")
+    void findUserIdsWithValidAccessToken_handlesMissingIdsAndMixedSessions() {
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        UserDto first = principal(identified(user())).getUserDto();
+        UserDto second = principal(identified(user())).getUserDto();
+        JwtTokenProvider pastTokens = providerIssuedAt(now.minusSeconds(660), Duration.ofMinutes(10));
+        JwtInformation valid = information(first, tokens);
+        JwtInformation expired = information(first, pastTokens);
+        // 발급 후 11분이 지났어도 유효기간이 20분인 Access Token은 온라인이다.
+        JwtInformation other = information(second, providerIssuedAt(now.minusSeconds(660), Duration.ofMinutes(20)));
+        JwtInformation expiredOnly = information(principal(identified(user())).getUserDto(), pastTokens);
+        registry.registerJwtInformation(expired);
+        registry.registerJwtInformation(valid);
+        registry.registerJwtInformation(other);
+        registry.registerJwtInformation(expiredOnly);
+
+        assertThat(secondRegistry.findUserIdsWithValidAccessToken(List.of())).isEmpty();
+        assertThat(secondRegistry.findUserIdsWithValidAccessToken(List.of(UUID.randomUUID(), first.id(),
+                expiredOnly.userDto().id(), second.id(), first.id(), UUID.randomUUID())))
+                .containsExactlyInAnyOrder(first.id(), second.id());
+
+        secondRegistry.invalidateJwtInformationByRefreshToken(first.id(), valid.refreshToken());
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(first.id()))).isEmpty();
+        assertThat(registry.hasActiveJwtInformationByRefreshToken(expired.refreshToken())).isTrue();
+    }
+
+    @Test
+    @DisplayName("Access 만료 후에도 Refresh 갱신이 가능하며 갱신·로그아웃 시 캐시를 유지한 채 온라인 표시를 계산한다")
+    void userReader_keepsRefreshValidAndRecalculatesOnlineOnRefreshAndLogout() {
+        User user = users.saveAndFlush(user());
+        persistedUserIds.add(user.getId());
+        UserDto dto = principal(user).getUserDto();
+        JwtInformation old = information(dto, providerIssuedAt(clock.instant().minusSeconds(660), Duration.ofMinutes(10)));
+        registry.registerJwtInformation(old);
+
+        assertThat(userReader.findUserDto(user.getId()).orElseThrow().online()).isFalse();
+        assertThat(userReader.findUserDtosByIds(List.of(user.getId())).get(user.getId()).online()).isFalse();
+        assertThat(secondRegistry.hasActiveJwtInformationByAccessToken(old.accessToken())).isFalse();
+        assertThat(secondRegistry.hasActiveJwtInformationByRefreshToken(old.refreshToken())).isTrue();
+        assertExpiresWith(user.getId(), old);
+        UserDto cached = userCache().get(user.getId(), UserDto.class);
+        assertThat(cached).isNotNull();
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        JwtInformation refreshed = information(dto, tokens);
+        secondRegistry.rotateJwtInformation(old.refreshToken(), refreshed);
+
+        assertThat(userReader.findUserDto(user.getId()).orElseThrow().online()).isTrue();
+        assertThat(userReader.findUserDtosByIds(List.of(user.getId())).get(user.getId()).online()).isTrue();
+
+        secondRegistry.invalidateJwtInformationByRefreshToken(user.getId(), refreshed.refreshToken());
 
         assertThat(userReader.findUserDto(user.getId()).orElseThrow().online()).isFalse();
         assertThat(userReader.findUserDtosByIds(List.of(user.getId())).get(user.getId()).online()).isFalse();
         assertThat(userCache().get(user.getId(), UserDto.class)).isEqualTo(cached);
         assertThat(statistics.getPrepareStatementCount()).isZero();
+    }
+
+    private JwtTokenProvider providerIssuedAt(Instant issuedAt, Duration accessValidity) {
+        // Access 만료 후에도 갱신할 수 있도록 테스트의 Refresh 유효기간은 충분히 길게 둔다.
+        return new JwtTokenProvider(new JwtProperties(2, jwtProperties.secret(),
+                accessValidity, Duration.ofDays(1), jwtProperties.issuer()),
+                Clock.fixed(issuedAt, ZoneOffset.UTC));
     }
 
     private JwtTokenProvider provider(int limit, Duration refreshValidity) {

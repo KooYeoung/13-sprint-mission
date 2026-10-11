@@ -380,14 +380,17 @@ class JwtAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("과거에 발급한 리프레시 토큰의 갱신은 새 발급 시각과 설정된 유효기간을 적용한다")
+    @DisplayName("Access 만료 시 오프라인·인증 실패이며 Refresh 갱신 후 새 유효기간과 온라인 표시를 적용한다")
     void refresh_renewsIssuedAtAndExpirationWithoutWaiting() throws Exception {
         User user = createUser();
-        Instant past = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.SECONDS);
+        Instant past = Instant.now().minusSeconds(660).truncatedTo(ChronoUnit.SECONDS);
         JwtTokenProvider pastProvider = new JwtTokenProvider(jwtProperties, Clock.fixed(past, ZoneOffset.UTC));
         String oldToken = pastProvider.generateRefreshToken(user.getId(), user.getUsername());
-        jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(user, true),
-                pastProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRole()), oldToken));
+        String oldAccess = pastProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+        jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(user, true), oldAccess, oldToken));
+        assertThat(getUsers(oldAccess).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        ResponseEntity<String> observerLogin = login(createUser());
+        assertUserOnline(getUsers(accessToken(observerLogin)), user, false);
         Instant before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
         ResponseEntity<String> response = refresh(oldToken);
@@ -404,6 +407,7 @@ class JwtAuthenticationIntegrationTest {
                 .isEqualTo(access.getIssuedAt().toInstant().plus(jwtProperties.accessTokenValidity()));
         assertThat(refresh.getExpiration().toInstant())
                 .isEqualTo(refresh.getIssuedAt().toInstant().plus(jwtProperties.refreshTokenValidity()));
+        assertUserOnline(getUsers(accessToken(response)), user, true);
     }
 
     @ParameterizedTest

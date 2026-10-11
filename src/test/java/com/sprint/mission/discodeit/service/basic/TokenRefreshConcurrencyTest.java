@@ -59,7 +59,7 @@ class TokenRefreshConcurrencyTest {
                 1,
                 "concurrency-test-secret-with-at-least-32-bytes", Duration.ofMinutes(10),
                 Duration.ofDays(14), "concurrency-test"), Clock.fixed(now, ZoneOffset.UTC));
-        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider, eventPublisher);
+        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider, eventPublisher, Clock.fixed(now, ZoneOffset.UTC));
         TokenServiceImpl service = new TokenServiceImpl(provider, userDetailsService, cookieManager, registry);
         OffsetDateTime dateTime = now.atOffset(ZoneOffset.UTC);
         UserDto user = new UserDto(UUID.randomUUID(), "concurrent-user", "user@example.com",

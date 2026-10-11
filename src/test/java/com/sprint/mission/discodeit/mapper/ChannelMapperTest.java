@@ -4,7 +4,7 @@ import com.sprint.mission.discodeit.dto.repository.ChannelSummary;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.Role;
-import com.sprint.mission.discodeit.security.JwtRegistry;
+import com.sprint.mission.discodeit.service.basic.UserOnlineStatusReader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         UserMapperImpl.class, BinaryContentMapperImpl.class, UserOnlineMapper.class})
 class ChannelMapperTest {
     @Autowired ChannelMapper mapper;
-    @MockitoBean JwtRegistry registry;
+    @MockitoBean UserOnlineStatusReader userOnlineStatusReader;
 
     @AfterEach
     void clearRequest() { RequestContextHolder.resetRequestAttributes(); }

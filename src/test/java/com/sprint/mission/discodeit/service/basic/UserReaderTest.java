@@ -5,7 +5,6 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
-import com.sprint.mission.discodeit.security.JwtRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,13 +29,13 @@ class UserReaderTest {
     @Mock UserMapper mapper;
     @Mock CacheManager cacheManager;
     @Mock Cache cache;
-    @Mock JwtRegistry jwtRegistry;
+    @Mock UserOnlineStatusReader userOnlineStatusReader;
     @InjectMocks UserReader reader;
 
     @Test
     void findUserDtosByIds_returnsEmptyWithoutAccessingCacheOrDatabase() {
         assertThat(reader.findUserDtosByIds(List.of())).isEmpty();
-        verifyNoInteractions(repository, mapper, cacheManager, cache, jwtRegistry);
+        verifyNoInteractions(repository, mapper, cacheManager, cache, userOnlineStatusReader);
     }
 
     @Test
@@ -46,7 +45,7 @@ class UserReaderTest {
         given(cacheManager.getCache(CacheConfig.USERS)).willReturn(cache);
         given(cache.get(first.id(), UserDto.class)).willReturn(first);
         given(cache.get(second.id(), UserDto.class)).willReturn(second);
-        given(jwtRegistry.findActiveUserIds(Set.of(first.id(), second.id()))).willReturn(Set.of());
+        given(userOnlineStatusReader.findOnlineUserIds(Set.of(first.id(), second.id()))).willReturn(Set.of());
 
         assertThat(reader.findUserDtosByIds(List.of(first.id(), second.id())))
                 .containsExactlyInAnyOrderEntriesOf(Map.of(first.id(), first, second.id(), second));
@@ -63,7 +62,7 @@ class UserReaderTest {
         given(cache.get(cached.id(), UserDto.class)).willReturn(cached);
         given(repository.findByIdIn(List.of(loaded.id(), absentId))).willReturn(List.of(user));
         given(mapper.toDto(user, false)).willReturn(loaded);
-        given(jwtRegistry.findActiveUserIds(Set.of(cached.id(), loaded.id()))).willReturn(Set.of(loaded.id()));
+        given(userOnlineStatusReader.findOnlineUserIds(Set.of(cached.id(), loaded.id()))).willReturn(Set.of(loaded.id()));
 
         Map<UUID, UserDto> result = reader.findUserDtosByIds(List.of(cached.id(), loaded.id(), loaded.id(), absentId));
 
@@ -73,8 +72,8 @@ class UserReaderTest {
         assertThat(loaded.online()).isFalse();
         verify(repository).findByIdIn(List.of(loaded.id(), absentId));
         verifyNoMoreInteractions(repository); // 누락 ID별 단건 조회가 추가되면 안 된다.
-        verify(jwtRegistry).findActiveUserIds(Set.of(cached.id(), loaded.id()));
-        verifyNoMoreInteractions(jwtRegistry); // 온라인 상태도 사용자마다 개별 조회하지 않는다.
+        verify(userOnlineStatusReader).findOnlineUserIds(Set.of(cached.id(), loaded.id()));
+        verifyNoMoreInteractions(userOnlineStatusReader); // 온라인 상태도 사용자마다 개별 조회하지 않는다.
         verify(cache).put(loaded.id(), loaded);
         verify(cache, never()).put(eq(absentId), any());
     }
@@ -84,7 +83,7 @@ class UserReaderTest {
         UserDto cached = principal(identified(user())).getUserDto();
         given(cacheManager.getCache(CacheConfig.USERS)).willReturn(cache);
         given(cache.get(cached.id(), UserDto.class)).willReturn(cached);
-        given(jwtRegistry.findActiveUserIds(Set.of(cached.id())))
+        given(userOnlineStatusReader.findOnlineUserIds(Set.of(cached.id())))
                 .willReturn(Set.of(cached.id())).willReturn(Set.of());
 
         UserDto online = reader.findUserDto(cached.id()).orElseThrow();
@@ -106,7 +105,7 @@ class UserReaderTest {
 
         assertThat(reader.findUserDtosByIds(List.of(absentId, absentId))).isEmpty();
 
-        verifyNoInteractions(mapper, jwtRegistry);
+        verifyNoInteractions(mapper, userOnlineStatusReader);
         verify(cache, never()).put(any(), any());
     }
 }

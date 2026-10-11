@@ -147,6 +147,38 @@ public class RedisJwtRegistry implements JwtRegistry{
         return activeUserIds;
     }
 
+    @Override
+    public Set<UUID> findUserIdsWithValidAccessToken(Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return Set.of();
+
+        List<UUID> distinctUserIds = new ArrayList<>(new LinkedHashSet<>(userIds));
+        // GET을 파이프라인으로 묶어 사용자마다 Redis 왕복 통신이 발생하지 않도록 한다.
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            distinctUserIds.forEach(userId -> {
+                byte[] key = redisTemplate.getStringSerializer().serialize(jwtKey(userId));
+                connection.stringCommands().get(key);
+            });
+            return null;
+        });
+
+        Set<UUID> onlineUserIds = new HashSet<>();
+        long now = clock.millis();
+        for (int i = 0; i < distinctUserIds.size(); i++) {
+            UUID userId = distinctUserIds.get(i);
+            // 없는 키의 null 결과도 위치를 유지하므로 요청 순서대로 연결한다.
+            boolean hasValidAccessToken = deserializeStoredTokens(userId, (String) results.get(i)).stream()
+                    .filter(info -> info.refreshExpiresAt() > now)
+                    .flatMap(info -> jwtTokenProvider.validateToken(info.accessToken()).stream())
+                    .filter(claims -> JwtTokenProvider.TokenType.ACCESS.name()
+                            .equals(jwtTokenProvider.getTokenType(claims)))
+                    .filter(claims -> userId.equals(jwtTokenProvider.getUserId(claims)))
+                    .anyMatch(claims -> claims.getExpiration() != null
+                            && claims.getExpiration().getTime() > now);
+            if (hasValidAccessToken) onlineUserIds.add(userId);
+        }
+        return onlineUserIds;
+    }
+
     private String jwtKey(UUID userId) {
         return "discodeit:jwt:"+userId;
     }
@@ -170,7 +202,10 @@ public class RedisJwtRegistry implements JwtRegistry{
 
     private List<StoredJwtInformation> readStoredTokens(UUID userId){
         String json = redisTemplate.opsForValue().get(jwtKey(userId));
+        return deserializeStoredTokens(userId, json);
+    }
 
+    private List<StoredJwtInformation> deserializeStoredTokens(UUID userId, String json) {
         if (json == null) {
             return List.of();
         }

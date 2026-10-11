@@ -8,7 +8,6 @@ import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
 import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.mapper.UserMapper;
-import com.sprint.mission.discodeit.security.JwtRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -25,7 +24,7 @@ public class UserReader {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CacheManager cacheManager;
-    private final JwtRegistry jwtRegistry;
+    private final UserOnlineStatusReader userOnlineStatusReader;
 
     public Optional<UserDto> findUserDto(UUID userId) {
         return Optional.ofNullable(findUserDtosByIds(List.of(userId)).get(userId));
@@ -55,9 +54,9 @@ public class UserReader {
             return Map.of();
         }
 
-        Set<UUID> activeUserIds = jwtRegistry.findActiveUserIds(users.keySet());
+        Set<UUID> onlineUserIds = userOnlineStatusReader.findOnlineUserIds(users.keySet());
 
-        users.replaceAll((userId, user) -> withOnline(user, activeUserIds.contains(userId)));
+        users.replaceAll((userId, user) -> withOnline(user, onlineUserIds.contains(userId)));
 
         return users;
     }
