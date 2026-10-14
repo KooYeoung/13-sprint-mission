@@ -1,6 +1,6 @@
 package com.sprint.mission.discodeit.mapper;
 
-import com.sprint.mission.discodeit.security.JwtRegistry;
+import com.sprint.mission.discodeit.service.basic.UserOnlineStatusReader;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,17 +23,17 @@ class UserOnlineMapperTest {
     UserOnlineMapper userOnlineMapper;
 
     @Mock
-    JwtRegistry jwtRegistry;
+    UserOnlineStatusReader userOnlineStatusReader;
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    @DisplayName("해당 사용자 ID의 JWT 등록 여부로 온라인 상태를 판단한다")
-    void isOnline_returnsRegistryStateForRequestedUser(boolean active) {
+    @DisplayName("해당 사용자 ID의 온라인 상태 판단을 전담 리더에 위임한다")
+    void isOnline_returnsReaderStateForRequestedUser(boolean active) {
         UUID userId = UUID.randomUUID();
-        given(jwtRegistry.hasActiveJwtInformationByUserId(userId)).willReturn(active);
+        given(userOnlineStatusReader.isOnline(userId)).willReturn(active);
 
         assertThat(userOnlineMapper.isOnline(userId)).isEqualTo(active);
 
-        verify(jwtRegistry).hasActiveJwtInformationByUserId(userId);
+        verify(userOnlineStatusReader).isOnline(userId);
     }
 }

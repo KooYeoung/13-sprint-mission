@@ -8,9 +8,11 @@ import java.time.Instant;
 
 public record ReadStatusUpdateRequest(
         @NotNull(message = ValidationMessage.TIME_MESSAGE)
-        Instant newLastReadAt
+        Instant newLastReadAt,
+        @NotNull(message = ValidationMessage.NOT_NULL_MESSAGE)
+        Boolean newNotificationEnabled
 ) {
     public ReadStatusUpdateCommand toCommand() {
-        return new ReadStatusUpdateCommand(newLastReadAt);
+        return new ReadStatusUpdateCommand(newLastReadAt, newNotificationEnabled);
     }
 }

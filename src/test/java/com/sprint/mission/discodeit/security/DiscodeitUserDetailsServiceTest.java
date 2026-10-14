@@ -5,6 +5,7 @@ import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.user.UserLoginFailedException;
+import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.service.basic.UserReader;
 import org.junit.jupiter.api.DisplayName;
@@ -70,6 +71,36 @@ class DiscodeitUserDetailsServiceTest {
                 .hasCauseInstanceOf(UserLoginFailedException.class);
 
         then(userReader).should().getByUsername(username);
+        then(userMapper).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("사용자 ID로 조회한 현재 사용자 정보와 비밀번호를 UserDetails로 반환한다")
+    void loadUserById_returnsCurrentUserDetails() {
+        User user = new User(new UserCreateCommand("renamed-user", "encoded-password", "test@example.com"), null);
+        UserDto userDto = userDto(user.getUsername());
+        given(userReader.getUser(userDto.id())).willReturn(user);
+        given(userMapper.toDto(user, true)).willReturn(userDto);
+
+        DiscodeitUserDetails result = userDetailsService.loadUserById(userDto.id());
+
+        assertThat(result.getUserDto()).isSameAs(userDto);
+        assertThat(result.getPassword()).isEqualTo(user.getPassword());
+        then(userReader).should().getUser(userDto.id());
+    }
+
+    @Test
+    @DisplayName("ID에 해당하는 사용자가 없으면 인증 실패 예외로 변환한다")
+    void loadUserById_convertsMissingUserToAuthenticationFailure() {
+        UUID userId = UUID.randomUUID();
+        UserNotFoundException failure = new UserNotFoundException(userId);
+        given(userReader.getUser(userId)).willThrow(failure);
+
+        assertThatThrownBy(() -> userDetailsService.loadUserById(userId))
+                .isInstanceOf(UsernameNotFoundException.class)
+                .hasMessage("사용자를 찾을 수 없습니다.")
+                .hasCause(failure);
+
         then(userMapper).shouldHaveNoInteractions();
     }
 

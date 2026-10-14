@@ -25,6 +25,8 @@ public enum ErrorCode {
     READ_STATUS_NOT_FOUND("READ_STATUS_NOT_FOUND", HttpStatus.NOT_FOUND, "읽음 상태를 찾을 수 없습니다."),
     READ_STATUS_ALREADY_EXISTS("READ_STATUS_ALREADY_EXISTS", HttpStatus.CONFLICT, "이미 읽음 상태가 존재합니다."),
 
+    NOTIFICATION_NOT_FOUND("NOTIFICATION_NOT_FOUND", HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+
     FILE_SAVE_FAILED("FILE_SAVE_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다."),
     FILE_READ_FAILED("FILE_READ_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "파일을 읽는 중 오류가 발생했습니다."),
     FILE_DIRECTORY_CREATE_FAILED("FILE_DIRECTORY_CREATE_FAILED", HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 디렉터리 생성 중 오류가 발생했습니다."),

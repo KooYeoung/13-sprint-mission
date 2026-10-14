@@ -1,3 +1,18 @@
+discodeit:
+  security:
+    jwt:
+      registry-type: ${JWT_REGISTRY_TYPE:in-memory}
+      max-active-jwt-count: ${JWT_MAX_ACTIVE_JWT_COUNT:1}
+      secret: ${JWT_SECRET}
+      access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
+      refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
+      issuer: ${JWT_ISSUER:discodeit}
+    refresh-cookie:
+      http-only: ${REFRESH_COOKIE_HTTP_ONLY:true}
+      same-site: ${REFRESH_COOKIE_SAME_SITE:lax}
+      # HTTPS 운영 환경의 기본값이며, HTTP 검증 시에는 환경변수로 명시적으로 변경한다.
+      secure: ${REFRESH_COOKIE_SECURE:true}
+
 server:
   # 환경변수가 없으면 8080 포트 사용
   port: ${SERVER_PORT:8080}

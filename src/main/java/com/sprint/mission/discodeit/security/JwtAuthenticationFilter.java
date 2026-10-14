@@ -45,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void processJwtAuthentication(HttpServletRequest request) {
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (header == null){
-            log.warn("Authorization 헤더가 없어 JWT 인증을 건너뜁니다.");
+            log.debug("Authorization 헤더가 없어 JWT 인증을 건너뜁니다.");
             return ;
         }
         if (!header.startsWith(BEARER_PREFIX)){
@@ -58,7 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .filter(claims -> accessTokenTypeName().equals(jwtTokenProvider.getTokenType(claims)))
                 .filter(claims -> jwtRegistry.hasActiveJwtInformationByAccessToken(accessToken))
                 .ifPresent(claims ->{
-                    DiscodeitUserDetails userDetails = (DiscodeitUserDetails) discodeitUserDetailsService.loadUserByUsername(claims.getSubject());
+                    DiscodeitUserDetails userDetails = discodeitUserDetailsService.loadUserById(jwtTokenProvider.getUserId(claims));
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             userDetails,

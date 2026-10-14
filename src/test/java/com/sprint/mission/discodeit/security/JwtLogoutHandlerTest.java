@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.security;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.security.handler.JwtLogoutHandler;
 import com.sprint.mission.discodeit.service.RefreshTokenCookieManager;
 import io.jsonwebtoken.Claims;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +32,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JwtLogoutHandler 단위 테스트")
 class JwtLogoutHandlerTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     RefreshTokenCookieManager cookieManager;
@@ -44,7 +48,7 @@ class JwtLogoutHandlerTest {
     @ValueSource(booleans = {false, true})
     @DisplayName("인증 객체 유무와 관계없이 쿠키의 사용자 ID와 리프레시 토큰으로 해당 토큰 쌍을 무효화한다")
     void logout_invalidatesMatchingRefreshTokenAndClearsCookie(boolean authenticated) {
-        JwtLogoutHandler handler = new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider);
+        JwtLogoutHandler handler = new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider, eventPublisher);
         UUID userId = UUID.randomUUID();
         Claims claims = Jwts.claims().subject("cookie-user").build();
         given(cookieManager.readRefreshToken()).willReturn(Optional.of("refresh-token"));
@@ -62,6 +66,7 @@ class JwtLogoutHandlerTest {
         // 실제 삭제 쿠키의 속성과 응답 헤더는 매니저 단위 테스트와 HTTP 통합 테스트에서 검증한다.
         verify(cookieManager).clearRefreshTokenCookie();
         verify(jwtRegistry).invalidateJwtInformationByRefreshToken(userId, "refresh-token");
+        verify(eventPublisher).publishEvent(new UserCacheClearEvent(userId));
         verify(jwtRegistry, never()).invalidateJwtInformationByUserId(userId);
         assertThat(response.getHeader(HttpHeaders.AUTHORIZATION)).isNull();
     }
@@ -71,11 +76,11 @@ class JwtLogoutHandlerTest {
     void logout_clearsCookieWhenTokenIsMissing() {
         given(cookieManager.readRefreshToken()).willReturn(Optional.empty());
 
-        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider).logout(
+        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider, eventPublisher).logout(
                 new MockHttpServletRequest(), new MockHttpServletResponse(), null);
 
         verify(cookieManager).clearRefreshTokenCookie();
-        verifyNoInteractions(jwtTokenProvider, jwtRegistry);
+        verifyNoInteractions(jwtTokenProvider, jwtRegistry, eventPublisher);
     }
 
     @Test
@@ -84,11 +89,11 @@ class JwtLogoutHandlerTest {
         given(cookieManager.readRefreshToken()).willReturn(Optional.of("invalid-token"));
         given(jwtTokenProvider.validateToken("invalid-token")).willReturn(Optional.empty());
 
-        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider).logout(
+        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider, eventPublisher).logout(
                 new MockHttpServletRequest(), new MockHttpServletResponse(), null);
 
         verify(cookieManager).clearRefreshTokenCookie();
-        verifyNoInteractions(jwtRegistry);
+        verifyNoInteractions(jwtRegistry, eventPublisher);
     }
 
     @Test
@@ -99,10 +104,10 @@ class JwtLogoutHandlerTest {
         given(jwtTokenProvider.validateToken("access-token")).willReturn(Optional.of(claims));
         given(jwtTokenProvider.getTokenType(claims)).willReturn(JwtTokenProvider.TokenType.ACCESS.name());
 
-        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider).logout(
+        new JwtLogoutHandler(cookieManager, jwtRegistry, jwtTokenProvider, eventPublisher).logout(
                 new MockHttpServletRequest(), new MockHttpServletResponse(), null);
 
         verify(cookieManager).clearRefreshTokenCookie();
-        verifyNoInteractions(jwtRegistry);
+        verifyNoInteractions(jwtRegistry, eventPublisher);
     }
 }

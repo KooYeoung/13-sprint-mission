@@ -13,7 +13,8 @@ public record ReadStatusDto(
         OffsetDateTime updatedAt,
         UUID userId,
         UUID channelId,
-        OffsetDateTime lastReadAt
+        OffsetDateTime lastReadAt,
+        Boolean notificationEnabled
 ) implements LoggableResult {
 
     @Override

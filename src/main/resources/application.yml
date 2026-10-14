@@ -37,6 +37,24 @@ spring:
       max-file-size: 10MB
       max-request-size: 20MB
 
+  cache:
+    cache-names:
+      - channels
+      - users
+      - usersByNotifications
+    caffeine:
+      spec: >
+        maximumSize=100,
+        expireAfterAccess=600s,
+        recordStats
+    redis:
+      enable-statistics: true
+    type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
 springdoc:
   api-docs:
     # OpenAPI 명세 제공 경로
@@ -56,6 +74,9 @@ logging:
     org.hibernate.orm.jdbc.batch: info
 
 management:
+  observations:
+    annotations:
+      enabled: true
   endpoints:
     web:
       exposure:
@@ -71,20 +92,24 @@ management:
       # info.* 설정을 /actuator/info 응답에 포함
       enabled: true
 discodeit:
-  security:
-    jwt:
-      secret: ${JWT_SECRET:secret-very-to-long-bytes32-has-sufficient-strength}
-      access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
-      refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
-      issuer: ${JWT_ISSUER:discodeit}
-    refresh-cookie:
-      http-only: ${REFRESH_COOKIE_HTTP_ONLY:true}
-      secure: ${REFRESH_COOKIE_SECURE:false}
-      same-site: ${REFRESH_COOKIE_SAME_SITE:lax}
+  async:
+    enabled: true
+    # 환경변수로 풀별 설정을 변경할 수 있다. queue-capacity: 0은 대기열 없이 처리한다.
+    notification:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 32
+      keep-alive: 60s
+    file-upload:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 4
+      keep-alive: 60s
   storage:
     # 파일 저장 방식과 경로를 환경변수로 설정
     type: ${STORAGE_TYPE:local}
     local:
+      simulated-upload-delay: 0ms
       root-path: ${STORAGE_LOCAL_ROOT_PATH:.discodeit/storage}
     s3:
       region: ${AWS_S3_REGION}

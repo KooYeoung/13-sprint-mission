@@ -13,31 +13,47 @@ import java.util.UUID;
 
 public interface ChannelRepository extends JpaRepository<Channel, UUID> {
     @Query("""
-                select new com.sprint.mission.discodeit.dto.repository.ChannelSummary(
-                            c.id, c.type, c.name, c.description, max(m.createdAt)
-                            )
+                select c.id
                 from Channel c
-                left join Message m on m.channel = c
                 where c.type in :types or exists (
                     select 1
                     from ReadStatus r
                     where r.user.id = :userId
                         and r.channel.id = c.id
                     )
-                group by c.id, c.type, c.name, c.description
             """)
-    List<ChannelSummary> findVisibleChannels(@Param("userId") UUID userId,
-                                             @Param("types") List<ChannelType> types);
+    List<UUID> findVisibleChannelIds(@Param("userId") UUID userId,
+                                     @Param("types") List<ChannelType> types);
+
     @Query("""
                 select new com.sprint.mission.discodeit.dto.repository.ChannelSummary(
-                            c.id, c.type, c.name, c.description, max(m.createdAt)
+                            c.id, c.type, c.name, c.description, grouped.lastMessageCreated
                             )
                 from Channel c
-                left join Message m on m.channel = c
+                left join (
+                                select m.channel.id as channelId , max(m.createdAt) lastMessageCreated
+                                from Message m
+                                where m.channel.id in :channelId
+                                group by m.channel.id
+                            ) as grouped on grouped.channelId = c.id
                 where c.id = :channelId
-                group by c.id, c.type, c.name, c.description
             """)
     Optional<ChannelSummary> findByDetail(@Param("channelId") UUID channelId);
+
+    @Query("""
+                select new com.sprint.mission.discodeit.dto.repository.ChannelSummary(
+                            c.id, c.type, c.name, c.description, grouped.lastMessageCreated
+                            )
+                from Channel c
+                left join (
+                                select m.channel.id as channelId , max(m.createdAt) lastMessageCreated
+                                from Message m
+                                where m.channel.id in :channelIds
+                                group by m.channel.id
+                            ) as grouped on grouped.channelId = c.id
+               where c.id in :channelIds
+            """)
+    List<ChannelSummary> findSummariesByIdIn(@Param("channelIds") List<UUID> channelIds);
 
     @Query("""
         select (count(c) > 0)

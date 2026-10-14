@@ -10,13 +10,17 @@ import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.MessageFile;
 import com.sprint.mission.discodeit.entity.User;
+import com.sprint.mission.discodeit.events.ChannelCacheClearEvent;
+import com.sprint.mission.discodeit.events.MessageCreatedEvent;
 import com.sprint.mission.discodeit.exception.message.MessageNotFoundException;
 import com.sprint.mission.discodeit.mapper.MessageMapper;
 import com.sprint.mission.discodeit.mapper.PageResponseMapper;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.service.MessageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +35,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class BasicMessageService implements MessageService {
     private final MessageRepository messageRepository;
@@ -39,6 +44,7 @@ public class BasicMessageService implements MessageService {
     private final ChannelReader channelReader;
     private final MessageMapper messageMapper;
     private final PageResponseMapper<MessageDto> messageDtoPageResponseMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @LogAction(value = "메시지 생성")
     @Override
@@ -56,6 +62,12 @@ public class BasicMessageService implements MessageService {
 
         Message savedMessage = messageRepository.save(new Message(author, channel, command));
         List<MessageFile> savedMessageFiles = messageFileService.save(savedMessage, files);
+
+        eventPublisher.publishEvent(getMessageCreatedEvent(channel, author, savedMessage));
+        log.debug("메시지 생성 이벤트를 발행했습니다. messageId={}, channelId={}, authorId={}",
+                savedMessage.getId(), channel.getId(), author.getId());
+
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channel.getId()));
 
         return messageMapper.toDto(savedMessage, savedMessageFiles);
     }
@@ -117,12 +129,14 @@ public class BasicMessageService implements MessageService {
     @Override
     @PreAuthorize("@messageGuard.isOwner(#messageId, authentication.principal.userDto.id)")
     public void delete(UUID messageId) {
-        if (!messageRepository.existsById(messageId)) throw new MessageNotFoundException(messageId);
+        Message message = getMessageRequireThrow(messageId);
+        UUID channelId = message.getChannelId();
 
         messageFileService.deleteByMessageId(messageId);
 
         messageRepository.deleteById(messageId);
 
+        eventPublisher.publishEvent(new ChannelCacheClearEvent(channelId));
     }
 
     @Override
@@ -173,5 +187,16 @@ public class BasicMessageService implements MessageService {
 
         return messageRepository.findAllByCondition(condition);
     }
+
+    private MessageCreatedEvent getMessageCreatedEvent(Channel channel, User author, Message savedMessage) {
+        return MessageCreatedEvent.of(
+                channel.getId(),
+                author.getId(),
+                channel.getName(),
+                author.getUsername(),
+                savedMessage.getContent()
+        );
+    }
+
 
 }

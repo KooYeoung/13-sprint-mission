@@ -46,4 +46,9 @@ public class Message extends UpdatableEntity {
         return channel.getId();
     }
 
+    public UUID getAuthorId() {
+        if (author == null) return null;
+        return author.getId();
+    }
+
 }

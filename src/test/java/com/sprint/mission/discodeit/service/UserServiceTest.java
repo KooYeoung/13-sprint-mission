@@ -13,6 +13,7 @@ import com.sprint.mission.discodeit.exception.user.UserUsernameDuplicatedExcepti
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.basic.BasicUserService;
+import com.sprint.mission.discodeit.service.basic.UserReader;
 import com.sprint.mission.discodeit.service.basic.BinaryContentService;
 import com.sprint.mission.discodeit.service.basic.ReadStatusService;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -30,7 +32,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +50,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock UserReader userReader;
+
 
     private static final String ENCODED_PASSWORD = "$2a$10$encoded-password-for-test";
 
@@ -217,7 +224,7 @@ class UserServiceTest {
 
             // BinaryContentService가 파일 저장 후 반환할 프로필 엔티티를 준비한다.
             // 이 객체가 실제 User 생성자에 전달되어 저장되는지 ArgumentCaptor로 확인한다.
-            BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
+            BinaryContent profile =  BinaryContent.createProcessing("filename", "contentType", 1000L);
 
             UserDto expectedDto = createExpectedDto(userId, command, true);
 
@@ -275,127 +282,38 @@ class UserServiceTest {
     @Nested
     @DisplayName("사용자 조회")
     class FindUserTest {
-
         @Test
-        @DisplayName("사용자 단건 조회 성공")
-        void findById_returnsUserDto_whenUserExists() {
-            // given
-            // 조회 대상 userId와 repository가 반환할 실제 User 엔티티를 준비한다.
-            // 이 테스트에서 User는 상태 변경 대상은 아니지만 생성 비용이 낮고 값 검증이 쉬우므로 실제 객체를 사용한다.
-            UserCreateCommand command = createTestUserCommand();
-            UUID userId = UUID.randomUUID();
-            User user = new User(command, null);
-            ReflectionTestUtils.setField(user, "id", userId);
-
-            // mapper가 반환할 DTO는 실제 record 객체로 준비한다.
-            // mapper는 mock이므로 실제 필드 매핑의 정확성은 UserMapper 테스트에서 별도로 검증한다.
-            UserDto expectedDto = createExpectedDto(userId, command, false);
-
-            given(userRepository.findById(userId)).willReturn(Optional.of(user));
-            given(userMapper.toDto(user)).willReturn(expectedDto);
-
-            // when
-            // 사용자 단건 조회 로직을 실행한다.
-            UserDto result = userService.findById(userId);
-
-            // then
-            // 서비스는 mapper가 만든 DTO를 그대로 반환해야 한다.
-            assertThat(result).isEqualTo(expectedDto);
-
-            // 단건 조회의 핵심 협력은 repository 조회와 mapper 변환이다.
-            verify(userRepository).findById(userId);
-            verify(userMapper).toDto(user);
-
-            // findById()는 파일 저장, 사용자 상태 생성/삭제, 읽음 상태 정리, 메시지 작성자 연결 해제를 수행하지 않는다.
-            verifyNoInteractions(binaryContentService, readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, userMapper);
+        void findById_returnsCachedReaderResult() {
+            UserDto expected = createExpectedDto(createTestUserCommand());
+            given(userReader.findUserDto(expected.id())).willReturn(Optional.of(expected));
+            assertThat(userService.findById(expected.id())).isEqualTo(expected);
         }
 
         @Test
-        @DisplayName("사용자 단건 조회 실패 - 존재하지 않는 사용자")
-        void findById_throwsUserNotFoundException_whenUserDoesNotExist() {
-            // given
-            // 조회할 userId는 있지만 repository가 해당 사용자를 찾지 못하는 상황을 만든다.
-            UUID userId = UUID.randomUUID();
-
-            // BasicUserService.findById(...)는 repository.findById(...) 결과가 비어 있으면
-            // 후속 mapper 변환 없이 UserNotFoundException을 던져야 한다.
-            given(userRepository.findById(userId)).willReturn(Optional.empty());
-
-            // when & then
-            // 존재하지 않는 사용자를 조회하면 UserNotFoundException이 발생해야 한다.
-            assertThatThrownBy(() -> userService.findById(userId))
-                    .isInstanceOf(UserNotFoundException.class);
-
-            // 실패 흐름에서도 조회 시도 자체는 반드시 있어야 한다.
-            verify(userRepository).findById(userId);
-            verifyNoMoreInteractions(userRepository);
-
-            // 사용자를 찾지 못했으므로 DTO 변환이나 다른 부가 작업은 실행되면 안 된다.
-            verifyNoInteractions(userMapper, binaryContentService, readStatusService, messageService);
+        void findById_propagatesMissingUser() {
+            UUID id = UUID.randomUUID();
+            given(userReader.findUserDto(id)).willReturn(Optional.empty());
+            assertThatThrownBy(() -> userService.findById(id)).isInstanceOf(UserNotFoundException.class);
         }
 
         @Test
-        @DisplayName("사용자 목록 조회 성공 - 사용자 목록 반환")
-        void findAll_returnsUserDtoList_whenUsersExist() {
-            // given
-            // repository가 반환할 실제 User 엔티티 목록을 준비한다.
-            // 목록 조회에서는 User 상태 변경은 없지만, 단순 값 객체보다 실제 엔티티를 쓰면 mapper 전달 인자를 명확히 검증할 수 있다.
-            List<UserCreateCommand> commands = List.of(createTestUserCommand(), createTestUserCommand());
-            List<User> users = commands.stream()
-                    .map(command -> new User(command, null))
-                    .toList();
+        void findAll_preservesIdOrderAndOmitsDeletedUsers() {
+            UserDto first = createExpectedDto(createTestUserCommand());
+            UserDto second = createExpectedDto(createTestUserCommand());
+            List<UUID> ids = List.of(first.id(), UUID.randomUUID(), second.id());
+            Map<UUID, UserDto> users = new LinkedHashMap<>();
+            users.put(second.id(), second);
+            users.put(first.id(), first);
+            given(userRepository.findAllIds()).willReturn(ids);
+            given(userReader.findUserDtosByIds(ids)).willReturn(users);
 
-            // mapper가 각 User별로 반환할 실제 UserDto 목록을 준비한다.
-            List<UserDto> userDtos = commands.stream()
-                    .map(UserServiceTest.this::createExpectedDto)
-                    .toList();
-
-            given(userRepository.findAll()).willReturn(users);
-            given(userMapper.toDto(users.get(0))).willReturn(userDtos.get(0));
-            given(userMapper.toDto(users.get(1))).willReturn(userDtos.get(1));
-
-            // when
-            // 사용자 목록 조회 서비스 로직을 실행한다.
-            List<UserDto> results = userService.findAll();
-
-            // then
-            // 서비스는 repository 조회 순서를 유지한 채 mapper 결과를 리스트로 반환해야 한다.
-            assertThat(results).containsExactlyElementsOf(userDtos);
-
-            // 조회된 각 User가 mapper에 정확히 한 번씩 전달됐는지 확인한다.
-            verify(userRepository).findAll();
-            verify(userMapper).toDto(users.get(0));
-            verify(userMapper).toDto(users.get(1));
-
-            // findAll()은 조회 전용이므로 파일/상태/메시지 정리 협력 객체를 사용하지 않는다.
-            verifyNoInteractions(binaryContentService, readStatusService, messageService);
-            verifyNoMoreInteractions(userRepository, userMapper);
+            assertThat(userService.findAll()).containsExactly(first, second);
         }
 
         @Test
-        @DisplayName("사용자 목록 조회 성공 - 사용자가 없으면 빈 목록 반환")
-        void findAll_returnsEmptyList_whenUsersDoNotExist() {
-            // given
-            // repository.findAll() 결과가 빈 리스트인 상황을 만든다.
-            // 이 케이스는 예외가 아니라 정상적으로 빈 DTO 목록을 반환해야 하는 흐름이다.
-            given(userRepository.findAll()).willReturn(List.of());
-
-            // when
-            // 사용자 목록 조회 서비스 로직을 실행한다.
-            List<UserDto> results = userService.findAll();
-
-            // then
-            // 조회된 사용자가 없으면 null이 아니라 빈 리스트를 반환해야 한다.
-            assertThat(results).isEmpty();
-
-            // 사용자 목록 조회는 repository.findAll()까지만 실행된다.
-            verify(userRepository).findAll();
-            verifyNoMoreInteractions(userRepository);
-
-            // 변환할 User가 없으므로 mapper는 호출되지 않아야 한다.
-            // 조회 전용 흐름이므로 다른 부가 협력 객체도 사용하지 않는다.
-            verifyNoInteractions(userMapper, binaryContentService, readStatusService, messageService);
+        void findAll_returnsEmptyWhenNoUsersExist() {
+            given(userRepository.findAllIds()).willReturn(List.of());
+            assertThat(userService.findAll()).isEmpty();
         }
     }
 
@@ -693,14 +611,14 @@ class UserServiceTest {
 
             // 기존 프로필과 새 프로필의 id가 달라야 기존 프로필 삭제 분기가 실행된다.
             UUID oldProfileId = UUID.randomUUID();
-            BinaryContent oldProfile = new BinaryContent("file", "contentType", 1000L);
+            BinaryContent oldProfile =  BinaryContent.createProcessing("file", "contentType", 1000L);
             ReflectionTestUtils.setField(oldProfile, "id", oldProfileId);
 
             User user = new User(command, oldProfile);
 
             MockMultipartFile newFile = new MockMultipartFile("file", "test.jpg", "image/jpeg", "test".getBytes());
             UUID newProfileId = UUID.randomUUID();
-            BinaryContent newProfileContent = new BinaryContent(newFile.getOriginalFilename(), newFile.getContentType(), newFile.getSize());
+            BinaryContent newProfileContent = BinaryContent.createProcessing(newFile.getOriginalFilename(), newFile.getContentType(), newFile.getSize());
             ReflectionTestUtils.setField(newProfileContent, "id", newProfileId);
 
             UserUpdateCommand updateCommand = createUpdateCommand();
@@ -755,7 +673,7 @@ class UserServiceTest {
             // 기존 프로필 이미지를 가진 사용자를 준비한다.
             // binaryContentService.create(null)가 Optional.empty()를 반환하면 서비스는 이 기존 프로필을 그대로 사용한다.
             UUID profileId = UUID.randomUUID();
-            BinaryContent profile = new BinaryContent("file", "contentType", 1000L);
+            BinaryContent profile = BinaryContent.createProcessing("file", "contentType", 1000L);
             ReflectionTestUtils.setField(profile, "id", profileId);
 
             User user = new User(command, profile);
@@ -1005,7 +923,7 @@ class UserServiceTest {
             UserCreateCommand command = createTestUserCommand();
             UUID userId = UUID.randomUUID();
 
-            BinaryContent profile = new BinaryContent("filename", "contentType", 1000L);
+            BinaryContent profile = BinaryContent.createProcessing("filename", "contentType", 1000L);
             User user = new User(command, profile);
             ReflectionTestUtils.setField(user, "id", userId);
 

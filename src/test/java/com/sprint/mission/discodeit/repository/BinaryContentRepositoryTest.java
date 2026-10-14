@@ -4,15 +4,23 @@ import com.sprint.mission.discodeit.config.JpaAuditingTestConfig;
 import com.sprint.mission.discodeit.config.P6SpySqlFormatter;
 import com.sprint.mission.discodeit.config.QuerydslTestConfig;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.entity.BinaryContentStatus;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.data.auditing.AuditingHandler;
+import org.springframework.data.auditing.CurrentDateTimeProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
 import java.util.List;
+import java.util.Optional;
+import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -27,6 +35,40 @@ class BinaryContentRepositoryTest {
 
     @Autowired
     EntityManager em;
+
+    @Autowired
+    AuditingHandler auditingHandler;
+
+    @ParameterizedTest
+    @EnumSource(value = BinaryContentStatus.class, names = {"SUCCESS", "FAIL"})
+    @DisplayName("업로드 상태와 변경 시각이 DB에 저장되어 재조회된다")
+    void updateStatus_persistsStatusAndAuditTimestamp(BinaryContentStatus targetStatus) {
+        Instant createdAt = Instant.parse("2026-10-01T00:00:00Z");
+        AtomicReference<Instant> now = new AtomicReference<>(createdAt);
+        auditingHandler.setDateTimeProvider(() -> Optional.of(now.get()));
+        try {
+            BinaryContent content = binaryContentRepository.saveAndFlush(
+                    BinaryContent.createProcessing("file.txt", "text/plain", 1L));
+            UUID id = content.getId();
+            em.clear();
+
+            BinaryContent saved = binaryContentRepository.findById(id).orElseThrow();
+            assertThat(saved.getStatus()).isEqualTo(BinaryContentStatus.PROCESSING);
+            assertThat(saved.getCreatedAt()).isEqualTo(createdAt);
+
+            now.set(createdAt.plusSeconds(10));
+            saved.updateStatus(targetStatus);
+            em.flush();
+            em.clear();
+
+            BinaryContent updated = binaryContentRepository.findById(id).orElseThrow();
+            assertThat(updated.getStatus()).isEqualTo(targetStatus);
+            assertThat(updated.getCreatedAt()).isEqualTo(createdAt);
+            assertThat(updated.getUpdatedAt()).isEqualTo(now.get());
+        } finally {
+            auditingHandler.setDateTimeProvider(CurrentDateTimeProvider.INSTANCE);
+        }
+    }
 
     @Test
     @DisplayName("파일 목록 조회 성공 - ID 목록에 포함된 파일만 반환")
@@ -237,7 +279,7 @@ class BinaryContentRepositoryTest {
     }
 
     private BinaryContent createBinaryContent(String originalFileName, String contentType, Long size) {
-        return new BinaryContent(originalFileName, contentType, size);
+        return BinaryContent.createProcessing(originalFileName, contentType, size);
     }
 
     private BinaryContent saveBinaryContent(String originalFileName, String contentType, Long size) {

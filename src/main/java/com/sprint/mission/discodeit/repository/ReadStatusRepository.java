@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.repository;
 
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
+
+    @Query("""
+        select new com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds(rs.channel.id, rs.user.id)
+        from ReadStatus rs
+        where rs.channel.id in :channelIds
+    """)
+    List<ChannelParticipantIds> findParticipantIdsByChannelIdIn(@Param("channelIds") List<UUID> channelIds);
 
     @EntityGraph(attributePaths = {"user", "channel"})
     @Query("SELECT rs FROM ReadStatus rs WHERE rs.user.id = :userId")
@@ -30,7 +38,8 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
                             user_id,
                             last_read_at,
                             created_at,
-                            updated_at
+                            updated_at,
+                            notification_enabled
                         )
                         select
                             gen_random_uuid(),
@@ -38,12 +47,16 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
                             u.id,
                             :readAt,
                             now(),
-                            now()
-                            from users u 
+                            now(),
+                            :notificationEnabled
+                            from users u
                             where u.id in (:userIds)
             """,
             nativeQuery = true)
-    int burkInsert(@Param("channelId") UUID channelId, @Param("userIds") List<UUID> userIds, @Param("readAt") Instant readAt);
+    int bulkInsert(@Param("channelId") UUID channelId,
+                   @Param("userIds") List<UUID> userIds,
+                   @Param("readAt") Instant readAt,
+                   @Param("notificationEnabled") Boolean notificationEnabled);
 
     @EntityGraph(attributePaths = {"user", "user.profile", "channel"})
     @Query("SELECT rs FROM ReadStatus rs WHERE rs.channel.id = :channelId")
@@ -62,4 +75,16 @@ public interface ReadStatusRepository extends JpaRepository<ReadStatus, UUID> {
     boolean existsByUser_Id(UUID userId);
 
     void deleteByUser_Id(UUID userId);
+
+    @Query("""
+        SELECT rs
+        FROM ReadStatus rs
+        WHERE
+            rs.channel.id = :channelId
+            AND rs.user.id != :excludedUserId
+            AND rs.notificationEnabled = true
+    """)
+    List<ReadStatus> findNotificationEnabledByChannelIdExcludingUserId(
+            @Param("channelId") UUID channelId,
+            @Param("excludedUserId") UUID excludedUserId);
 }

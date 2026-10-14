@@ -3,6 +3,10 @@ server:
   port: 0
 
 spring:
+  cache:
+    # 일반 테스트는 로컬 Redis 연결 없이 실행한다. Redis 통합 테스트에서만 재정의한다.
+    type: caffeine
+
   docker:
     compose:
       # 테스트에서는 PostgreSQL Docker Compose를 실행하지 않음
@@ -70,10 +74,16 @@ logging:
 discodeit:
   security:
     jwt:
+      registry-type: in-memory
+      max-active-jwt-count: 1
       secret: ${JWT_SECRET:secret-very-to-long-bytes32-has-sufficient-strength}
       access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
       refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
       issuer: ${JWT_ISSUER:discodeit}
+    refresh-cookie:
+      http-only: true
+      secure: false
+      same-site: lax
   admin:
     user:
       username: test-admin

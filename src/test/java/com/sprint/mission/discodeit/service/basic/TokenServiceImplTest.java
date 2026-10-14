@@ -96,11 +96,12 @@ class TokenServiceImplTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    @DisplayName("갱신은 현재 사용자 정보를 직접 반환하며 기존 인증 유무와 관계없이 컨텍스트를 변경하지 않는다")
+    @DisplayName("토큰의 사용자명이 이전 값이어도 ID로 현재 사용자를 조회하고 기존 인증을 유지한다")
     void rotateRefreshToken_returnsCurrentUserWithoutChangingAuthentication(boolean alreadyAuthenticated) {
         Authentication previous = alreadyAuthenticated ? setPreviousAuthentication() : null;
-        stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
-        given(userDetailsService.loadUserByUsername(userDto.username()))
+        Claims claims = stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
+        given(jwtTokenProvider.getUserId(claims)).willReturn(userDto.id());
+        given(userDetailsService.loadUserById(userDto.id()))
                 .willReturn(new DiscodeitUserDetails(userDto, "unused-password"));
         stubGeneratedTokens();
 
@@ -111,7 +112,8 @@ class TokenServiceImplTest {
         verify(jwtRegistry).rotateJwtInformation(REFRESH_TOKEN,
                 new JwtInformation(userDto, NEW_ACCESS_TOKEN, NEW_REFRESH_TOKEN));
         verify(cookieManager).readRefreshToken();
-        verify(userDetailsService).loadUserByUsername(userDto.username());
+        verify(userDetailsService).loadUserById(userDto.id());
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
         verify(jwtTokenProvider).generateAccessToken(userDto.id(), userDto.username(), userDto.role());
         verify(jwtTokenProvider).generateRefreshToken(userDto.id(), userDto.username());
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(previous);
@@ -170,8 +172,9 @@ class TokenServiceImplTest {
     @DisplayName("사용자 조회 실패는 갱신 실패 예외로 변환하고 토큰 발급과 인증 변경을 하지 않는다")
     void rotateRefreshToken_convertsMissingUserToRenewalFailure() {
         Authentication previous = setPreviousAuthentication();
-        stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
-        given(userDetailsService.loadUserByUsername(userDto.username()))
+        Claims claims = stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
+        given(jwtTokenProvider.getUserId(claims)).willReturn(userDto.id());
+        given(userDetailsService.loadUserById(userDto.id()))
                 .willThrow(new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
 
         assertThatThrownBy(service::rotateRefreshToken)
@@ -179,6 +182,7 @@ class TokenServiceImplTest {
                 .hasMessage("토큰 갱신에 실패했습니다.");
 
         verifyNoTokenGeneration();
+        verify(jwtRegistry, never()).rotateJwtInformation(any(), any());
         verifyNoCookieChanges();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(previous);
     }
@@ -205,13 +209,15 @@ class TokenServiceImplTest {
                 .willReturn(NEW_REFRESH_TOKEN);
     }
 
-    private void stubValidatedToken(JwtTokenProvider.TokenType type) {
+    private Claims stubValidatedToken(JwtTokenProvider.TokenType type) {
         given(cookieManager.readRefreshToken()).willReturn(Optional.of(REFRESH_TOKEN));
         given(jwtRegistry.hasActiveJwtInformationByRefreshToken(REFRESH_TOKEN)).willReturn(true);
-        Claims claims = Jwts.claims().subject(userDto.username())
+        Claims claims = Jwts.claims().subject("previous-username")
+                .add(JwtTokenProvider.CLAIM_USER_ID, userDto.id().toString())
                 .add(JwtTokenProvider.CLAIM_TOKEN_TYPE, type.name()).build();
         given(jwtTokenProvider.validateToken(REFRESH_TOKEN)).willReturn(Optional.of(claims));
         given(jwtTokenProvider.getTokenType(claims)).willReturn(type.name());
+        return claims;
     }
 
     private Authentication setPreviousAuthentication() {
@@ -237,8 +243,9 @@ class TokenServiceImplTest {
     @DisplayName("사전 검사 후 다른 요청이 토큰을 교체하면 갱신 실패를 전파하고 새 쿠키를 쓰지 않는다")
     void rotateRefreshToken_propagatesRegistryRotationFailure() {
         Authentication previous = setPreviousAuthentication();
-        stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
-        given(userDetailsService.loadUserByUsername(userDto.username()))
+        Claims claims = stubValidatedToken(JwtTokenProvider.TokenType.REFRESH);
+        given(jwtTokenProvider.getUserId(claims)).willReturn(userDto.id());
+        given(userDetailsService.loadUserById(userDto.id()))
                 .willReturn(new DiscodeitUserDetails(userDto, "unused-password"));
         stubGeneratedTokens();
         TokenRenewalFailedException failure = new TokenRenewalFailedException();

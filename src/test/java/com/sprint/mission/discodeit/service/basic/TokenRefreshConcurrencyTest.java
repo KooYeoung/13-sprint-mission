@@ -15,6 +15,7 @@ import com.sprint.mission.discodeit.service.RefreshTokenCookieManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +42,8 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("실제 토큰 서비스·Provider·Registry 동시 갱신 컴포넌트 테스트")
 class TokenRefreshConcurrencyTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     DiscodeitUserDetailsService userDetailsService;
@@ -53,9 +56,10 @@ class TokenRefreshConcurrencyTest {
     void rotateRefreshToken_returnsOnlyOneSuccessfulPair() throws Exception {
         Instant now = Instant.parse("2026-09-23T00:00:00Z");
         JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
+                1,
                 "concurrency-test-secret-with-at-least-32-bytes", Duration.ofMinutes(10),
                 Duration.ofDays(14), "concurrency-test"), Clock.fixed(now, ZoneOffset.UTC));
-        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider);
+        InMemoryJwtRegistry registry = new InMemoryJwtRegistry(provider, eventPublisher, Clock.fixed(now, ZoneOffset.UTC));
         TokenServiceImpl service = new TokenServiceImpl(provider, userDetailsService, cookieManager, registry);
         OffsetDateTime dateTime = now.atOffset(ZoneOffset.UTC);
         UserDto user = new UserDto(UUID.randomUUID(), "concurrent-user", "user@example.com",
@@ -64,7 +68,7 @@ class TokenRefreshConcurrencyTest {
         registry.registerJwtInformation(new JwtInformation(user, initial.accessToken(), initial.refreshToken()));
         given(cookieManager.readRefreshToken()).willReturn(Optional.of(initial.refreshToken()));
         CyclicBarrier bothPassedActiveCheck = new CyclicBarrier(2);
-        given(userDetailsService.loadUserByUsername(user.username())).willAnswer(invocation -> {
+        given(userDetailsService.loadUserById(user.id())).willAnswer(invocation -> {
             // 사용자 조회 전에 두 요청 모두 동일한 기존 토큰의 활성 검사를 통과하도록 강제한다.
             bothPassedActiveCheck.await(5, SECONDS);
             return new DiscodeitUserDetails(user, "unused-password");

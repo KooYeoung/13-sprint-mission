@@ -1580,7 +1580,7 @@ class MessageRepositoryTest {
 
     private AuthorFixture saveAuthorFixture(String username, String email) {
         BinaryContent savedProfile = binaryContentRepository.saveAndFlush(
-                new BinaryContent(username + ".png", "image/png", 1_024L)
+                 BinaryContent.createProcessing(username + ".png", "image/png", 1_024L)
         );
         UserCreateCommand command = new UserCreateCommand(username, "testPassword", email);
         User savedUser = userRepository.saveAndFlush(new User(command, savedProfile));

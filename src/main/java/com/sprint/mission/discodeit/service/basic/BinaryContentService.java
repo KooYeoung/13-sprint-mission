@@ -4,8 +4,8 @@ import com.sprint.mission.discodeit.aspect.LogAction;
 import com.sprint.mission.discodeit.dto.response.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.response.DownloadDto;
 import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.events.BinaryContentCreatedEvent;
 import com.sprint.mission.discodeit.exception.storage.FileNotFoundException;
-import com.sprint.mission.discodeit.exception.storage.FileReadFailedException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentStorage;
@@ -13,8 +13,7 @@ import com.sprint.mission.discodeit.storage.BinaryContentUpload;
 import com.sprint.mission.discodeit.storage.DownloadResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.lang.NonNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +31,7 @@ public class BinaryContentService {
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
     private final BinaryContentMapper binaryContentMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Optional<BinaryContent> create(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -40,18 +40,27 @@ public class BinaryContentService {
 
         String originalFileName = file.getOriginalFilename();
 
-        BinaryContent binaryContent = binaryContentRepository.save(new BinaryContent(
+        BinaryContent binaryContent = binaryContentRepository.save(BinaryContent.createProcessing(
                 originalFileName,
                 file.getContentType(),
                 file.getSize()
         ));
 
-        binaryContentStorage.put(binaryContent.getId(), BinaryContentUpload.from(file));
+        BinaryContentUpload upload = BinaryContentUpload.from(file);
+        try {
+            eventPublisher.publishEvent(new BinaryContentCreatedEvent(binaryContent.getId(), upload));
+        } catch (RuntimeException failure) {
+            try {
+                upload.close();
+            } catch (IOException | RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
 
-        log.info("파일 업로드 완료. binaryContentId={}", binaryContent.getId());
+        log.debug("바이너리 파일 생성 이벤트를 발행했습니다. 커밋 후 업로드를 실행합니다. binaryContentId={}", binaryContent.getId());
         return Optional.of(binaryContent);
     }
-
 
     @Transactional(readOnly = true)
     public BinaryContentDto findById(UUID id) {
@@ -117,7 +126,7 @@ public class BinaryContentService {
         return binaryContentMapper.toDownloadDto(binaryContent, result);
     }
 
-    private @NonNull BinaryContent getBinaryContentById(UUID id) {
+    private BinaryContent getBinaryContentById(UUID id) {
         return binaryContentRepository.findById(id)
                 .orElseThrow(() -> new FileNotFoundException(id));
     }

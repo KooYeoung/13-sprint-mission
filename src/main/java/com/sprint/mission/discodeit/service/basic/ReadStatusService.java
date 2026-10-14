@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusCreateCommand;
 import com.sprint.mission.discodeit.dto.command.readStatus.ReadStatusUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.ReadStatusDto;
+import com.sprint.mission.discodeit.dto.repository.ChannelParticipantIds;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ReadStatus;
 import com.sprint.mission.discodeit.entity.User;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -34,12 +36,18 @@ public class ReadStatusService {
     public void saveAll(Channel channel, List<UUID> userIds, Instant readAt) {
         if (userIds == null) throw new UserNotFoundException();
 
-        List<UUID> distinctUserIds = userIds.stream().distinct().toList();
+        List<UUID> distinctUserIds = userIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
         if (distinctUserIds.isEmpty()) throw new UserNotFoundException();
 
-        int insertedRowsCount = readStatusRepository.burkInsert(channel.getId(), distinctUserIds, readAt);
+        int insertedRowsCount = readStatusRepository.bulkInsert(channel.getId(), distinctUserIds, readAt, channel.isPrivate());
 
         if (insertedRowsCount != distinctUserIds.size()) throw new UserNotFoundException();
+        log.debug("채널 참여자의 읽음 상태 생성을 요청했습니다. channelId={}, participantCount={}, notificationEnabled={}",
+                channel.getId(), insertedRowsCount, channel.isPrivate());
     }
 
     @PreAuthorize("#command.userId() == authentication.principal.userDto.id "
@@ -56,6 +64,12 @@ public class ReadStatusService {
     @Transactional(readOnly = true)
     public List<ReadStatus> findAllByChannelId(UUID channelId) {
         return readStatusRepository.findByChannelId(channelId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChannelParticipantIds> findParticipantIdsByChannelIds(List<UUID> channelIds) {
+        if (channelIds.isEmpty()) return List.of();
+        return readStatusRepository.findParticipantIdsByChannelIdIn(channelIds);
     }
 
     @Transactional(readOnly = true)
@@ -86,12 +100,19 @@ public class ReadStatusService {
                 .toList();
     }
 
+    @PreAuthorize("@readStatusGuard.isOwner(#readStatusId, authentication.principal.userDto.id)")
     public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateCommand command) {
         ReadStatus readStatus = getReadStatusRequireThrow(readStatusId);
+        Boolean previousEnabled = readStatus.getNotificationEnabled();
 
         readStatus.updateInfo(command);
 
-        return readStatusMapper.toDto(readStatusRepository.save(readStatus));
+        ReadStatusDto updated = readStatusMapper.toDto(readStatusRepository.save(readStatus));
+        if (!Objects.equals(previousEnabled, readStatus.getNotificationEnabled())) {
+            log.info("채널 알림 설정 변경을 요청했습니다. readStatusId={}, userId={}, channelId={}, previousEnabled={}, newEnabled={}",
+                    readStatusId, readStatus.getUserId(), readStatus.getChannelId(), previousEnabled, readStatus.getNotificationEnabled());
+        }
+        return updated;
     }
 
     public void delete(UUID id) {
@@ -103,6 +124,13 @@ public class ReadStatusService {
         if (!readStatusRepository.existsByUser_Id(userId)) return;
 
         readStatusRepository.deleteByUser_Id(userId);
+    }
+
+    public List<UUID> findNotificationRecipientIds(UUID channelId, UUID excludedUserId) {
+        return readStatusRepository.findNotificationEnabledByChannelIdExcludingUserId(channelId, excludedUserId)
+                .stream()
+                .map(ReadStatus::getUserId)
+                .toList();
     }
 
     private ReadStatus getReadStatusRequireThrow(UUID id) {

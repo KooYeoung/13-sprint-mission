@@ -57,7 +57,7 @@ public class JwtTokenProvider {
         try {
             return Optional.of(parseClaims(token));
         } catch (ExpiredJwtException e) {
-            log.warn("[JWT] 만료된 토큰: {}", e.getMessage());
+            log.debug("[JWT] 만료된 토큰: {}", e.getMessage());
         } catch (JwtException | IllegalArgumentException | NullPointerException e) {
             log.warn("[JWT] 유효하지 않은 토큰: {}", e.getMessage());
         }
@@ -82,8 +82,10 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
 
-            String tokenType = payload.get(CLAIM_TOKEN_TYPE, String.class);
-            TokenType.valueOf(tokenType);
+        String tokenType = payload.get(CLAIM_TOKEN_TYPE, String.class);
+        TokenType.valueOf(tokenType);
+        // 사용자 조회에 사용하기 전에 필수 ID 클레임의 자료형과 UUID 형식을 검증한다.
+        getUserId(payload);
 
         return payload;
     }
@@ -131,5 +133,9 @@ public class JwtTokenProvider {
 
     public Duration getRefreshTokenExpirationTime(){
        return jwtProperties.refreshTokenValidity();
+    }
+
+    public Integer getMaxActiveJwtCount(){
+        return jwtProperties.maxActiveJwtCount();
     }
 }

@@ -4,9 +4,21 @@ discodeit:
       username: ${ADMIN_USER_NAME:디스코드잇_관리자}
       password: ${ADMIN_USER_PASSWORD:admin1234}
       email: ${ADMIN_USER_EMAIL:admin@discodeit.com}
+  security:
+    jwt:
+      registry-type: ${JWT_REGISTRY_TYPE:in-memory}
+      max-active-jwt-count: ${JWT_MAX_ACTIVE_JWT_COUNT:1}
+      secret: ${JWT_SECRET:secret-very-to-long-bytes32-has-sufficient-strength}
+      access-token-validity: ${JWT_ACCESS_TOKEN_VALIDITY:10m}
+      refresh-token-validity: ${JWT_REFRESH_TOKEN_VALIDITY:14d}
+      issuer: ${JWT_ISSUER:discodeit}
+    refresh-cookie:
+      http-only: ${REFRESH_COOKIE_HTTP_ONLY:true}
+      secure: ${REFRESH_COOKIE_SECURE:false}
+      same-site: ${REFRESH_COOKIE_SAME_SITE:lax}
 
 server:
-  port: 8080
+  port: 0
 
 spring:
   docker:
@@ -19,7 +31,7 @@ spring:
       lifecycle-management: start-only
 
       readiness:
-        # PostgreSQL 준비 완료 대기 설정
+        # PostgreSQL·Redis 준비 완료 대기 설정
         timeout: 2m
         tcp:
           connect-timeout: 10s
@@ -74,6 +86,7 @@ management:
           - health
           - info
           - metrics
+          - caches
           - loggers
 
   info:

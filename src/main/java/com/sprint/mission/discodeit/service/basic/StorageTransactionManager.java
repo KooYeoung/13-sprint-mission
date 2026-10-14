@@ -30,7 +30,7 @@ public class StorageTransactionManager {
 
     public void afterRollback(String description, TransactionalStorageAction action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            log.warn("트랜잭션 동기화가 활성화되어 있지 않아 롤백 후 스토리지 작업을 등록할 수 없습니다. description={}", description);
+            log.debug("활성화된 트랜잭션 동기화가 없어 롤백 정리 작업 등록을 생략합니다. description={}", description);
             return;
         }
 

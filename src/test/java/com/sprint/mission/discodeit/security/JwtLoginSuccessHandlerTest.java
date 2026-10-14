@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.security;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sprint.mission.discodeit.dto.response.JwtDto;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -31,6 +33,8 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JwtLoginSuccessHandler 단위 테스트")
 class JwtLoginSuccessHandlerTest {
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     private static final String ACCESS_TOKEN = "issued-access-token";
     private static final String REFRESH_TOKEN = "issued-refresh-token";
@@ -51,7 +55,7 @@ class JwtLoginSuccessHandlerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper().findAndRegisterModules();
-        jwtLoginSuccessHandler = new JwtLoginSuccessHandler(objectMapper, tokenService, jwtRegistry);
+        jwtLoginSuccessHandler = new JwtLoginSuccessHandler(objectMapper, tokenService, jwtRegistry, eventPublisher);
         OffsetDateTime now = OffsetDateTime.parse("2026-09-10T10:00:00+09:00");
         userDto = new UserDto(
                 UUID.randomUUID(),
@@ -78,6 +82,7 @@ class JwtLoginSuccessHandlerTest {
         verify(tokenService).generateToken(userDto);
         verify(jwtRegistry).registerJwtInformation(new JwtInformation(userDto, ACCESS_TOKEN, REFRESH_TOKEN));
         verify(tokenService).addRefreshTokenCookie(REFRESH_TOKEN);
+        verify(eventPublisher).publishEvent(new UserCacheClearEvent(userDto.id()));
     }
 
     @Test

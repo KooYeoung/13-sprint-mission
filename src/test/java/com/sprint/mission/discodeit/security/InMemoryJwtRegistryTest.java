@@ -1,18 +1,28 @@
 package com.sprint.mission.discodeit.security;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.dto.response.UserDto;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.exception.jwt.TokenRenewalFailedException;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -30,6 +40,10 @@ import static org.mockito.BDDMockito.given;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("인메모리 JWT 레지스트리 단위 테스트")
 class InMemoryJwtRegistryTest {
+    private static final Instant NOW = Instant.parse("2026-10-11T00:00:00Z");
+
+    @Mock ApplicationEventPublisher eventPublisher;
+
 
     @Mock
     JwtTokenProvider jwtTokenProvider;
@@ -38,13 +52,15 @@ class InMemoryJwtRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new InMemoryJwtRegistry(jwtTokenProvider);
+        registry = new InMemoryJwtRegistry(jwtTokenProvider, eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
+        given(jwtTokenProvider.getMaxActiveJwtCount()).willReturn(1);
     }
 
     @Test
     @DisplayName("첫 로그인 정보를 등록하면 사용자와 두 토큰으로 조회할 수 있다")
     void register_makesUserAndTokensActive() {
         JwtInformation info = information(UUID.randomUUID());
+        stubValidRefresh(info);
         assertActive(info, false);
 
         registry.registerJwtInformation(info);
@@ -58,6 +74,7 @@ class InMemoryJwtRegistryTest {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation replacement = information(old.userDto().id());
         JwtInformation other = information(UUID.randomUUID());
+        stubValidRefresh(replacement, other);
         registry.registerJwtInformation(old);
         registry.registerJwtInformation(other);
 
@@ -73,6 +90,7 @@ class InMemoryJwtRegistryTest {
     void invalidate_removesOnlyRequestedUser() {
         JwtInformation target = information(UUID.randomUUID());
         JwtInformation other = information(UUID.randomUUID());
+        stubValidRefresh(other);
         registry.registerJwtInformation(target);
         registry.registerJwtInformation(other);
 
@@ -88,6 +106,7 @@ class InMemoryJwtRegistryTest {
     void invalidateByRefreshToken_removesMatchingPairAndAllowsRepeatedRequests() {
         JwtInformation target = information(UUID.randomUUID());
         JwtInformation other = information(UUID.randomUUID());
+        stubValidRefresh(other);
         registry.registerJwtInformation(target);
         registry.registerJwtInformation(other);
 
@@ -103,6 +122,7 @@ class InMemoryJwtRegistryTest {
     void invalidateByRefreshToken_preservesUsersWhenTokenDoesNotMatch() {
         JwtInformation target = information(UUID.randomUUID());
         JwtInformation other = information(UUID.randomUUID());
+        stubValidRefresh(target, other);
         registry.registerJwtInformation(target);
         registry.registerJwtInformation(other);
 
@@ -117,6 +137,7 @@ class InMemoryJwtRegistryTest {
     void invalidateByRefreshToken_preservesNewLogin() {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation current = information(old.userDto().id());
+        stubValidRefresh(current);
         registry.registerJwtInformation(old);
         registry.registerJwtInformation(current);
 
@@ -131,6 +152,7 @@ class InMemoryJwtRegistryTest {
     void invalidateByRefreshToken_preservesRotatedTokens() {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation current = information(old.userDto().id());
+        stubValidRefresh(current);
         registry.registerJwtInformation(old);
         registry.rotateJwtInformation(old.refreshToken(), current);
 
@@ -161,6 +183,7 @@ class InMemoryJwtRegistryTest {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation replacement = information(old.userDto().id());
         JwtInformation other = information(UUID.randomUUID());
+        stubValidRefresh(replacement, other);
         registry.registerJwtInformation(old);
         registry.registerJwtInformation(other);
 
@@ -188,6 +211,7 @@ class InMemoryJwtRegistryTest {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation other = information(UUID.randomUUID());
         JwtInformation replacement = information(old.userDto().id());
+        stubValidRefresh(old, other);
         registry.registerJwtInformation(old);
         registry.registerJwtInformation(other);
 
@@ -205,6 +229,7 @@ class InMemoryJwtRegistryTest {
         JwtInformation old = information(UUID.randomUUID());
         JwtInformation current = information(old.userDto().id());
         JwtInformation rejected = information(old.userDto().id());
+        stubValidRefresh(current);
         registry.registerJwtInformation(old);
         registry.rotateJwtInformation(old.refreshToken(), current);
 
@@ -227,11 +252,19 @@ class InMemoryJwtRegistryTest {
         given(jwtTokenProvider.validateToken(valid.refreshToken()))
                 .willReturn(Optional.of(Jwts.claims().subject(valid.userDto().username()).build()));
 
+        // 저장 정보가 아직 정리되지 않았어도 만료된 사용자는 즉시 오프라인이다.
+        assertThat(registry.hasActiveJwtInformationByUserId(expired.userDto().id())).isFalse();
+        assertThat(registry.findActiveUserIds(List.of(expired.userDto().id(), valid.userDto().id(),
+                valid.userDto().id(), UUID.randomUUID()))).containsExactly(valid.userDto().id());
+        assertThat(registry.findActiveUserIds(List.of())).isEmpty();
+
         registry.clearExpiredJwtInformation();
         registry.clearExpiredJwtInformation();
 
         assertActive(expired, false);
         assertActive(valid, true);
+        org.mockito.Mockito.verify(eventPublisher).publishEvent(new UserCacheClearEvent(expired.userDto().id()));
+        org.mockito.Mockito.verifyNoMoreInteractions(eventPublisher);
     }
 
     @Test
@@ -239,6 +272,7 @@ class InMemoryJwtRegistryTest {
     void clearExpired_preservesConcurrentNewLogin() throws Exception {
         JwtInformation expired = information(UUID.randomUUID());
         JwtInformation replacement = information(expired.userDto().id());
+        stubValidRefresh(replacement);
         registry.registerJwtInformation(expired);
         CountDownLatch validationStarted = new CountDownLatch(1);
         CountDownLatch finishValidation = new CountDownLatch(1);
@@ -298,11 +332,116 @@ class InMemoryJwtRegistryTest {
             assertTokensActive(old, false);
             assertTokensActive(first, firstSucceeded);
             assertTokensActive(second, secondSucceeded);
+            stubValidRefresh(firstSucceeded ? first : second);
             assertThat(registry.hasActiveJwtInformationByUserId(old.userDto().id())).isTrue();
         } finally {
             start.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("최대 두 세션을 유지하고 갱신한 세션은 가장 최근 순서로 이동한다")
+    void registerAndRotate_respectConfiguredLimitAndRecency() {
+        given(jwtTokenProvider.getMaxActiveJwtCount()).willReturn(2);
+        UUID userId = UUID.randomUUID();
+        JwtInformation first = information(userId);
+        JwtInformation second = information(userId);
+        JwtInformation third = information(userId);
+        JwtInformation rotatedSecond = information(userId);
+        JwtInformation fourth = information(userId);
+        registry.registerJwtInformation(first);
+        registry.registerJwtInformation(second);
+        assertTokensActive(first, true);
+        assertTokensActive(second, true);
+
+        registry.registerJwtInformation(third);
+        assertTokensActive(first, false);
+        assertTokensActive(second, true);
+        assertTokensActive(third, true);
+
+        registry.rotateJwtInformation(second.refreshToken(), rotatedSecond);
+        registry.registerJwtInformation(fourth);
+        assertTokensActive(second, false);
+        assertTokensActive(third, false);
+        assertTokensActive(rotatedSecond, true);
+        assertTokensActive(fourth, true);
+    }
+
+    @Test
+    @DisplayName("유효한 Access 세션이 하나라도 있으면 온라인이며 마지막 유효 세션 로그아웃 후에는 제외한다")
+    void findUserIdsWithValidAccessToken_handlesMultipleSessionsAndLogout() {
+        given(jwtTokenProvider.getMaxActiveJwtCount()).willReturn(2);
+        UUID userId = UUID.randomUUID();
+        JwtInformation expired = information(userId);
+        JwtInformation valid = information(userId);
+        stubValidRefresh(expired);
+        given(jwtTokenProvider.validateToken(expired.accessToken())).willReturn(Optional.empty());
+        stubAccessExpiration(valid, NOW.plusSeconds(60));
+        registry.registerJwtInformation(expired);
+        registry.registerJwtInformation(valid);
+
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(userId, UUID.randomUUID(), userId)))
+                .containsExactly(userId);
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of())).isEmpty();
+
+        registry.invalidateJwtInformationByRefreshToken(userId, valid.refreshToken());
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(userId))).isEmpty();
+        assertThat(registry.hasActiveJwtInformationByUserId(userId)).isTrue();
+
+        JwtInformation refreshed = information(userId);
+        stubAccessExpiration(refreshed, NOW.plusSeconds(600));
+        registry.rotateJwtInformation(expired.refreshToken(), refreshed);
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(userId))).containsExactly(userId);
+
+        registry.invalidateJwtInformationByUserId(userId);
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(userId))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만료된 세션과 만료 시각이 없는 Access Token은 온라인 조회에서 제외한다")
+    void findUserIdsWithValidAccessToken_excludesExpiredSessionsAndMissingExpiration() {
+        JwtInformation expiredSession = information(UUID.randomUUID());
+        JwtInformation missingExpiration = information(UUID.randomUUID());
+        given(jwtTokenProvider.validateToken(expiredSession.refreshToken())).willReturn(Optional.empty());
+        stubAccessExpiration(missingExpiration, null);
+        registry.registerJwtInformation(expiredSession);
+        registry.registerJwtInformation(missingExpiration);
+
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(expiredSession.userDto().id(),
+                missingExpiration.userDto().id()))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1, true", "0, false", "-1, false"})
+    @DisplayName("Access 만료 시각 직전까지만 온라인이며 만료 시각부터는 오프라인이다")
+    void findUserIdsWithValidAccessToken_checksExpirationBoundary(long remainingSeconds, boolean online) {
+        JwtInformation info = information(UUID.randomUUID());
+        stubAccessExpiration(info, NOW.plusSeconds(remainingSeconds));
+        registry.registerJwtInformation(info);
+
+        assertThat(registry.findUserIdsWithValidAccessToken(List.of(info.userDto().id())).contains(info.userDto().id()))
+                .isEqualTo(online);
+    }
+
+    private void stubAccessExpiration(JwtInformation info, Instant expiration) {
+        stubValidRefresh(info);
+        Claims claims = Jwts.claims()
+                .id(info.accessToken())
+                .add("user_id", info.userDto().id().toString())
+                .add("token_type", JwtTokenProvider.TokenType.ACCESS.name())
+                .expiration(expiration == null ? null : Date.from(expiration))
+                .build();
+        given(jwtTokenProvider.validateToken(info.accessToken())).willReturn(Optional.of(claims));
+        given(jwtTokenProvider.getTokenType(claims)).willReturn(JwtTokenProvider.TokenType.ACCESS.name());
+        given(jwtTokenProvider.getUserId(claims)).willReturn(info.userDto().id());
+    }
+
+    private void stubValidRefresh(JwtInformation... infos) {
+        for (JwtInformation info : infos) {
+            given(jwtTokenProvider.validateToken(info.refreshToken()))
+                    .willReturn(Optional.of(Jwts.claims().subject(info.userDto().username()).build()));
         }
     }
 

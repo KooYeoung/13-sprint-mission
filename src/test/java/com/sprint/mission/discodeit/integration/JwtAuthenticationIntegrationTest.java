@@ -6,14 +6,17 @@ import com.sprint.mission.discodeit.config.JwtProperties;
 import com.sprint.mission.discodeit.config.RefreshCookieProperties;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
+import com.sprint.mission.discodeit.dto.command.user.UserUpdateCommand;
 import com.sprint.mission.discodeit.dto.request.user.UserRoleUpdateRequest;
 import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.repository.UserRepository;
+import com.sprint.mission.discodeit.repository.NotificationRepository;
 import com.sprint.mission.discodeit.mapper.UserMapper;
 import com.sprint.mission.discodeit.security.JwtAuthenticationFilter;
 import com.sprint.mission.discodeit.security.JwtInformation;
 import com.sprint.mission.discodeit.security.JwtRegistry;
+import com.sprint.mission.discodeit.security.InMemoryJwtRegistry;
 import com.sprint.mission.discodeit.security.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.Filter;
@@ -80,6 +83,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("실제 서버의 JWT 인증 통합 테스트")
 class JwtAuthenticationIntegrationTest {
 
+    @Autowired InMemoryJwtRegistry inMemoryJwtRegistry;
+
     private static final String RAW_PASSWORD = "jwt-integration-password";
 
     @Autowired
@@ -90,6 +95,9 @@ class JwtAuthenticationIntegrationTest {
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    NotificationRepository notificationRepository;
 
     @Autowired
     PasswordEncoder passwordEncoder;
@@ -128,6 +136,7 @@ class JwtAuthenticationIntegrationTest {
     void deleteCreatedUsers() {
         createdUserIds.forEach(jwtRegistry::invalidateJwtInformationByUserId);
         // 실제 HTTP 요청은 별도 트랜잭션이므로 테스트 롤백 대신 생성한 사용자만 정리한다.
+        createdUserIds.forEach(id -> notificationRepository.deleteAll(notificationRepository.findAllByReceiverId(id)));
         userRepository.deleteAllById(createdUserIds);
     }
 
@@ -148,6 +157,36 @@ class JwtAuthenticationIntegrationTest {
             assertThat(item.path("username").asText()).isEqualTo(user.getUsername());
             assertThat(item.path("role").asText()).isEqualTo(user.getRole().name());
         });
+    }
+
+    @Test
+    @DisplayName("사용자명 변경 후에도 기존 Access 인증과 Refresh 갱신이 가능하고 새 사용자명으로 로그인한다")
+    void tokens_remainUsableAfterUsernameChanged() throws Exception {
+        User user = createUser();
+        String previousUsername = user.getUsername();
+        ResponseEntity<String> loginResponse = login(user);
+        String previousAccess = accessToken(loginResponse);
+        String previousRefresh = cookie(loginResponse, "REFRESH_TOKEN").getValue();
+
+        user.updateInfo(new UserUpdateCommand("renamed-" + UUID.randomUUID(), null, null), null);
+        user = userRepository.saveAndFlush(user);
+
+        // 기존 토큰은 이전 사용자명을 유지하지만 인증에는 변경되지 않는 user_id를 사용한다.
+        assertThat(jwtTokenProvider.parseClaims(previousAccess).getSubject()).isEqualTo(previousUsername);
+        assertThat(jwtTokenProvider.parseClaims(previousRefresh).getSubject()).isEqualTo(previousUsername);
+        assertThat(getUsers(previousAccess).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> refreshed = refresh(previousRefresh);
+
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode refreshedUser = objectMapper.readTree(refreshed.getBody()).path("userDto");
+        assertThat(refreshedUser.path("id").asText()).isEqualTo(user.getId().toString());
+        assertThat(refreshedUser.path("username").asText()).isEqualTo(user.getUsername());
+        assertTokenClaims(accessToken(refreshed), JwtTokenProvider.TokenType.ACCESS, user);
+        assertTokenClaims(cookie(refreshed, "REFRESH_TOKEN").getValue(), JwtTokenProvider.TokenType.REFRESH, user);
+
+        // 폼 로그인은 계속 사용자명과 비밀번호를 사용한다.
+        assertTokenClaims(accessToken(login(user)), JwtTokenProvider.TokenType.ACCESS, user);
     }
 
     @Test
@@ -341,14 +380,17 @@ class JwtAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("과거에 발급한 리프레시 토큰의 갱신은 새 발급 시각과 설정된 유효기간을 적용한다")
+    @DisplayName("Access 만료 시 오프라인·인증 실패이며 Refresh 갱신 후 새 유효기간과 온라인 표시를 적용한다")
     void refresh_renewsIssuedAtAndExpirationWithoutWaiting() throws Exception {
         User user = createUser();
-        Instant past = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.SECONDS);
+        Instant past = Instant.now().minusSeconds(660).truncatedTo(ChronoUnit.SECONDS);
         JwtTokenProvider pastProvider = new JwtTokenProvider(jwtProperties, Clock.fixed(past, ZoneOffset.UTC));
         String oldToken = pastProvider.generateRefreshToken(user.getId(), user.getUsername());
-        jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(user, true),
-                pastProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRole()), oldToken));
+        String oldAccess = pastProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+        jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(user, true), oldAccess, oldToken));
+        assertThat(getUsers(oldAccess).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        ResponseEntity<String> observerLogin = login(createUser());
+        assertUserOnline(getUsers(accessToken(observerLogin)), user, false);
         Instant before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
         ResponseEntity<String> response = refresh(oldToken);
@@ -365,6 +407,7 @@ class JwtAuthenticationIntegrationTest {
                 .isEqualTo(access.getIssuedAt().toInstant().plus(jwtProperties.accessTokenValidity()));
         assertThat(refresh.getExpiration().toInstant())
                 .isEqualTo(refresh.getIssuedAt().toInstant().plus(jwtProperties.refreshTokenValidity()));
+        assertUserOnline(getUsers(accessToken(response)), user, true);
     }
 
     @ParameterizedTest
@@ -658,8 +701,8 @@ class JwtAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("만료 정리는 리프레시 만료 사용자만 오프라인으로 바꾸고 유효한 로그인은 유지한다")
-    void cleanup_removesExpiredRefreshAndUpdatesOnlineState() throws Exception {
+    @DisplayName("만료 사용자는 정리 전부터 오프라인이며 정리 후에도 유효한 로그인은 유지한다")
+    void cleanup_removesExpiredRefreshWithoutAffectingValidLogin() throws Exception {
         User expiredUser = createUser();
         ResponseEntity<String> validLogin = login(createUser());
         JwtTokenProvider pastProvider = new JwtTokenProvider(jwtProperties, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
@@ -667,9 +710,9 @@ class JwtAuthenticationIntegrationTest {
         jwtRegistry.registerJwtInformation(new JwtInformation(userMapper.toDto(expiredUser, true),
                 pastProvider.generateAccessToken(expiredUser.getId(), expiredUser.getUsername(), expiredUser.getRole()),
                 expiredRefresh));
-        assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, true);
+        assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, false);
 
-        jwtRegistry.clearExpiredJwtInformation();
+        inMemoryJwtRegistry.clearExpiredJwtInformation();
 
         assertThat(jwtRegistry.hasActiveJwtInformationByUserId(expiredUser.getId())).isFalse();
         assertUserOnline(getUsers(accessToken(validLogin)), expiredUser, false);

@@ -91,18 +91,34 @@ dependencies {
 	// Adobe S3Mock - 로컬에서 진짜 S3 API 를 흉내내는 컨테이너.
 	//   계정/토큰 불필요(LocalStack 은 2026-03 부터 토큰 필요) → S3 연동을 격리·재현 가능하게 테스트.
 	testImplementation 'com.adobe.testing:s3mock-testcontainers:4.11.0'
-
+	testImplementation 'org.testcontainers:postgresql'
 
 	// JJWT - JWT 생성·서명·검증 라이브러리
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	implementation 'org.springframework.retry:spring-retry'
+
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'com.github.ben-manes.caffeine:caffeine'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 	finalizedBy tasks.named('jacocoTestReport')
+}
+
+// k6가 호출할 실제 앱을 테스트 런타임의 H2로 실행한다.
+tasks.named('bootTestRun') {
+	mainClass = 'com.sprint.mission.discodeit.DiscodeitApplication'
+	optimizedLaunch = false
+	maxHeapSize = '512m'
+	systemProperty 'spring.config.location', 'classpath:/application.yml'
+	systemProperty 'spring.profiles.active', 'test,performance'
 }
 
 

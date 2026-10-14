@@ -1,5 +1,6 @@
 package com.sprint.mission.discodeit.service;
 
+import com.sprint.mission.discodeit.events.UserCacheClearEvent;
 import com.sprint.mission.discodeit.dto.command.user.UserCreateCommand;
 import com.sprint.mission.discodeit.dto.command.user.UserRoleUpdateCommand;
 import com.sprint.mission.discodeit.dto.response.UserDto;
@@ -13,7 +14,10 @@ import com.sprint.mission.discodeit.service.basic.UserRoleManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import com.sprint.mission.discodeit.events.RoleUpdatedEvent;
 import org.mockito.InjectMocks;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,6 +34,9 @@ import static org.mockito.BDDMockito.then;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("사용자 역할 변경 컴포넌트 단위 테스트")
 class UserRoleManagerTest {
+
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     UserRoleManager userRoleManager;
@@ -93,7 +100,29 @@ class UserRoleManagerTest {
 
         then(userRepository).should().findById(userId);
         then(userMapper).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
         then(jwtRegistry).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void updateRole_publishesPreviousAndNewRoleForActualUser() {
+        User user = com.sprint.mission.discodeit.support.NotificationTestFixtures.identified(createUser());
+        given(userRepository.findById(user.getId())).willReturn(Optional.of(user));
+        userRoleManager.updateRole(user.getId(), new UserRoleUpdateCommand(Role.CHANNEL_MANAGER));
+        ArgumentCaptor<RoleUpdatedEvent> event = ArgumentCaptor.forClass(RoleUpdatedEvent.class);
+        then(eventPublisher).should().publishEvent(event.capture());
+        assertThat(event.getValue()).isEqualTo(new RoleUpdatedEvent(user.getId(), Role.USER, Role.CHANNEL_MANAGER));
+        assertThat(user.getRole()).isEqualTo(Role.CHANNEL_MANAGER);
+    }
+
+    @Test
+    void updateRole_invalidatesUserCacheWithoutNotificationWhenRoleIsUnchanged() {
+        User user = createUser();
+        UUID userId = UUID.randomUUID();
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        userRoleManager.updateRole(userId, new UserRoleUpdateCommand(Role.USER));
+        then(eventPublisher).should().publishEvent(new UserCacheClearEvent(userId));
+        then(eventPublisher).should(org.mockito.Mockito.never()).publishEvent(org.mockito.ArgumentMatchers.any(RoleUpdatedEvent.class));
     }
 
     private User createUser() {
