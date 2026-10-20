@@ -623,7 +623,7 @@ class UserServiceTest {
 
             UserUpdateCommand updateCommand = createUpdateCommand();
 
-            BinaryContentDto newProfile = new BinaryContentDto(newProfileId, newFile.getOriginalFilename(), newFile.getSize(), newFile.getContentType());
+            BinaryContentDto newProfile = new BinaryContentDto(newProfileId, newFile.getOriginalFilename(), newFile.getSize(), newFile.getContentType(), newProfileContent.getStatus());
             UserDto expectedDto = createExpectedDto(userId, updateCommand, false, newProfile);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
@@ -680,7 +680,7 @@ class UserServiceTest {
 
             UserUpdateCommand updateCommand = createUpdateCommand();
 
-            BinaryContentDto profileDto = new BinaryContentDto(profileId, profile.getOriginalFileName(), profile.getSize(), profile.getContentType());
+            BinaryContentDto profileDto = new BinaryContentDto(profileId, profile.getOriginalFileName(), profile.getSize(), profile.getContentType(), profile.getStatus());
             UserDto expectedDto = createExpectedDto(userId, updateCommand, false, profileDto);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(user));
