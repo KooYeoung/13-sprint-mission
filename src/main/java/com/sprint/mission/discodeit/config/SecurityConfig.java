@@ -50,9 +50,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                        // SockJS 전송 경로의 CSRF 검사를 제외한다. 사용자 인증은 STOMP CONNECT에서 수행한다.
+                        .ignoringRequestMatchers("/ws/**")
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+                        // HTTP 핸드셰이크는 열고 이후 CONNECT 인증과 발행·구독 인가는 메시지 인터셉터에서 검사한다.
+                        .requestMatchers( "/ws/**").permitAll()
                         .requestMatchers(
                                 "/api/auth/csrf-token",
                                 "/api/auth/login",
